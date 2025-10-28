@@ -1,0 +1,11 @@
+- Escribir README con paso a paso para descargar el repositorio, abrirlo con Android studio, y deploy en el telefono
+- Escribir paso a paso para el uso de WebRTC con mención al repositorio https://github.com/angel-ayala/webrtc-client-server
+- Verificar que haya un ciclo correcto de iniciar y detener el servicio con MAVLink
+- Verificar que haya un ciclo correcto de iniciar y detener el servicio con WebRTC
+- Implementar SimulationHandler en sdk
+- Implementar MissionController en adapters
+- Implementar métodos para captura de foto y grabación de videos en CameraManager
+- Definir métodos faltantes en CommandController
+- Definir métodos faltantes en MessageController
+- Diseñar pasos para mejorar UI y ViewModels
+

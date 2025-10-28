@@ -1,0 +1,92 @@
+package org.WenuLink.adapters
+
+import android.content.Context
+import android.media.MediaFormat
+import org.WenuLink.sdk.CameraManager
+import org.WenuLink.webrtc.utils.videoBuffer2VideoFrame
+import io.getstream.log.taggedLogger
+import org.webrtc.CapturerObserver
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoCapturer
+import java.nio.ByteBuffer
+import kotlin.math.round
+
+class CameraCapturer : VideoCapturer {
+    data class MediaMetadata(
+        var MEDIA_STREAM_ID: String = "MAVLinkPOLI-${CameraManager.cameraStreamID}",
+        var VIDEO_CAMERA_NAME: String = CameraManager.cameraName,
+        var VIDEO_RESOLUTION_WIDTH: Int = CameraManager.frameWidth,
+        var VIDEO_RESOLUTION_HEIGHT: Int = CameraManager.frameHeight,
+        var FPS: Int = round(CameraManager.frameRate).toInt()
+    )
+
+    companion object {
+        private val logger by taggedLogger("CameraCapturer")
+        fun hasCameraPresent(): Boolean = CameraManager.isConnected()
+    }
+
+    private var context: Context? = null
+    private var observer: CapturerObserver? = null
+
+    private fun processYuvData(
+        mediaFormat: MediaFormat,
+        videoBuffer: ByteBuffer,
+        dataSize: Int,
+        width: Int,
+        height: Int
+    ) {
+        val videoFrame =
+            videoBuffer2VideoFrame(mediaFormat, videoBuffer, width, height)
+        if (videoFrame != null && observer != null) {
+            // If frame captured and observed present, feed it
+            observer!!.onFrameCaptured(videoFrame)
+            videoFrame.release()
+        }
+    }
+
+    override fun initialize(
+        surfaceTextureHelper: SurfaceTextureHelper,
+        applicationContext: Context,
+        capturerObserver: CapturerObserver
+    ) {
+        this.context = applicationContext
+        this.observer = capturerObserver
+    }
+
+    override fun startCapture(width: Int, height: Int, framerate: Int) {
+        // Hook onto the DJI onYuvDataReceived event
+        if (!CameraManager.isConnected()) {
+            logger.e { "No camera connected" }
+            return
+        }
+        CameraManager.startCodecWithCallback(context as Context) { mediaFormat, videoBuffer, dataSize, width, height ->
+            if (videoBuffer != null)
+                this.processYuvData(
+                    mediaFormat,
+                    videoBuffer,
+                    dataSize,
+                    width,
+                    height
+                )
+        }
+    }
+
+    @Throws(InterruptedException::class)
+    override fun stopCapture() {
+        CameraManager.stopCodec()
+    }
+
+    override fun changeCaptureFormat(width: Int, height: Int, framerate: Int) {
+        // Empty on purpose since no different format exists(?)
+    }
+
+    override fun dispose() {
+        // Stop receiving frames on the callback from the decoder
+        observer = null
+
+    }
+
+    override fun isScreencast(): Boolean {
+        return false
+    }
+}
