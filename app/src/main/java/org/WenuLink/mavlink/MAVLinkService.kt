@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.NavigationController
 import kotlin.getValue
 
 class MAVLinkService {
@@ -89,6 +90,7 @@ class MAVLinkService {
         connectionController = ConnectionController(client)
         controllers += connectionController
         controllers += ParameterController(client)
+        controllers += NavigationController(client)
 
         telemetry.registerListenerScope(serviceScope)
 
@@ -172,10 +174,6 @@ class MAVLinkService {
         when (msg.msgid) {
             MAVLINK_MSG_ID_HEARTBEAT -> gcsLastTimestamp = System.currentTimeMillis()
             MAVLINK_MSG_ID_SYSTEM_TIME -> connectionController.sendSystemTime(startTimestamp)
-            // TODO: Unhandled message ID: 43
-            // MAVLINK_MSG_ID_MISSION_REQUEST_LIST -> {}
-            // TODO: Unhandled message ID: 44
-            // MAVLINK_MSG_ID_MISSION_COUNT -> {}
             MAVLINK_MSG_ID_AUTOPILOT_VERSION -> commandController.sendCommandAck(
                 MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                 MAV_RESULT.MAV_RESULT_ACCEPTED
