@@ -162,6 +162,8 @@ class MainActivity : ComponentActivity() {
         val isPermissionsGranted by viewModel.isPermissionsGranted.observeAsState(false)
         val workflowStatus by viewModel.workflowStatus.observeAsState("Idle")
         val isServiceRunning by viewModel.isServiceRunning.observeAsState(false)
+        var isSimulationReady by remember { mutableStateOf(viewModel.isSimulationReady()) }
+        var isSimulationActive by remember { mutableStateOf(viewModel.isSimulationActive()) }
         // DJI
         val isSDKOk by viewModel.isRegistered.observeAsState(false)
         val sdkStatus by viewModel.sdkStatus.observeAsState("Idle")
@@ -210,6 +212,21 @@ class MainActivity : ComponentActivity() {
                         "Start Drone Service"
                     })
                 }
+
+                if (isSimulationReady) {
+                    Button(onClick = {
+                        viewModel.enableSimulation(!isSimulationActive)
+                    }) {
+                        Text(
+                            if (isSimulationActive) {
+                                "Enable simulation"
+                            } else {
+                                "Disable simulation"
+                            }
+                        )
+                    }
+                }
+
                 if (isServiceRunning) {
                     HorizontalDivider()
                     Button(onClick = {

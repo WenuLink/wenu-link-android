@@ -69,6 +69,12 @@ class MAVLinkService {
         endpointAddress = serverAddress
     }
 
+    fun isSimulationReady(): Boolean = telemetry.isSimulationReady()
+
+    fun isSimulationActive(): Boolean = telemetry.isSimulationActive()
+
+    fun enableSimulation(enable: Boolean) = telemetry.enableSimulation(enable)
+
     fun canStartClient(): Boolean = isEnabled
 
     fun getTelemetryFlow(): StateFlow<Boolean> = TelemetryHandler.isDataFlowing

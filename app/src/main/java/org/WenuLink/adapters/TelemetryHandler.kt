@@ -3,6 +3,7 @@ package org.WenuLink.adapters
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
+import org.WenuLink.sdk.SimManager
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -37,6 +38,7 @@ class TelemetryHandler {
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private lateinit var handlerScope: CoroutineScope //(Dispatchers.Main + Job())
     @Volatile private var lastTelemetryData: TelemetryData? = null
+    @Volatile private var runSimulation: Boolean = false
 
     fun checkReadiness(
         delayTime: Long = 100,
@@ -74,7 +76,23 @@ class TelemetryHandler {
         lastTelemetryData = telemetry
     }
 
-    fun registerStateListeners(register: Boolean) {
+    fun isSimulationReady(): Boolean = SimManager.isAvailable()
+
+    fun isSimulationActive(): Boolean = SimManager.isActive()
+
+    fun enableSimulation(enable: Boolean) {
+        if (isSimulationReady()) runSimulation = enable
+        else logger.e { "Unable to set, Simulation is not available." }
+    }
+
+    fun registerSimState(register: Boolean) {
+        if (register) SimManager.registerStateCallback { state ->
+                updateTelemetryData(SimManager.state2telemetry(state))
+            }
+        else SimManager.unregisterStateCallback()
+    }
+
+    fun registerRealState(register: Boolean) {
         if (!AircraftManager.isAircraftConnected()) {
             logger.w { "Aircraft not connected. Not ready for telemetry." }
             return
@@ -84,6 +102,11 @@ class TelemetryHandler {
             updateTelemetryData(FCManager.state2telemetry(state))
         }
         else FCManager.unregisterStateCallback()
+    }
+
+    fun registerStateListeners(register: Boolean) {
+        if (runSimulation) registerSimState(register)
+        else registerRealState(register)
     }
 
     @Synchronized
@@ -118,6 +141,17 @@ class TelemetryHandler {
         else AircraftManager.stopListeners()
     }
 
+    fun listenSimulation(listen: Boolean) {
+        if (listen) SimManager.run { error ->
+            if (error == null) logger.i { "Simulation is running" }
+            else logger.e { "Unable to start simulation $error" }
+        }
+        else SimManager.stop { error ->
+            if (error == null) logger.i { "Simulation is stop" }
+            else logger.e { "Unable to stop simulation $error" }
+        }
+    }
+
     fun registerListenerScope(serviceScope: CoroutineScope) {
         handlerScope = serviceScope
 
@@ -126,7 +160,10 @@ class TelemetryHandler {
             .launchIn(handlerScope)
 
         isListeningAircraft.distinctUntilChangedBy { it }
-            .onEach { listenAircraft(it) }
+            .onEach {
+                if (runSimulation) listenSimulation(it)
+                else listenAircraft(it)
+            }
             .launchIn(handlerScope)
 
         isDataFlowing.distinctUntilChangedBy { it }
@@ -139,8 +176,9 @@ class TelemetryHandler {
     }
 
     fun hasListenersData(): Boolean {
-        // must always exist RC and AircraftS
-        return RCManager.isUpdated().and(AircraftManager.isUpdated())
+        // must always exist RC
+        return RCManager.isUpdated().and(
+            if (!runSimulation) AircraftManager.isUpdated() else SimManager.isActive())
     }
 
     fun start(start: Boolean, onResult: (Boolean, String?) -> Unit) {

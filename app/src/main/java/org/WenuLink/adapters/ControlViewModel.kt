@@ -148,4 +148,12 @@ class ControlViewModel : ViewModel() {
             WebRTCService.runProcess(isRunning)
         }
     }
+
+    fun isSimulationReady(): Boolean = mavlink.isSimulationReady()
+
+    fun isSimulationActive(): Boolean = mavlink.isSimulationActive()
+
+    fun enableSimulation(enable: Boolean) {
+        mavlink.enableSimulation(enable)
+    }
 }
