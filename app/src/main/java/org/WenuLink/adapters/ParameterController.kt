@@ -14,11 +14,14 @@ import com.MAVLink.common.msg_param_value
 import com.MAVLink.enums.MAV_PARAM_TYPE
 import kotlin.math.round
 
-// TODO: make available only supported features
+/**
+ * MAVLinkController class to deal with the parameters service and related MAVLink messages.
+ * https://mavlink.io/en/services/parameter.html
+ */
 class ParameterController (
     private var client: MAVLinkClient
 ) : MAVLinkController {
-
+    // TODO: make available only supported features
     enum class Parameter {
         //    DJI_LED_ENABLED,
         DJI_SPIN_ENABLED,
@@ -91,8 +94,8 @@ class ParameterController (
             Log.w(TAG, "updateParameter: parameter not found (${paramMsg})")
             return
         }
-        update(paramID, round(paramMsg.param_value).toInt()) { success ->
-            if (success) {
+        update(paramID, round(paramMsg.param_value).toInt()) { error ->
+            if (error == null) {
                 sendParameter(paramID, round(paramMsg.param_value).toInt())
             }
         }
@@ -193,7 +196,7 @@ class ParameterController (
         }
     }
 
-    private fun update(paramID: Parameter, paramValue: Int, onResult: (Boolean) -> Unit) {
+    private fun update(paramID: Parameter, paramValue: Int, onResult: (String?) -> Unit) {
         when (paramID) {
             Parameter.DJI_SPIN_ENABLED -> flightController.setAutoQuickSpinEnabled(
                 paramValue > 0,
@@ -259,19 +262,19 @@ class ParameterController (
                 flightController.setRollPitchControlMode(
                     SDKUtils.int2RollPitchControlMode(paramValue)
                 )
-                onResult(true)
+                onResult(null)
             }
 
             Parameter.DJI_VERT_MODE -> {
                 flightController.setVerticalControlMode(
                     SDKUtils.int2VerticalControlMode(paramValue)
                 )
-                onResult(true)
+                onResult(null)
             }
 
             Parameter.DJI_YAW_MODE -> {
                 flightController.setYawControlMode(SDKUtils.int2YawControlMode(paramValue))
-                onResult(true)
+                onResult(null)
             }
         }
     }

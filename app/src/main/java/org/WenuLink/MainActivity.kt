@@ -62,10 +62,9 @@ class MainActivity : ComponentActivity() {
 
     private val controlViewModel: ControlViewModel by viewModels()
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermissions() {
         controlViewModel.updateWorkflow("Checking permissions")
-        val permissionsList = arrayOf(
+        var permissionsList = arrayOf(
             Manifest.permission.VIBRATE,
             Manifest.permission.INTERNET,
             Manifest.permission.ACCESS_WIFI_STATE,
@@ -77,9 +76,15 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.FOREGROUND_SERVICE,
-            Manifest.permission.POST_NOTIFICATIONS,
         )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            permissionsList += arrayOf(Manifest.permission.FOREGROUND_SERVICE)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsList += arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         val missingPermissions = permissionsList.filter {
             ContextCompat.checkSelfPermission(applicationContext, it) != PackageManager.PERMISSION_GRANTED
@@ -106,9 +111,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            checkAndRequestPermissions()
-        }
+        checkAndRequestPermissions()
 
         enableEdgeToEdge()
         setContent {

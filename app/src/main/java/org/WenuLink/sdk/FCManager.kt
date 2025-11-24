@@ -2,6 +2,7 @@ package org.WenuLink.sdk
 
 import org.WenuLink.adapters.TelemetryData
 import dji.common.error.DJIError
+import dji.common.flightcontroller.FlightControllerState
 import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
@@ -15,7 +16,6 @@ object FCManager {
         private set
     @Volatile private var serialNumber: String? = null
     @Volatile private var fwVersion: String? = null
-    @Volatile private var lastTelemetryData: TelemetryData? = null
 
     @Synchronized
     fun updateSerialNumber(sn: String) {
@@ -64,54 +64,45 @@ object FCManager {
 
     override fun toString(): String {
         return if (!isConnected()) {
-            val sn = "SN:" + if (serialNumber != null) serialNumber else "N/A"
-            val fw = "FW:" + if (fwVersion != null) fwVersion else "N/A"
+            val sn = "SN: " + if (serialNumber != null) serialNumber else "N/A"
+            val fw = "FW: " + if (fwVersion != null) fwVersion else "N/A"
             if (serialNumber != null && fwVersion != null) {
-                "FlightController SN: $sn - FW:$fw"
+                "FlightController $sn - $fw"
             } else
                 "Reading FlightController"
         } else "No FlightController"
     }
 
-    @Synchronized
-    fun getTelemetryData(): TelemetryData? {
-        return lastTelemetryData
+    fun state2telemetry(state: FlightControllerState): TelemetryData {
+        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
+        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(state.flightMode)
+        return TelemetryData(
+            roll = state.attitude.roll,
+            pitch = state.attitude.pitch,
+            yaw = state.attitude.yaw,
+            latitude = state.aircraftLocation.latitude,
+            longitude = state.aircraftLocation.longitude,
+            altitude = state.aircraftLocation.altitude,
+            velocityX = state.velocityX,
+            velocityY = state.velocityY,
+            velocityZ = state.velocityZ,
+            flightTime = state.flightTimeInSeconds,
+            flightMode = customMode,
+            flightGuided = guidedFlag,
+            takeOffAltitude = state.takeoffLocationAltitude,
+            isFlying = state.isFlying,
+            motorsOn = state.areMotorsOn(),
+            satelliteCount = state.satelliteCount,
+            gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+        )
     }
 
-    @Synchronized
-    private fun updateTelemetryData(telemetry: TelemetryData?) {
-        lastTelemetryData = telemetry
+    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
+        fcInstance?.setStateCallback(stateCallback)
     }
 
-    fun startReadingState() {
-        fcInstance?.setStateCallback { state ->
-            val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(state.flightMode)
-            val telemetryData = TelemetryData(
-                roll = state.attitude.roll,
-                pitch = state.attitude.pitch,
-                yaw = state.attitude.yaw,
-                latitude = state.aircraftLocation.latitude,
-                longitude = state.aircraftLocation.longitude,
-                altitude = state.aircraftLocation.altitude,
-                velocityX = state.velocityX,
-                velocityY = state.velocityY,
-                velocityZ = state.velocityZ,
-                flightTime = state.flightTimeInSeconds,
-                flightMode = customMode,
-                flightGuided = guidedFlag,
-                takeOffAltitude = state.takeoffLocationAltitude,
-                isFlying = state.isFlying,
-                motorsOn = state.areMotorsOn(),
-                satelliteCount = state.satelliteCount,
-                gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
-            )
-            updateTelemetryData(telemetryData)
-        }
-    }
-
-    fun stopReadingState() {
-        fcInstance?.setStateCallback { null }
-        updateTelemetryData(null)
+    fun unregisterStateCallback() {
+        fcInstance?.setStateCallback(null)
     }
 
     fun getHomePosition(): Triple<Double, Double, Int>? {
@@ -128,10 +119,15 @@ object FCManager {
         )
     }
 
+    fun getCurrentLocation(): Pair<Double?, Double?> {
+        return Pair(fcInstance?.state?.aircraftLocation?.latitude,
+            fcInstance?.state?.aircraftLocation?.longitude)
+    }
+
     fun setHomePosition(
         latitude: Double? = null,
         longitude: Double? = null,
-        onResult: (Boolean) -> Unit
+        onResult: (String?) -> Unit
     ) {
         if (latitude != null && longitude != null) {
             fcInstance?.setHomeLocation(
@@ -143,6 +139,14 @@ object FCManager {
                 SDKUtils.createCompletionCallback(onResult)
             )
         }
+    }
+
+    fun simpleTakeoff(onResult: (String?) -> Unit) {
+        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+    }
+
+    fun simpleLanding(onResult: (String?) -> Unit) {
+        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
     }
 
 }

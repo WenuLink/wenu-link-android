@@ -13,7 +13,7 @@ import kotlin.math.round
 
 class CameraCapturer : VideoCapturer {
     data class MediaMetadata(
-        var MEDIA_STREAM_ID: String = "MAVLinkPOLI-${CameraManager.cameraStreamID}",
+        var MEDIA_STREAM_ID: String = "WenuLink-${CameraManager.cameraStreamID}",
         var VIDEO_CAMERA_NAME: String = CameraManager.cameraName,
         var VIDEO_RESOLUTION_WIDTH: Int = CameraManager.frameWidth,
         var VIDEO_RESOLUTION_HEIGHT: Int = CameraManager.frameHeight,

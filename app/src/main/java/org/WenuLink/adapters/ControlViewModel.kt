@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 class ControlViewModel : ViewModel() {
 
-    private val mavlink = MAVLinkService.Companion.getInstance()
+    private val mavlink = MAVLinkService.getInstance()
 
     private val _isPermissionsGranted = MutableLiveData<Boolean>()
     val isPermissionsGranted: LiveData<Boolean> = _isPermissionsGranted
@@ -48,8 +48,8 @@ class ControlViewModel : ViewModel() {
 //    private val _isDataFlowing = MutableStateFlow(false)
     val isDataFlowing: StateFlow<Boolean> = mavlink.getTelemetryFlow()
 
-    val isMAVLinkRunning: StateFlow<Boolean> = MAVLinkService.Companion.isRunning
-    val isWebRTCRunning: StateFlow<Boolean> = WebRTCService.Companion.isRunning
+    val isMAVLinkRunning: StateFlow<Boolean> = MAVLinkService.isRunning
+    val isWebRTCRunning: StateFlow<Boolean> = WebRTCService.isRunning
 
     fun updatePermission(granted: Boolean) {
         _isPermissionsGranted.postValue(granted)
@@ -128,8 +128,8 @@ class ControlViewModel : ViewModel() {
     }
 
     fun runService(run: Boolean, context: Context) {
-        if (run) DroneService.Companion.start(context)
-        else DroneService.Companion.stop(context)
+        if (run) DroneService.start(context)
+        else DroneService.stop(context)
         _isServiceRunning.postValue(run)
     }
 
@@ -137,7 +137,7 @@ class ControlViewModel : ViewModel() {
         // TODO: Update GCS server address from user input
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
-            MAVLinkService.Companion.runProcess(isRunning)
+            MAVLinkService.runProcess(isRunning)
         }
     }
 
@@ -145,7 +145,7 @@ class ControlViewModel : ViewModel() {
         // TODO: Update signaling server address from user input
         // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
         viewModelScope.launch {
-            WebRTCService.Companion.runProcess(isRunning)
+            WebRTCService.runProcess(isRunning)
         }
     }
 }

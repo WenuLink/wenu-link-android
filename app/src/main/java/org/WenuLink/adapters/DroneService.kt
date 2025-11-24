@@ -68,7 +68,7 @@ class DroneService : Service() {
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
-            MainActivity.Companion.getIntent(applicationContext),
+            MainActivity.getIntent(applicationContext),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -108,10 +108,10 @@ class DroneService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startWebRTC() {
-        if (!WebRTCService.Companion.isEnabled) {
+        if (!WebRTCService.isEnabled) {
             return  // silently omit
         }
-        webRTC = WebRTCService.Companion.getInstance()
+        webRTC = WebRTCService.getInstance()
 
         if (!webRTC.canStartClient()) {
             Log.e(TAG, "WebRTC client not ready, check if is enabled and a camera is present.")
@@ -119,7 +119,7 @@ class DroneService : Service() {
         }
 
         webRTC.startClient(serviceScope, applicationContext)
-        WebRTCService.Companion.runProcess(true) // autostart
+        WebRTCService.runProcess(true) // autostart
         Log.i(TAG, "WebRTC service started")
     }
 
@@ -130,10 +130,10 @@ class DroneService : Service() {
     }
 
     private fun startMAVLink() {
-        if (!MAVLinkService.Companion.isEnabled) {
+        if (!MAVLinkService.isEnabled) {
             return  // silently omit
         }
-        mavlink = MAVLinkService.Companion.getInstance()
+        mavlink = MAVLinkService.getInstance()
 
         if (!mavlink.canStartClient()) {
             Log.e(TAG, "MAVLink client not ready, check if is enabled.")
@@ -141,7 +141,7 @@ class DroneService : Service() {
         }
 
         mavlink.startClient(serviceScope)
-        MAVLinkService.Companion.runProcess(true) // autostart
+        MAVLinkService.runProcess(true) // autostart
         Log.i(TAG, "MAVLink service started")
     }
 

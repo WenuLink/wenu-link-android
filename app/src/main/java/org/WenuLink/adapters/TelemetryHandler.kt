@@ -36,6 +36,7 @@ class TelemetryHandler {
     private val _isListeningAircraft = MutableStateFlow(false)
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private lateinit var handlerScope: CoroutineScope //(Dispatchers.Main + Job())
+    @Volatile private var lastTelemetryData: TelemetryData? = null
 
     fun checkReadiness(
         delayTime: Long = 100,
@@ -58,65 +59,54 @@ class TelemetryHandler {
         }
     }
 
+    @Synchronized
+    fun hasTelemetryData(): Boolean {
+        return lastTelemetryData != null
+    }
 
     @Synchronized
-    fun run() {
-        if (!FCManager.isConnected()) {
-            logger.w { "Flight controller not present. Not ready for telemetry." }
-            return
-        }
+    fun getTelemetryData(): TelemetryData? {
+        return lastTelemetryData
+    }
 
+    @Synchronized
+    private fun updateTelemetryData(telemetry: TelemetryData?) {
+        lastTelemetryData = telemetry
+    }
+
+    fun registerStateListeners(register: Boolean) {
         if (!AircraftManager.isAircraftConnected()) {
             logger.w { "Aircraft not connected. Not ready for telemetry." }
             return
         }
 
-        if (isFlowing()) {
+        if (register) FCManager.registerStateCallback { state ->
+            updateTelemetryData(FCManager.state2telemetry(state))
+        }
+        else FCManager.unregisterStateCallback()
+    }
+
+    @Synchronized
+    fun run() {
+        if (hasTelemetryData()) {
             logger.w { "Telemetry already flowing!" }
             return
         }
 
         logger.i { "Starting Telemetry." }
-        FCManager.startReadingState()
+        registerStateListeners(true)
     }
 
     @Synchronized
     fun stop() {
-        if (!isFlowing()) {
+        if (!hasTelemetryData()) {
+            logger.w { "No telemetry data to stop!" }
             return
         }
         logger.i { "Stopping Telemetry." }
-        FCManager.stopReadingState()
+        registerStateListeners(false)
+        updateTelemetryData(null)
     }
-
-    @Synchronized
-    fun getRecent(): TelemetryData? = FCManager.getTelemetryData()
-
-    fun registerListenerScope(serviceScope: CoroutineScope) {
-        handlerScope = serviceScope
-
-        if (RCManager.isRCConnected()) {
-            isListeningRC.distinctUntilChangedBy { it }
-                .onEach { listenRemoteController(it) }
-                .launchIn(handlerScope)
-        }
-        if (AircraftManager.isAircraftConnected()) {
-            isListeningAircraft.distinctUntilChangedBy { it }
-                .onEach { listenAircraft(it) }
-                .launchIn(handlerScope)
-        }
-
-        // Non-blocking logs of your flows
-        isDataFlowing.distinctUntilChangedBy { it }
-            .onEach {
-                if (it) run()
-                else stop()
-                logger.d { "isDataFlowing: $it" }
-            }
-            .launchIn(handlerScope)
-    }
-
-    fun getRCData(): RCData? = RCManager.getHardwareData()
 
     fun listenRemoteController(listen: Boolean) {
         if (listen) RCManager.startListeners()
@@ -128,47 +118,60 @@ class TelemetryHandler {
         else AircraftManager.stopListeners()
     }
 
-    fun startListening(start: Boolean) {
-        handlerScope.launch {
-            _isListeningRC.value = start
-            _isListeningAircraft.value = start
-        }
+    fun registerListenerScope(serviceScope: CoroutineScope) {
+        handlerScope = serviceScope
+
+        isListeningRC.distinctUntilChangedBy { it }
+            .onEach { listenRemoteController(it) }
+            .launchIn(handlerScope)
+
+        isListeningAircraft.distinctUntilChangedBy { it }
+            .onEach { listenAircraft(it) }
+            .launchIn(handlerScope)
+
+        isDataFlowing.distinctUntilChangedBy { it }
+            .onEach {
+                if (it) run()
+                else stop()
+                logger.d { "isDataFlowing: $it" }
+            }
+            .launchIn(handlerScope)
     }
 
-    fun hasUpdatedData(): Boolean {
-        return RCManager.isUpdated() && AircraftManager.isUpdated()
-    }
-
-    fun isFlowing(): Boolean {
-        return getRecent() != null
+    fun hasListenersData(): Boolean {
+        // must always exist RC and AircraftS
+        return RCManager.isUpdated().and(AircraftManager.isUpdated())
     }
 
     fun start(start: Boolean, onResult: (Boolean, String?) -> Unit) {
+        _isListeningRC.value = start
+        _isListeningAircraft.value = start
+
         if (start) {
-            startListening(true)
             handlerScope.launch {
-                checkReadiness(isReady = ::hasUpdatedData) { success ->
+                checkReadiness(isReady = ::hasListenersData) { success ->
                     if (success) {
                         _isDataFlowing.value = true
                     } else {
                         onResult(false, "Telemetry cannot start yet!") // Indicate failure
                     }
                 }
-                checkReadiness(isReady = ::isFlowing) { success ->
+                checkReadiness(isReady = ::hasTelemetryData) { success ->
                     if (success) {
                         onResult(true, null) // Indicate success
                     } else {
-                        onResult(false, "Telemetry cannot flow yet!") // Indicate failure
+                        onResult(false, "No telemetry captured yet!") // Indicate failure
                     }
                 }
             }
         }
         else {
             _isDataFlowing.value = false
-            startListening(false)
             onResult(true, null) // Indicate success
         }
     }
+
+    fun getRCData(): RCData? = RCManager.getHardwareData()
 
     fun getAircraftBattery(): BatteryData = AircraftManager.getBatteryData()
 
@@ -177,9 +180,9 @@ class TelemetryHandler {
         val homeLocation = FCManager.getHomePosition()
         if (homeLocation == null){
             logger.i { "Home position not set, trying current aircraft position." }
-            FCManager.setHomePosition { success ->
-                if (success) logger.i { "Home position set OK" }
-                else logger.w { "Unable to set home position" }
+            FCManager.setHomePosition { error ->
+                if (error == null) logger.i { "Home position set OK" }
+                else logger.w { "Unable to set home position: $error" }
             }
         }
         return homeLocation

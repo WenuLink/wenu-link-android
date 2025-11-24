@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbManager
+import android.os.Build
 import android.util.Log
 
 import org.WenuLink.sdk.SDKManager
@@ -33,6 +34,7 @@ class WenuLinkApp : Application() {
         Log.i(TAG, "STARTING..")
         if (!SDKManager.isContextAttached) {
             Log.e(TAG, "Fatal error: SDK context not attached!")
+            return
         }
         // Register to listen for USB attach/detach
         val filter = IntentFilter().apply {
@@ -40,7 +42,13 @@ class WenuLinkApp : Application() {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
-        registerReceiver(usbReceiver, filter)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, RECEIVER_EXPORTED)
+        }
+        else {
+            registerReceiver(usbReceiver, filter)
+        }
 
         AndroidStreamLogger.installOnDebuggableApp(this)
     }

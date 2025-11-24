@@ -99,4 +99,8 @@ class MAVLinkClient(
             }
         }
     }
+
+    fun isTargetSystem(targetID: Short): Boolean {
+        return systemID.toShort() == targetID
+    }
 }

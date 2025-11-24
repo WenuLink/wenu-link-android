@@ -29,11 +29,15 @@ import kotlin.experimental.or
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+/**
+ * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink messages.
+ *
+ * https://mavlink.io/en/services/heartbeat.html
+ */
 class ConnectionController (
     private var client: MAVLinkClient
 ) : MAVLinkController {
     private val TAG: String = ConnectionController::class.java.simpleName
-
 
     override fun processMessage(msg: MAVLinkMessage) {
         when (msg.msgid) {
@@ -165,8 +169,10 @@ class ConnectionController (
 
     fun sendRadioStatus() {
         val msg = msg_radio_status()
-        msg.rssi = 0 // TODO: work out units conversion maybe from airlink?
-        msg.remrssi = 0
+        // DJI represent the signal quality in percent with range [0, 100], where 100 is the best quality.
+        // MAVLink uses [0, 254] as uint8_t
+        msg.rssi = 0 // TODO: work out units conversion maybe from AirLink's DownLinkSignalQuality
+        msg.remrssi = 0 // TODO: work out units conversion from AirLink's UpLinkSignalQuality
         client.sendMessage(msg)
     }
 

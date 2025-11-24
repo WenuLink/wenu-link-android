@@ -12,13 +12,18 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_protocol_version
 import com.MAVLink.minimal.msg_protocol_version.MAVLINK_MSG_ID_PROTOCOL_VERSION
 
+/**
+ * MAVLinkController class to deal with the command service and related MAVLink messages.
+ *
+ * https://mavlink.io/en/services/command.html
+ *
+ * https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#incoming-commands
+ */
 class CommandController (
     private var client: MAVLinkClient
 ) : MAVLinkController {
     private val TAG: String = CommandController::class.java.simpleName
 
-    // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#incoming-commands
-    // https://mavlink.io/en/services/command.html
     override fun processMessage(msg: MAVLinkMessage) {
         val longMsg = msg as msg_command_long
         if (longMsg.target_system != 0.toShort() && longMsg.target_system != client.systemID.toShort()) {

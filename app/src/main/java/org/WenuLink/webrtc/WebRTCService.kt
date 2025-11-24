@@ -101,7 +101,7 @@ class WebRTCService {
         )
     }
 
-    fun canStartClient(): Boolean = CameraCapturer.Companion.hasCameraPresent() && isEnabled
+    fun canStartClient(): Boolean = CameraCapturer.hasCameraPresent() && isEnabled
 
     fun startClient(serviceScope: CoroutineScope, context: Context) {
         if (!isEnabled) {

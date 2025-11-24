@@ -54,7 +54,7 @@ class MAVLinkService {
     private val telemetry: TelemetryHandler = TelemetryHandler.getInstance()
     private lateinit var commandController: CommandController
     private lateinit var connectionController: ConnectionController
-    private var controllers: List<MAVLinkController> = emptyList<MAVLinkController>()
+    private var controllers: List<MAVLinkController> = emptyList()
     private var ticks: Long = 0
     private lateinit var serviceScope: CoroutineScope
     private var runningJob: Job? = null
@@ -166,8 +166,9 @@ class MAVLinkService {
     // https://mavlink.io/en/services/
     fun messageCallback(msg: MAVLinkMessage) {
         Log.i(TAG, "Processing MAVLink message ID: ${msg.msgid}")
-        // Process other message Controllers
+        // Process message with registered Controllers
         controllers.forEach { it.processMessage(msg) }
+        // Process other messages
         when (msg.msgid) {
             MAVLINK_MSG_ID_HEARTBEAT -> gcsLastTimestamp = System.currentTimeMillis()
             MAVLINK_MSG_ID_SYSTEM_TIME -> connectionController.sendSystemTime(startTimestamp)
@@ -196,7 +197,7 @@ class MAVLinkService {
             return
         }
 
-        val telemetryData = telemetry.getRecent() ?: run {
+        val telemetryData = telemetry.getTelemetryData() ?: run {
             Log.w(TAG, "No telemetry data yet!")
             return
         }

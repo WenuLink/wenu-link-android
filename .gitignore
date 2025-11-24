@@ -181,4 +181,4 @@ logs*
 # android
 .gradle
 .idea
-*.properties
+local.properties

@@ -64,12 +64,12 @@ object SDKUtils {
         return result
     }
 
-    fun createCompletionCallback(onResult: (Boolean) -> Unit): CommonCallbacks.CompletionCallback<DJIError> {
+    fun createCompletionCallback(onResult: (String?) -> Unit): CommonCallbacks.CompletionCallback<DJIError> {
         return CommonCallbacks.CompletionCallback<DJIError> { error ->
-            if (error == null) onResult(true)
+            if (error == null) onResult(null)
             else {
                 Log.e("SDKUtils", "CompletionCallback onFailure $error")
-                onResult(false)
+                onResult(error.description)
             }
         }
     }
