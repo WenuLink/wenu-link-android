@@ -46,11 +46,11 @@ class MAVLinkService {
     private val logger by taggedLogger("MAVLinkService")
 
     private val TAG: String = MAVLinkService::class.java.simpleName
-    private var startCallback: (Boolean, String?) -> Unit = { s, e -> }
-    private var stopCallback: (Boolean, String?) -> Unit = { s, e -> }
+    private var startCallback: (String?) -> Unit = { error -> }
+    private var stopCallback: (String?) -> Unit = { error -> }
     private lateinit var client: MAVLinkClient
     private var gcsLastTimestamp: Long = 0
-    private var startTimestamp = 0L
+    private var startTimestamp: Long = 0
     private val telemetry: TelemetryHandler = TelemetryHandler.getInstance()
     private lateinit var commandController: CommandController
     private lateinit var connectionController: ConnectionController
@@ -100,17 +100,8 @@ class MAVLinkService {
 
         isRunning.distinctUntilChangedBy { it }
             .onEach {
-                if (it) {
-                    telemetry.start(true) { success, error ->
-                        // Only start client after telemetry
-                        if (success) run()
-                    }
-                }
-                else {
-                    stop()
-                    // stop telemetry at the end
-                    telemetry.start(false) { s, e -> }
-                }
+                if (it) run()
+                else stop()
                 logger.d { "isRunning: $it" }
             }
             .launchIn(this.serviceScope)
@@ -118,12 +109,33 @@ class MAVLinkService {
         logger.d { "MAVLinkClient initialized for ${targetIp}:${targetPort}" }
     }
 
-    fun registerStartCallback(onResult: (Boolean, String?) -> Unit) {
+    fun registerStartCallback(onResult: (String?) -> Unit) {
         startCallback = onResult
     }
 
-    fun registerStopCallback(onResult: (Boolean, String?) -> Unit) {
+    fun registerStopCallback(onResult: (String?) -> Unit) {
         stopCallback = onResult
+    }
+
+    private fun createClientJob() {
+        runningJob = serviceScope.launch {
+            client.start { success, error ->
+                startTimestamp = System.currentTimeMillis()
+                ticks = 0
+                isServiceUp = success
+                logger.d { "MAVLinkClient's up $isServiceUp" }
+                startCallback(error)
+            }
+            while (isActive) {
+                try {
+                    tick(delayTime)
+                } catch (e: Exception) {
+                    logger.e { "Error in data tick $e" }
+                } finally {
+                    delay(delayTime)
+                }
+            }
+        }
     }
 
     fun run() {
@@ -136,21 +148,10 @@ class MAVLinkService {
             return
         }
 
-        runningJob = serviceScope.launch {
-            client.start { success, error ->
-                startTimestamp = System.currentTimeMillis()
-                isServiceUp = success
-                logger.d { "MAVLinkClient's up $isServiceUp" }
-                startCallback(success, error)
-            }
-            while (isActive) {
-                try {
-                    tick()
-                } catch (e: Exception) {
-                    logger.e {"Error in data tick $e" }
-                }
-                delay(delayTime)
-            }
+        // Only start client after telemetry
+        telemetry.start(true) { error ->
+            if (error == null) createClientJob()
+            else startCallback(error)
         }
     }
 
@@ -158,14 +159,20 @@ class MAVLinkService {
         if (!isEnabled) {
             return
         }
+
+        if (!isServiceUp)
+            return
+        // stopClientJob
         runningJob?.cancel()
         runningJob = null
-        if (isServiceUp)
-            client.stop { success, error ->
-                isServiceUp = !success
+        client.stop { success, error ->
+            if (success) {
+                isServiceUp = false
+                telemetry.start(false, stopCallback)
                 Log.d(TAG, "MAVLinkClient's up $isServiceUp")
-                stopCallback(success, error)
             }
+            else stopCallback(error)
+        }
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
@@ -197,7 +204,7 @@ class MAVLinkService {
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#outgoing-messages
-    fun tick() {
+    fun tick(timeMillis: Long) {
         if (!client.isReady()) {
             Log.e(TAG, "MAVLink client is not ready yet!.")
             return
@@ -208,7 +215,7 @@ class MAVLinkService {
             return
         }
 
-        ticks += delayTime
+        ticks += timeMillis
         if (ticks % 100 == 0L) {
             connectionController.sendAttitude(telemetryData)
             connectionController.sendAltitude(telemetryData)

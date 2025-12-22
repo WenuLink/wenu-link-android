@@ -30,6 +30,7 @@ class TelemetryHandler {
         val isDataFlowing: StateFlow<Boolean> = _isDataFlowing.asStateFlow()
 
     }
+
     private val logger by taggedLogger("TelemetryHandler")
 
     private val _isListeningRC = MutableStateFlow(false)
@@ -73,22 +74,28 @@ class TelemetryHandler {
 
     @Synchronized
     private fun updateTelemetryData(telemetry: TelemetryData?) {
+        logger.w { "Telemetry updated $telemetry!" }
         lastTelemetryData = telemetry
     }
 
-    fun isSimulationReady(): Boolean = SimManager.isAvailable()
+    fun isSimulationReady(): Boolean {
+        logger.i { "isSimulationReady: ${SimManager.isAvailable()}" }
+        return SimManager.isAvailable()
+    }
 
     fun isSimulationActive(): Boolean = SimManager.isActive()
 
     fun enableSimulation(enable: Boolean) {
+        logger.i { "Enable Simulation $enable" }
         if (isSimulationReady()) runSimulation = enable
         else logger.e { "Unable to set, Simulation is not available." }
     }
 
     fun registerSimState(register: Boolean) {
+        logger.w { "registerSimState $register" }
         if (register) SimManager.registerStateCallback { state ->
-                updateTelemetryData(SimManager.state2telemetry(state))
-            }
+            updateTelemetryData(SimManager.state2telemetry(state))
+        }
         else SimManager.unregisterStateCallback()
     }
 
@@ -98,6 +105,8 @@ class TelemetryHandler {
             return
         }
 
+        logger.w { "registerRealState $register" }
+
         if (register) FCManager.registerStateCallback { state ->
             updateTelemetryData(FCManager.state2telemetry(state))
         }
@@ -105,30 +114,9 @@ class TelemetryHandler {
     }
 
     fun registerStateListeners(register: Boolean) {
+        logger.w { "registerStateListeners runSimulation: $runSimulation" }
         if (runSimulation) registerSimState(register)
         else registerRealState(register)
-    }
-
-    @Synchronized
-    fun run() {
-        if (hasTelemetryData()) {
-            logger.w { "Telemetry already flowing!" }
-            return
-        }
-
-        logger.i { "Starting Telemetry." }
-        registerStateListeners(true)
-    }
-
-    @Synchronized
-    fun stop() {
-        if (!hasTelemetryData()) {
-            logger.w { "No telemetry data to stop!" }
-            return
-        }
-        logger.i { "Stopping Telemetry." }
-        registerStateListeners(false)
-        updateTelemetryData(null)
     }
 
     fun listenRemoteController(listen: Boolean) {
@@ -147,9 +135,38 @@ class TelemetryHandler {
             else logger.e { "Unable to start simulation $error" }
         }
         else SimManager.stop { error ->
-            if (error == null) logger.i { "Simulation is stop" }
+            if (error == null) logger.i { "Simulation is stopped" }
             else logger.e { "Unable to stop simulation $error" }
         }
+    }
+
+    fun startDataFlow() {
+        logger.w { "startDataFlow()" }
+        if (hasTelemetryData()) {
+            logger.w { "Telemetry already flowing!" }
+            return
+        }
+        // Start processes
+        logger.i { "Starting Telemetry." }
+        _isListeningRC.value = true
+        _isListeningAircraft.value = true
+        // Set listeners
+        registerStateListeners(true)
+    }
+
+    fun stopDataFlow() {
+        logger.w { "stopDataFlow()" }
+        if (!hasTelemetryData()) {
+            logger.w { "No telemetry data to stop!" }
+            return
+        }
+        // Stop processes
+        logger.i { "Stopping Telemetry." }
+        _isListeningRC.value = false
+        _isListeningAircraft.value = false
+        // Clear listeners and data
+        registerStateListeners(false)
+        updateTelemetryData(null)
     }
 
     fun registerListenerScope(serviceScope: CoroutineScope) {
@@ -168,58 +185,64 @@ class TelemetryHandler {
 
         isDataFlowing.distinctUntilChangedBy { it }
             .onEach {
-                if (it) run()
-                else stop()
+                if (it) startDataFlow()
+                else stopDataFlow()
                 logger.d { "isDataFlowing: $it" }
             }
             .launchIn(handlerScope)
     }
 
-    fun hasListenersData(): Boolean {
-        // must always exist RC
+    fun areListenersRunning(): Boolean {
+        // must exist RC and Aircraft or Simulation
         return RCManager.isUpdated().and(
-            if (!runSimulation) AircraftManager.isUpdated() else SimManager.isActive())
+            if (!runSimulation) AircraftManager.isUpdated() else SimManager.isActive()
+        )
     }
 
-    fun start(start: Boolean, onResult: (Boolean, String?) -> Unit) {
-        _isListeningRC.value = start
-        _isListeningAircraft.value = start
-
+    fun start(start: Boolean, onResult: (String?) -> Unit) {
+        logger.d { "start($start)" }
         if (start) {
-            handlerScope.launch {
-                checkReadiness(isReady = ::hasListenersData) { success ->
-                    if (success) {
-                        _isDataFlowing.value = true
-                    } else {
-                        onResult(false, "Telemetry cannot start yet!") // Indicate failure
+            // Starts and wait for data
+            _isDataFlowing.value = true
+//            handlerScope.launch {
+            // check listeners first
+            checkReadiness(isReady = ::areListenersRunning) { ready ->
+                if (ready)
+                    checkReadiness(isReady = ::hasTelemetryData) { ready ->
+                        // check for data
+                        if (ready)
+                            onResult(null) // Indicate success
+                        else
+                            onResult("No telemetry data received!") // Indicate failure
                     }
-                }
-                checkReadiness(isReady = ::hasTelemetryData) { success ->
-                    if (success) {
-                        onResult(true, null) // Indicate success
-                    } else {
-                        onResult(false, "No telemetry captured yet!") // Indicate failure
-                    }
-                }
+                else onResult("Telemetry cannot start!") // Indicate failure
             }
-        }
-        else {
+//            }
+        } else {
             _isDataFlowing.value = false
-            onResult(true, null) // Indicate success
+            // TODO: check for a successful stop
+            onResult(null) // Indicate success
         }
     }
 
     fun getRCData(): RCData? = RCManager.getHardwareData()
 
-    fun getAircraftBattery(): BatteryData = AircraftManager.getBatteryData()
+    fun getAircraftBattery(): BatteryData {
+        // TODO: Maybe include some custom battery level
+        return if (runSimulation) RCManager.getBatteryData()
+        else AircraftManager.getBatteryData()
+    }
 
     fun getHomePosition(): Triple<Double, Double, Int>? {
         // check for home location and set
-        val homeLocation = FCManager.getHomePosition()
-        if (homeLocation == null){
-            logger.i { "Home position not set, trying current aircraft position." }
+        var homeLocation = FCManager.getHomePosition()
+        if (homeLocation == null) {
+            logger.i { "Home position not set, using current aircraft position." }
             FCManager.setHomePosition { error ->
-                if (error == null) logger.i { "Home position set OK" }
+                if (error == null) {
+                    homeLocation = FCManager.getHomePosition()
+                    logger.i { "Home position set $homeLocation" }
+                }
                 else logger.w { "Unable to set home position: $error" }
             }
         }

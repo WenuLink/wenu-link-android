@@ -39,12 +39,11 @@ class DroneService : Service() {
     private val TAG: String = DroneService::class.java.simpleName
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private lateinit var serviceScope: CoroutineScope
 
     override fun onCreate() {
         super.onCreate()
-        startForegroundServiceWithNotification()
-        startMAVLink()
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     }
 
     private fun startForegroundServiceWithNotification() {
@@ -80,7 +79,7 @@ class DroneService : Service() {
        // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
         // TODO: update according to each present service
         startForeground(1, notification
-            .setContentTitle("MAVLinkPoli is running")
+            .setContentTitle("WenuLink service is running")
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent) // Open MainActivity when tapped
@@ -89,12 +88,21 @@ class DroneService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Initialize MAVLink and WebRTC
+        startMAVLink()
         startWebRTC()
+
+        // Check if any services were successfully initialized
         if (!::mavlink.isInitialized && !::webRTC.isInitialized) {
-            Log.i(TAG, "Unable to start service, MAVLink and WebRTC are disabled.")
-            stopSelf()
+            Log.i(TAG, "Unable to start service, MAVLink and/or WebRTC are disabled.")
+            stopSelf() // Stop the service if initialization fails
+            return START_NOT_STICKY // Return to indicate that the service should not be recreated
         }
-        return START_STICKY
+
+        // Start the foreground service if both services are initialized
+        startForegroundServiceWithNotification()
+
+        return START_STICKY // The service will continue running
     }
 
     override fun onDestroy() {

@@ -114,15 +114,17 @@ class ControlViewModel : ViewModel() {
     }
 
     fun initMAVLinkCallbacks() {
-        mavlink.registerStartCallback { success, message ->
+        mavlink.registerStartCallback { error ->
             viewModelScope.launch {
-                if (success) updateWorkflow("MAVLink Service's up")
+                if (error == null) updateWorkflow("MAVLink Service's up")
+                else updateWorkflow(error)
             }
         }
 
-        mavlink.registerStopCallback { success, message ->
+        mavlink.registerStopCallback { error ->
             viewModelScope.launch {
-                if (success)  updateWorkflow("MAVLink Service's down")
+                if (error == null) updateWorkflow("MAVLink Service's down")
+                else updateWorkflow(error)
             }
         }
     }

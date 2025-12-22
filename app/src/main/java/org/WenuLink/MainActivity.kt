@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -213,19 +212,21 @@ class MainActivity : ComponentActivity() {
                     })
                 }
 
-                if (isSimulationReady) {
+//                if (isSimulationReady) {
+                // TODO: Improve simulation enable/disable UI/UX
                     Button(onClick = {
                         viewModel.enableSimulation(!isSimulationActive)
+                        isSimulationActive = !isSimulationActive
                     }) {
                         Text(
-                            if (isSimulationActive) {
+                            if (!isSimulationActive) {
                                 "Enable simulation"
                             } else {
                                 "Disable simulation"
                             }
                         )
                     }
-                }
+//                }
 
                 if (isServiceRunning) {
                     HorizontalDivider()
