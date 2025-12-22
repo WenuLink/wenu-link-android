@@ -3,26 +3,15 @@
 WenuLink allows you to connect a DJI drone to an Android device, send MAVLink commands and stream the camera feed via WebRTC.
 This guide will help you set up your environment and run the Android app for local testing.
 
-## > Android Studio Setup
+## > Environment Configuration
 
-1. Clone the project:
+Clone the project:
 ```
 git clone https://github.com/angel-ayala/wenu-link-android
 cd WenuLink
 ```
 
-2. Open **Android Studio** → **File → Open**
-   Select the project folder and allow Gradle to sync.
-
-> **Note (recommended build optimization):**  
-> To avoid memory-related build failures, add the following line to both `local.properties` and `gradle.properties`:
->
->     org.gradle.jvmargs=-Xmx4g
-> This line increases the JVM heap size to 4GB, helping to prevent memory-related build failures during Gradle tasks.
-
-## > Environment Configuration
-
-### 1 - DJI SDK API Key
+### DJI SDK API Key
 
 Obtain a valid [DJI Developer API Key](https://developer.dji.com/) and add it to:
 
@@ -36,7 +25,7 @@ Obtain a valid [DJI Developer API Key](https://developer.dji.com/) and add it to
 If the file does not exist, create it manually.
 
 
-### 2️ - WebRTC and GCS Network Setup
+### WebRTC and GCS Network Setup
 
 Update your **local network IP address** in the following source files.
 
