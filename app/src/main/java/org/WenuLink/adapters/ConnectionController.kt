@@ -1,9 +1,6 @@
-package org.WenuLink.mavlink
+package org.WenuLink.adapters
 
 import android.util.Log
-import org.WenuLink.adapters.BatteryData
-import org.WenuLink.adapters.RCData
-import org.WenuLink.adapters.TelemetryData
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_altitude
 import com.MAVLink.common.msg_attitude
@@ -25,6 +22,9 @@ import com.MAVLink.enums.MAV_MODE_FLAG
 import com.MAVLink.enums.MAV_STATE
 import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.minimal.msg_heartbeat
+import kotlinx.coroutines.CoroutineScope
+import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.MAVLinkController
 import kotlin.experimental.or
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -38,6 +38,67 @@ class ConnectionController (
     private var client: MAVLinkClient
 ) : MAVLinkController {
     private val TAG: String = ConnectionController::class.java.simpleName
+    private val telemetry: TelemetryHandler = TelemetryHandler.getInstance()
+    private var ticks: Long = 0
+
+    fun startTelemetry(serviceScope: CoroutineScope, onResult: (String?) -> Unit) {
+        ticks = 0
+        telemetry.registerListenerScope(serviceScope)
+        telemetry.start(true, onResult)
+    }
+
+    fun stopTelemetry(onResult: (String?) -> Unit) {
+        telemetry.start(false, onResult)
+    }
+
+    fun isTelemetryRunning(): Boolean = telemetry.isFlowing()
+
+    // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#outgoing-messages
+    fun tick(timeMillis: Long) {
+        if (!client.isReady()) {
+            Log.e(TAG, "MAVLink client is not ready yet!.")
+            return
+        }
+
+        val telemetryData = telemetry.getTelemetryData() ?: run {
+            Log.w(TAG, "No telemetry data yet!")
+            return
+        }
+
+        ticks += timeMillis
+        if (ticks % 100 == 0L) {
+            sendAttitude(telemetryData)
+            sendAltitude(telemetryData)
+            sendVibration()
+            val rcData = telemetry.getRCData()
+            if (rcData != null)
+                sendHUD(telemetryData, rcData)
+        }
+        if (ticks % 200 == 0L) {
+            sendGlobalPositionInt(telemetryData)
+        }
+        if (ticks % 300 == 0L) {
+            sendRawGPSInt(telemetryData)
+            sendRadioStatus()
+//            checkRCChannels()  // prevent execution in case of RC input received
+        }
+        if (ticks % 1000 == 0L) {
+            sendHeartbeat(telemetryData)
+            sendSysStatus(telemetry.getAircraftBattery())
+            sendPowerStatus()
+            sendBatteryStatus(telemetry.getAircraftBattery())
+//            checkLanding()  // DJI landing callback
+        }
+        if (ticks % 5000 == 0L) {
+            val homePos = telemetry.getHomePosition()
+            if (homePos != null)
+                sendHomePosition(
+                    homePos.first,
+                    homePos.second,
+                    homePos.third
+                )
+        }
+    }
 
     override fun processMessage(msg: MAVLinkMessage) {
         when (msg.msgid) {
@@ -69,10 +130,10 @@ class ConnectionController (
         heartbeat.mavlink_version = 3
         // mode definition
         // For base mode logic, see Copter::sendHeartBeat() in ArduCopter/GCS_Mavlink.cpp
-        val baseMode: Short = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED.toShort()
-        baseMode.or(MAV_MODE_FLAG.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED.toShort())
+        var baseMode: Short = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED.toShort()
+        baseMode = baseMode.or(MAV_MODE_FLAG.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED.toShort())
 
-        if (telemetry.flightGuided) baseMode.or(MAV_MODE_FLAG.MAV_MODE_FLAG_GUIDED_ENABLED.toShort())
+        if (telemetry.flightGuided) baseMode = baseMode.or(MAV_MODE_FLAG.MAV_MODE_FLAG_GUIDED_ENABLED.toShort())
 
         heartbeat.base_mode = baseMode
         heartbeat.custom_mode = telemetry.flightMode.mode

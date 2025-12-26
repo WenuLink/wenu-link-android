@@ -6,13 +6,11 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.WenuLink.webrtc.WebRTCService
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.sdk.SDKManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.StateFlow
 
 class ControlViewModel : ViewModel() {
 
@@ -36,20 +34,8 @@ class ControlViewModel : ViewModel() {
     private val _activationState = MutableLiveData<String>()
     val activationState: LiveData<String> = _activationState
 
-    private val _isServiceRunning = MutableLiveData<Boolean>(mavlink.isServiceUp)
-    val isServiceRunning: LiveData<Boolean> = _isServiceRunning
-
     private val _canRunService = MutableLiveData<Boolean>(mavlink.isServiceUp)
     val canRunService: LiveData<Boolean> = _canRunService
-
-    private val _telemetryData = MutableLiveData<TelemetryData?>()
-    val telemetryData: LiveData<TelemetryData?> = _telemetryData
-
-//    private val _isDataFlowing = MutableStateFlow(false)
-    val isDataFlowing: StateFlow<Boolean> = mavlink.getTelemetryFlow()
-
-    val isMAVLinkRunning: StateFlow<Boolean> = MAVLinkService.isRunning
-    val isWebRTCRunning: StateFlow<Boolean> = WebRTCService.isRunning
 
     fun updatePermission(granted: Boolean) {
         _isPermissionsGranted.postValue(granted)
@@ -111,51 +97,5 @@ class ControlViewModel : ViewModel() {
 
     fun stopSDK(context: Context) {
         SDKManager.destroy(context)
-    }
-
-    fun initMAVLinkCallbacks() {
-        mavlink.registerStartCallback { error ->
-            viewModelScope.launch {
-                if (error == null) updateWorkflow("MAVLink Service's up")
-                else updateWorkflow(error)
-            }
-        }
-
-        mavlink.registerStopCallback { error ->
-            viewModelScope.launch {
-                if (error == null) updateWorkflow("MAVLink Service's down")
-                else updateWorkflow(error)
-            }
-        }
-    }
-
-    fun runService(run: Boolean, context: Context) {
-        if (run) DroneService.start(context)
-        else DroneService.stop(context)
-        _isServiceRunning.postValue(run)
-    }
-
-    fun runMAVLink(isRunning: Boolean) {
-        // TODO: Update GCS server address from user input
-        // mavlink.initClient("192.168.1.220", 14550)
-        viewModelScope.launch {
-            MAVLinkService.runProcess(isRunning)
-        }
-    }
-
-    fun runWebRTC(isRunning: Boolean) {
-        // TODO: Update signaling server address from user input
-        // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
-        viewModelScope.launch {
-            WebRTCService.runProcess(isRunning)
-        }
-    }
-
-    fun isSimulationReady(): Boolean = mavlink.isSimulationReady()
-
-    fun isSimulationActive(): Boolean = mavlink.isSimulationActive()
-
-    fun enableSimulation(enable: Boolean) {
-        mavlink.enableSimulation(enable)
     }
 }

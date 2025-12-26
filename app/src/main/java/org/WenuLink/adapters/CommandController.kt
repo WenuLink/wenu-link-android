@@ -1,4 +1,4 @@
-package org.WenuLink.mavlink
+package org.WenuLink.adapters
 
 import android.util.Log
 import com.MAVLink.Messages.MAVLinkMessage
@@ -11,6 +11,8 @@ import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_protocol_version
 import com.MAVLink.minimal.msg_protocol_version.MAVLINK_MSG_ID_PROTOCOL_VERSION
+import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.MAVLinkController
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
