@@ -55,6 +55,8 @@ object FCManager {
         })
 
         logger.i { "FlightController init" }
+
+        SimManager.init(flightController)
     }
 
     @Synchronized

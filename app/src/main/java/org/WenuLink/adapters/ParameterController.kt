@@ -1,7 +1,6 @@
 package org.WenuLink.adapters
 
 import android.util.Log
-import org.WenuLink.mavlink.CommandController
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.mavlink.MAVLinkController
 import org.WenuLink.sdk.FCManager
@@ -41,7 +40,7 @@ class ParameterController (
         DJI_YAW_MODE
     }
 
-    private val TAG: String = CommandController::class.java.simpleName
+    private val TAG: String = ParameterController::class.java.simpleName
     private val flightController = FCManager.fcInstance!!
 
     override fun processMessage(msg: MAVLinkMessage) {
