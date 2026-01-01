@@ -1,7 +1,5 @@
 # WenuLink
 
-## Introduction
-
 WenuLink is an Android application designed to function as a middleware interface—a software bridge—between DJI drones and Ground Control Stations (GCS) that utilize the MAVLink protocol.
 
 The name **"Wenu"** originates from Mapudungun, the language of the Mapuche people native to southern Chile. In their worldview, *Wenu* means _sky_, _high_, or _above_ (specifically *Wenu Mapu*, the "land above" or celestial world). This name represents the project's core concept: a tool that enables a connection to the sky, expanding drone capabilities for autonomy and visualization.
@@ -42,7 +40,7 @@ WenuLink is developed using **Kotlin** and **Jetpack Compose**, and its architec
 
 For detailed setup instructions (DJI SDK API keys, WebRTC signaling servers, MAVLink endpoints, and Android Studio configuration), please refer to our **Getting Started Guide**:
 
-📄 [_Click here to view the Getting Started Guide_](GettingStarted.md)
+📄 [_Click here to view the Getting Started Guide_](https://github.com/WenuLink/wenu-link-android/wiki/GettingStarted)
 
 ---
 
@@ -59,17 +57,17 @@ WenuLink is designed for:
 ## Team
 
 - **Angel Ayala Maldonado** — PhD in Computational Science at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil; Co-advisor of the [DeltaV Drones](https://deltavquad.github.io/) team.
-- **Max Johenneken** — Researcher at the Hochschule Bonn-Rhein-Sieg (H-BRS), Germany; specialization in UAV systems, machine learning and computer vision.
+- **Maximilian Johenneken** — Researcher at the Hochschule Bonn-Rhein-Sieg (H-BRS), Germany; specialization in UAV systems, machine learning and computer vision.
 - **Eliton Sena de Souza** — Operational Leader of the [DeltaV Drones](https://deltavquad.github.io/) team; Computer Engineering student at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil.
 - **Timon Schreiber** - Software Developer (Placeholder)
 ---
 
 ## Contribute
 
-WenuLink is in active development. We welcome contributions from the community, particularly in the following areas:
+WenuLink is in active development. All types of contributions are encouraged and valued. See the [CONTRIBUTING.md](/CONTRIBUTING.md) file for different ways to help and details about how this project handles them. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
 
-- Implementation of flight control commands (Takeoff/Land/Navigate)
-- Mission controller module logic
-- Improvements to WebRTC streaming implementation
-
-If you wish to contribute, please **fork the repository** and submit a **Pull Request**.
+And if you like the project, but just don't have time to contribute, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
+- Star the project
+- Tweet about it
+- Refer this project in your project's readme
+- Mention the project at local meetups and tell your friends/colleagues
