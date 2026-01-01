@@ -13,6 +13,7 @@ import org.WenuLink.adapters.TelemetryData
 object SimManager {
     private val logger by taggedLogger("SimulationManager")
 
+    private var hasCallback: Boolean = false
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
@@ -28,11 +29,14 @@ object SimManager {
     fun isActive(): Boolean = simInstance?.isSimulatorActive ?: false
 
     fun registerStateCallback(stateCallback: (SimulatorState) -> Unit) {
+        if (hasCallback) unregisterStateCallback()
         simInstance?.setStateCallback(stateCallback)
+        hasCallback = true
     }
 
     fun unregisterStateCallback() {
         simInstance?.setStateCallback(null)
+        hasCallback = false
     }
 
     fun state2telemetry(state: SimulatorState): TelemetryData {
@@ -66,6 +70,7 @@ object SimManager {
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit
     ) {
+        logger.d { "Starting Simulation" }
         this.satelliteCount = satelliteCount
         simInstance?.start(
             InitializationData.createInstance(
@@ -78,6 +83,7 @@ object SimManager {
     }
 
     fun stop(onResult: (String?) -> Unit) {
+        logger.d { "Stopping Simulation" }
         simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
     }
 

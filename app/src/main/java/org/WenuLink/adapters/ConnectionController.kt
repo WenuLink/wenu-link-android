@@ -23,6 +23,7 @@ import com.MAVLink.enums.MAV_STATE
 import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.minimal.msg_heartbeat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.mavlink.MAVLinkController
 import kotlin.experimental.or
@@ -35,23 +36,31 @@ import kotlin.math.sqrt
  * https://mavlink.io/en/services/heartbeat.html
  */
 class ConnectionController (
-    private var client: MAVLinkClient
+    private var client: MAVLinkClient,
+    private var connectionScope: CoroutineScope
 ) : MAVLinkController {
     private val TAG: String = ConnectionController::class.java.simpleName
     private val telemetry: TelemetryHandler = TelemetryHandler.getInstance()
     private var ticks: Long = 0
 
-    fun startTelemetry(serviceScope: CoroutineScope, onResult: (String?) -> Unit) {
+    init {
+        telemetry.registerListenerScope(connectionScope)
+    }
+
+    fun startTelemetry(onResult: (String?) -> Unit) {
         ticks = 0
-        telemetry.registerListenerScope(serviceScope)
-        telemetry.start(true, onResult)
+        connectionScope.launch {
+            telemetry.start(true, connectionScope, onResult)
+        }
     }
 
     fun stopTelemetry(onResult: (String?) -> Unit) {
-        telemetry.start(false, onResult)
+        connectionScope.launch {
+            telemetry.start(false, connectionScope, onResult)
+        }
     }
 
-    fun isTelemetryRunning(): Boolean = telemetry.isFlowing()
+    fun isTelemetryRunning(): Boolean = telemetry.isActive()
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#outgoing-messages
     fun tick(timeMillis: Long) {

@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
         // DJI
         val isSDKOk by viewModel.isRegistered.observeAsState(false)
         val sdkStatus by viewModel.sdkStatus.observeAsState("Idle")
-        val canRunService by viewModel.canRunService.observeAsState(false)
+//        val canRunService by viewModel.canRunService.observeAsState(false)
 //        val bindingState by viewModel.bindingState.observeAsState("Waiting Binding")
 //        val activationState by viewModel.activationState.observeAsState("Waiting Activation")
         // MAVLink
@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
                 Text(sdkStatus)
             }
 
-            if(isSDKOk && canRunService){
+            if(isSDKOk){
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
                     servicesViewModel.runService(!isServiceRunning)

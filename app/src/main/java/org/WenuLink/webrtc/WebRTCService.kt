@@ -108,6 +108,10 @@ class WebRTCService {
             return
         }
         this.serviceScope = serviceScope
+
+        logger.i { "Connecting WebRTC client to $signalingServer" }
+        if (::webRTCClient.isInitialized) return
+
         webRTCClient = WebRTCClient(signalingServer)
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(

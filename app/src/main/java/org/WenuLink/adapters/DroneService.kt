@@ -24,14 +24,24 @@ import kotlin.getValue
 
 class DroneService : Service() {
 
+    private val logger by taggedLogger("DroneService")
+    private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
-    private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val logger by taggedLogger("DroneService")
 
     override fun onCreate() {
         super.onCreate()
         (application as WenuLinkApp).droneService = this // Store the service reference
+        // create WebRTC instance
+        if (WebRTCService.isEnabled && !::webRTC.isInitialized)
+            webRTC = WebRTCService.getInstance()
+
+        // create MAVLink instance
+        if (MAVLinkService.isEnabled && !::mavlink.isInitialized) {
+            mavlink = MAVLinkService()
+            mavlink.registerScope(serviceScope)
+        }
+        logger.i { "DroneService created" }
     }
 
     private fun startForegroundServiceWithNotification() {
@@ -76,13 +86,9 @@ class DroneService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Initialize MAVLink and WebRTC
-        startMAVLink()
-        startWebRTC()
-
         // Check if any services were successfully initialized
         if (!::mavlink.isInitialized && !::webRTC.isInitialized) {
-            logger.i { "No service enable to start, stopping." }
+            logger.i { "Unable to start, no services enabled." }
             stopSelf() // Stop the service if initialization fails
             return START_NOT_STICKY // Return to indicate that the service should not be recreated
         }
@@ -94,24 +100,15 @@ class DroneService : Service() {
     }
 
     override fun onDestroy() {
-        stopMAVLink()
-        stopWebRTC()
-        serviceScope.cancel()
-        logger.i { "Service destroyed" }
         (application as WenuLinkApp).droneService = null // Clear the reference
+        serviceScope.cancel()
+        logger.d { "Service destroyed" }
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    fun startWebRTC() {
-        if (!WebRTCService.isEnabled) {
-            return  // silently omit
-        }
-
-        if (!::webRTC.isInitialized)
-            webRTC = WebRTCService.getInstance()
-
+    private fun startWebRTC() {
         if (!webRTC.canStartClient()) {
             logger.e { "WebRTC client not ready, check if is enabled and a camera is present." }
             return
@@ -122,10 +119,13 @@ class DroneService : Service() {
         logger.i { "WebRTC service started" }
     }
 
-    fun stopWebRTC() {
-        if (::webRTC.isInitialized)
-//            webRTC.disconnect()
-            webRTC.runProcess(false) // autostart
+    fun startWebRTCService() {
+        serviceScope.launch { startWebRTC() }
+    }
+
+    fun stopWebRTCService() {
+        if (!::webRTC.isInitialized) return
+        serviceScope.launch { webRTC.runProcess(false) }
         logger.i { "WebRTC service stop" }
     }
 
@@ -133,14 +133,7 @@ class DroneService : Service() {
 
     fun isWebRTCUp(): Boolean = webRTC.isServiceUp
 
-    fun startMAVLink() {
-        if (!MAVLinkService.isEnabled) {
-            return  // silently omit
-        }
-
-        if (!::mavlink.isInitialized)
-            mavlink = MAVLinkService.getInstance()
-
+    private fun startMAVLink() {
         if (!mavlink.canStartClient()) {
             logger.e  { "MAVLink client not ready, check if is enabled or if already running." }
             return
@@ -151,17 +144,22 @@ class DroneService : Service() {
         logger.i  { "MAVLink service started" }
     }
 
-    fun stopMAVLink () {
-        logger.i { "DroneService pre condition" }
-        if (::mavlink.isInitialized){
-            logger.i { "DroneService inside condition" }
-            serviceScope.launch {  mavlink.runProcess(false) }
-        }
+    fun startMAVLinkService() {
+        serviceScope.launch { startMAVLink() }
+    }
+
+    fun stopMAVLinkService () {
+        if (!::mavlink.isInitialized) return
+        serviceScope.launch { mavlink.runProcess(false) }
         logger.i { "MAVLink service stop" }
     }
 
     fun getMAVLinkState(): StateFlow<Boolean> = mavlink.isRunning
 
     fun isMAVLinkUp(): Boolean = mavlink.isServiceUp
+
+    fun isRunning(): Boolean = isMAVLinkUp() || isWebRTCUp()
+
+    fun isReady(): Boolean = ::mavlink.isInitialized || ::webRTC.isInitialized
 
 }

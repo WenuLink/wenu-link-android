@@ -6,15 +6,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.sdk.SDKManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class ControlViewModel : ViewModel() {
-
-    private val mavlink = MAVLinkService.getInstance()
 
     private val _isPermissionsGranted = MutableLiveData<Boolean>()
     val isPermissionsGranted: LiveData<Boolean> = _isPermissionsGranted
@@ -33,9 +30,6 @@ class ControlViewModel : ViewModel() {
 
     private val _activationState = MutableLiveData<String>()
     val activationState: LiveData<String> = _activationState
-
-    private val _canRunService = MutableLiveData<Boolean>(mavlink.isServiceUp)
-    val canRunService: LiveData<Boolean> = _canRunService
 
     fun updatePermission(granted: Boolean) {
         _isPermissionsGranted.postValue(granted)
@@ -66,9 +60,6 @@ class ControlViewModel : ViewModel() {
                 if (success) {
                     _sdkStatus.postValue("Connected to ${SDKManager.getAircraftModel()}.")
                     updateWorkflow("Waiting for telemetry")
-                    _canRunService.postValue(true)
-                } else {
-                    _canRunService.postValue(false)
                 }
             }
         }

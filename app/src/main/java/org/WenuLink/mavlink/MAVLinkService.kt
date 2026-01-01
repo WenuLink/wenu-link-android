@@ -27,23 +27,14 @@ import kotlin.getValue
 
 class MAVLinkService {
     companion object {
-        private var instance: MAVLinkService? = null
         var isEnabled: Boolean = true
             private set
-
-        fun getInstance(): MAVLinkService {
-            if (instance == null)
-                instance = MAVLinkService()
-            return instance!!
-        }
     }
     private val logger by taggedLogger("MAVLinkService")
 
     private val TAG: String = MAVLinkService::class.java.simpleName
-    private var startCallback: (String?) -> Unit = { error -> }
-    private var stopCallback: (String?) -> Unit = { error -> }
     private lateinit var client: MAVLinkClient
-    private var endpointAddress = "192.168.100.176:14550"
+    private var endpointAddress = "192.168.1.220:14550"
     private var gcsLastTimestamp: Long = 0
     private var startTimestamp: Long = System.currentTimeMillis()
     private lateinit var commandController: CommandController
@@ -59,6 +50,7 @@ class MAVLinkService {
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
     fun runProcess(isRunning: Boolean) {
+        logger.d { "runProcess($isRunning)" }
         _isRunning.value = isRunning
     }
 
@@ -74,8 +66,9 @@ class MAVLinkService {
             return
         }
 
-        if (::client.isInitialized)
-            return
+        logger.i { "Starting MAVLinkClient for $endpointAddress" }
+
+        if (::client.isInitialized) return
 
         val targetIp = endpointAddress.split(":")[0]
         val targetPort = endpointAddress.split(":")[1].toInt()
@@ -83,38 +76,34 @@ class MAVLinkService {
             targetIp = targetIp, targetPort = targetPort,
             onMessageReceived = this::messageCallback
         )
+
+        // Register controllers for each MAVLink service
         commandController = CommandController(client)
-        connectionController = ConnectionController(client)
+        connectionController = ConnectionController(client, serviceScope)
         controllers = emptyList()
         controllers += connectionController
         controllers += ParameterController(client)
 
+        logger.d { "Client created" }
+    }
+
+    fun registerScope(serviceScope: CoroutineScope) {
         isRunning.distinctUntilChangedBy { it }
             .onEach {
                 if (it) run(serviceScope)
                 else stop()
-                logger.d { "isRunning: $it" }
+                logger.d { "MAVLinkClient running: $it" }
             }
             .launchIn(serviceScope)
-
-        logger.d { "MAVLinkClient initialized for ${targetIp}:${targetPort}" }
-    }
-
-    fun registerStartCallback(onResult: (String?) -> Unit) {
-        startCallback = onResult
-    }
-
-    fun registerStopCallback(onResult: (String?) -> Unit) {
-        stopCallback = onResult
     }
 
     private fun createClientJob(serviceScope: CoroutineScope) {
+        logger.d { "Creating MAVLink client's Job" }
         runningJob = serviceScope.launch {
             client.start { success, error ->
                 startTimestamp = System.currentTimeMillis()
                 isServiceUp = success
-                logger.d { "MAVLinkClient's up $isServiceUp" }
-                startCallback(error)
+                logger.d { "MAVLinkClient's up: $isServiceUp" }
             }
             while (isActive) {
                 try {
@@ -129,44 +118,44 @@ class MAVLinkService {
     }
 
     fun run(serviceScope: CoroutineScope) {
+        logger.d { "run" }
         if (!::client.isInitialized) {
             logger.i { "Unable to run service, no MAVLink client." }
             return
         }
 
-        if (isServiceUp) {
-            return
-        }
+        if (isServiceUp) return
 
         if (connectionController.isTelemetryRunning()) return
 
         // Only start client after telemetry
-        connectionController.startTelemetry(serviceScope) { error ->
-            if (error == null) createClientJob(serviceScope)
-            else startCallback(error)
+        connectionController.startTelemetry { error ->
+            if (error == null) {
+                logger.i { "Telemetry started" }
+                createClientJob(serviceScope)
+            }
+            else logger.i { "Error in Telemetry: $error" }
+            // TODO: else { notice problem with toast }
         }
-        logger.i { "MAVLink run" }
     }
 
     fun stop() {
-        logger.d { "MAVLinkClient calling stop 111 ${::client.isInitialized} $isServiceUp" }
-        if (!::client.isInitialized) return
-
-        connectionController.stopTelemetry(stopCallback)
+        logger.d { "stop" }
 
         if (!isServiceUp) return
 
         // stopClientJob
         runningJob?.cancel()
         runningJob = null
-        logger.d{ "MAVLinkClient calling stop" }
+
+        if (!::client.isInitialized) return
 
         client.stop { success, error ->
-            if (success) {
-                isServiceUp = false
-                logger.d { "MAVLinkClient's up $isServiceUp" }
+            logger.d { "MAVLinkClient's up: ${!success}" }
+            connectionController.stopTelemetry {
+                isServiceUp = !success
+                logger.i { "Telemetry stopped" }
             }
-            else stopCallback(error)
         }
     }
 
