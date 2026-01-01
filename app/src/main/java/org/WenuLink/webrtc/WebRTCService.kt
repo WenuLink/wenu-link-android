@@ -38,20 +38,12 @@ class WebRTCService {
                 mInstance = WebRTCService()
             return mInstance!!
         }
-
-        private val _isRunning = MutableStateFlow(false)
-        val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
-
-        fun runProcess(isRunning: Boolean) {
-            _isRunning.value = isRunning
-        }
     }
 
     // logger an coroutine scope
     private val logger by taggedLogger("WebRTCService")
     private lateinit var serviceScope: CoroutineScope  //(SupervisorJob() + Dispatchers.Main)
     private var runningJob: Job? = null
-    private var listeningJob: Job? = null
 
     // element required for WebRTC logics
     private lateinit var videoSource: VideoSource
@@ -65,6 +57,13 @@ class WebRTCService {
         private set
     var isStreaming: Boolean = false
         private set
+
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+
+    fun runProcess(isRunning: Boolean) {
+        _isRunning.value = isRunning
+    }
 
     // used to send local video track to the fragment
     private val _localVideoTrackFlow = MutableSharedFlow<VideoTrack>()
@@ -109,6 +108,10 @@ class WebRTCService {
             return
         }
         this.serviceScope = serviceScope
+
+        logger.i { "Connecting WebRTC client to $signalingServer" }
+        if (::webRTCClient.isInitialized) return
+
         webRTCClient = WebRTCClient(signalingServer)
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(
@@ -197,8 +200,6 @@ class WebRTCService {
             return
 
         try {
-//            listeningJob?.cancel()
-//            listeningJob = null
             runningJob?.cancel()
             runningJob = null
             // dispose video tracks

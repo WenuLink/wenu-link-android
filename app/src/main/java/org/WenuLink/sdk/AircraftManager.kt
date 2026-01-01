@@ -1,6 +1,5 @@
 package org.WenuLink.sdk
 
-import android.util.Log
 import org.WenuLink.adapters.BatteryData
 import dji.common.battery.BatteryState
 import dji.common.error.DJIError
@@ -8,10 +7,12 @@ import dji.common.util.CommonCallbacks.CompletionCallbackWith
 import dji.sdk.airlink.AirLink
 import dji.sdk.battery.Battery
 import dji.sdk.products.Aircraft
+import io.getstream.log.taggedLogger
+import kotlin.getValue
 
 
 object AircraftManager {
-    private val TAG: String = AircraftManager::class.java.simpleName
+    private val logger by taggedLogger("AircraftManager")
     private val lastBatteryData: BatteryData = BatteryData()
     private val lastAirLinkQuality: IntArray = intArrayOf(-1, -1)
     private var aircraftInstance: Aircraft? = null
@@ -24,14 +25,14 @@ object AircraftManager {
         aircraftInstance = aircraft
         batteryInstance = aircraft.battery
         CameraManager.updateStreamID(getModel())
-        Log.i(TAG, "Aircraft connected: ${getModelName()}")
+        logger.i { "Aircraft connected: ${getModelName()}" }
     }
 
     @Synchronized
     fun initAirLink(airLink: AirLink)  {
         this.airLinkInstance = airLink
         useAirLink = true
-        Log.i(TAG, "AirLink connected")
+        logger.i { "AirLink connected" }
     }
 
     @Synchronized
@@ -89,7 +90,7 @@ object AircraftManager {
     }
 
     private fun startBatteryListeners() {
-        Log.d(TAG, "Starting Battery updates")
+        logger.d { "Starting Battery updates" }
         batteryInstance?.setStateCallback { batteryState: BatteryState ->
             updateBattery(
                 BatteryData(
@@ -106,7 +107,7 @@ object AircraftManager {
         batteryInstance?.getCellVoltages(object: CompletionCallbackWith<Array<Int>> {
             override fun onSuccess(p0: Array<Int>) {
                 updateBatteryCellVoltages(p0.toIntArray())
-                Log.d(TAG, "getCellVoltages $p0")
+                logger.d { "getCellVoltages $p0" }
             }
 
             override fun onFailure(p0: DJIError?) {
@@ -116,7 +117,7 @@ object AircraftManager {
     }
 
     private fun stopBatteryListeners() {
-        Log.d(TAG, "Stopping Battery updates")
+        logger.d { "Stopping Battery updates" }
         batteryInstance?.setStateCallback { null }
         updateBattery(BatteryData())
     }
@@ -124,16 +125,16 @@ object AircraftManager {
     private fun startAirLinkListeners() {
         if (!useAirLink) {
             updateAirlink(-1, -1)
-            Log.w(TAG, "Unable to start AirLink updates, no AirLink present")
+            logger.w { "Unable to start AirLink updates, no AirLink present" }
             return
         }
-        Log.d(TAG, "Starting AirLink updates")
+        logger.d { "Starting AirLink updates" }
         airLinkInstance?.setDownlinkSignalQualityCallback { i: Int -> updateAirlink(i, null) }
         airLinkInstance?.setUplinkSignalQualityCallback { i: Int -> updateAirlink(null, i) }
     }
 
     private fun stopAirLinkListeners() {
-        Log.d(TAG, "Stopping AirLink updates")
+        logger.d { "Stopping AirLink updates" }
         airLinkInstance?.setDownlinkSignalQualityCallback{ i -> }
         airLinkInstance?.setUplinkSignalQualityCallback{ i -> }
         updateAirlink(-1, -1)

@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -43,7 +42,7 @@ import androidx.core.content.ContextCompat
 import org.WenuLink.adapters.ControlViewModel
 import org.WenuLink.sdk.SDKManager
 import org.WenuLink.ui.theme.WenuLinkTheme
-
+import org.WenuLink.views.ServicesViewModel
 
 
 class MainActivity : ComponentActivity() {
@@ -61,6 +60,7 @@ class MainActivity : ComponentActivity() {
     private val TAG: String = MainActivity::class.java.simpleName
 
     private val controlViewModel: ControlViewModel by viewModels()
+    private val servicesViewModel: ServicesViewModel by viewModels()
 
     private fun checkAndRequestPermissions() {
         controlViewModel.updateWorkflow("Checking permissions")
@@ -138,7 +138,6 @@ class MainActivity : ComponentActivity() {
         controlViewModel.updatePermission(true)
         controlViewModel.updateWorkflow("Waiting for SDK")
         controlViewModel.startSDK(applicationContext)
-        controlViewModel.initMAVLinkCallbacks()
     }
 
     private fun onPermissionsDenied() {
@@ -150,7 +149,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // Deinitialize sdk only when no service is running
-        if(!controlViewModel.isServiceRunning.value!!){
+        if(!servicesViewModel.isServiceRunning.value){
             controlViewModel.stopSDK(applicationContext)
         }
         // TODO: mostrar aviso para forzar salida
@@ -161,19 +160,21 @@ class MainActivity : ComponentActivity() {
         // Basic
         val isPermissionsGranted by viewModel.isPermissionsGranted.observeAsState(false)
         val workflowStatus by viewModel.workflowStatus.observeAsState("Idle")
-        val isServiceRunning by viewModel.isServiceRunning.observeAsState(false)
+        val isServiceRunning by servicesViewModel.isServiceRunning.collectAsState(false)
+        var isSimulationReady by remember { mutableStateOf(servicesViewModel.isSimulationReady()) }
+        var isSimulationActive by remember { mutableStateOf(servicesViewModel.isSimulationActive()) }
         // DJI
         val isSDKOk by viewModel.isRegistered.observeAsState(false)
         val sdkStatus by viewModel.sdkStatus.observeAsState("Idle")
-        val canRunService by viewModel.canRunService.observeAsState(false)
+//        val canRunService by viewModel.canRunService.observeAsState(false)
 //        val bindingState by viewModel.bindingState.observeAsState("Waiting Binding")
 //        val activationState by viewModel.activationState.observeAsState("Waiting Activation")
         // MAVLink
-        val telemetry by viewModel.telemetryData.observeAsState()
-        val isDataFlowing by viewModel.isDataFlowing.collectAsState(false)
-        val isMAVLinkRunning by viewModel.isMAVLinkRunning.collectAsState(false)
+        val telemetry by servicesViewModel.telemetryData.observeAsState()
+        val isDataFlowing by servicesViewModel.isDataFlowing.collectAsState(false)
+        val isMAVLinkRunning by servicesViewModel.isMAVLinkRunning.collectAsState(false)
         // WebRTC
-        val isWebRTCRunning by viewModel.isWebRTCRunning.collectAsState(false)
+        val isWebRTCRunning by servicesViewModel.isWebRTCRunning.collectAsState(false)
         // Logs
         var logMessages by remember { mutableStateOf(listOf<String>()) }
 
@@ -199,10 +200,10 @@ class MainActivity : ComponentActivity() {
                 Text(sdkStatus)
             }
 
-            if(isSDKOk && canRunService){
+            if(isSDKOk){
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
-                    viewModel.runService(!isServiceRunning, applicationContext)
+                    servicesViewModel.runService(!isServiceRunning)
                 }) {
                     Text(if (isServiceRunning) {
                         "Stop Drone Service"
@@ -210,10 +211,27 @@ class MainActivity : ComponentActivity() {
                         "Start Drone Service"
                     })
                 }
+
+//                if (isSimulationReady) {
+                // TODO: Improve simulation enable/disable UI/UX
+                    Button(onClick = {
+                        servicesViewModel.enableSimulation(!isSimulationActive)
+                        isSimulationActive = !isSimulationActive
+                    }) {
+                        Text(
+                            if (!isSimulationActive) {
+                                "Enable simulation"
+                            } else {
+                                "Disable simulation"
+                            }
+                        )
+                    }
+//                }
+
                 if (isServiceRunning) {
                     HorizontalDivider()
                     Button(onClick = {
-                        viewModel.runMAVLink(!isMAVLinkRunning)
+                        servicesViewModel.runMAVLink(!isMAVLinkRunning)
                     }) {
                         Text(if (isMAVLinkRunning) {
                             "Stop MAVLink"
@@ -222,7 +240,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                     Button(onClick = {
-                        viewModel.runWebRTC(!isWebRTCRunning)
+                        servicesViewModel.runWebRTC(!isWebRTCRunning)
                     }) {
                         Text(if (isWebRTCRunning) {
                             "Stop WebRTC"
