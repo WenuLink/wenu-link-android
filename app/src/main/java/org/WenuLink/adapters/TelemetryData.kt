@@ -13,12 +13,13 @@ data class TelemetryData(
     val latitude: Double,
     val longitude: Double,
     val altitude: Float,
+    val positionX: Float,
+    val positionY: Float,
+    val positionZ: Float,
     val velocityX: Float,
     val velocityY: Float,
     val velocityZ: Float,
     val flightTime: Int,
-    val flightMode: ArduCopterFlightMode,
-    val flightGuided: Boolean,
     val takeOffAltitude: Float,
     val isFlying: Boolean,
     val motorsOn: Boolean,
@@ -67,41 +68,14 @@ data class BatteryData(
     }
 }
 
-enum class ArduCopterFlightMode(val mode: Long) {
-    STABILIZE(0),
-    ACRO(1),
-    ALT_HOLD(2),
-    AUTO(3),
-    GUIDED(4),
-    LOITER(5),
-    RTL(6),
-    CIRCLE(7),
-    LAND(9),
-    DRIFT(11),
-    SPORT(13),
-    FLIP(14),
-    AUTOTUNE(15),
-    POSHOLD(16),
-    BRAKE(17),
-    THROW(18),
-    AVOID_ADSB(19),
-    GUIDED_NOGPS(20),
-    SMART_RTL(21);
-}
-
-/**
- * Generic command wrapper for sending commands to the drone.
- * Could be extended to contain MAVLink messages or DJI-specific commands.
- */
-data class DroneCommand(
-    val type: CommandType,
-    val payload: Any
+data class Coordinates3D(
+    val lat: Double,
+    val long: Double,
+    val alt: Float
 )
 
-enum class CommandType {
-    TAKE_OFF,
-    LAND,
-    MOVE,
-    CUSTOM
-}
-
+data class MessageRate(
+    val messageID: Int,
+    var timeInterval: Long,
+    var lastUpdateStamp: Long = 0
+)

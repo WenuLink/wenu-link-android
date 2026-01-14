@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.views
 
 import android.content.Context
 import android.util.Log
@@ -6,12 +6,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.WenuLink.sdk.SDKManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.WenuLink.sdk.SDKManager
 
-class ControlViewModel : ViewModel() {
+class HomeViewModel : ViewModel() {
 
     private val _isPermissionsGranted = MutableLiveData<Boolean>()
     val isPermissionsGranted: LiveData<Boolean> = _isPermissionsGranted

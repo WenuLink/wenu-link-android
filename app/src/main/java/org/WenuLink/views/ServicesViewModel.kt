@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
-import org.WenuLink.adapters.DroneService
+import org.WenuLink.adapters.WenuLinkService
 import org.WenuLink.adapters.TelemetryData
 import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.Utils
@@ -32,13 +32,13 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     // To expose the StateFlow for MAVLink
     val isMAVLinkRunning: StateFlow<Boolean>
-        get() = thisApp.droneService?.getMAVLinkState() ?: MutableStateFlow(false)
+        get() = thisApp.wenuLinkService?.getMAVLinkState() ?: MutableStateFlow(false)
 
     // To expose the StateFlow for WebRTC
     val isWebRTCRunning: StateFlow<Boolean>
-        get() = thisApp.droneService?.getWebRTCState() ?: MutableStateFlow(false)
+        get() = thisApp.wenuLinkService?.getWebRTCState() ?: MutableStateFlow(false)
 
-    val isDataFlowing: StateFlow<Boolean> = TelemetryHandler.getInstance().isDataFlowing
+    val isDataFlowing: StateFlow<Boolean> = TelemetryHandler.getInstance().isBroadcasting
 
     fun isSimulationReady(): Boolean = TelemetryHandler.getInstance().isSimulationReady()
 
@@ -51,48 +51,39 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: updateSimulationState?
     }
 
-    fun isDroneServiceRunning(): Boolean = thisApp.droneService != null && (thisApp.droneService?.isRunning() ?: false)
+    fun isServiceRunning(): Boolean = thisApp.wenuLinkService?.isRunning() ?: false
 
-    fun isDroneServiceReady(): Boolean = thisApp.droneService?.isReady() ?: false
+    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
+
+    fun isServiceStop() = !isServiceRunning()
 
     fun startService() {
-        if (thisApp.droneService == null) {
-            val startFunction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                thisApp::startForegroundService
-            } else {
-                thisApp::startService
-            }
-            startFunction(Intent(thisApp, DroneService::class.java))
-        }
+        if (thisApp.wenuLinkService != null) return
 
-        Utils.waitReadiness(
-            viewModelScope,
-            isReady = this::isDroneServiceReady
-        ) { isInitialized ->
-            if (isInitialized) {
-                runMAVLink(true)
-                runWebRTC(true)
-            }
-            _isServiceRunning.value = true
+        val startFunction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            thisApp::startForegroundService
+        } else {
+            thisApp::startService
+        }
+        startFunction(Intent(thisApp, WenuLinkService::class.java))
+
+        viewModelScope.launch {
+            _isServiceRunning.value = Utils.waitTimeout(1000, 60000, ::isServiceReady)
         }
     }
 
     fun stopService() {
-        if (thisApp.droneService != null) {
-            logger.d { "stopService()" }
-            runMAVLink(false)
-            runWebRTC(false)
+        if (thisApp.wenuLinkService == null) return
 
-            Utils.waitReadiness(
-                viewModelScope,
-                invertCondition = true,
-                isReady = this::isDroneServiceRunning
-            ) { isStop ->
-                thisApp.stopService(
-                    Intent(thisApp, DroneService::class.java)
-                )
-                _isServiceRunning.value = false
-            }
+        // Stop services and wait for shutdown
+        runMAVLink(false)
+        runWebRTC(false)
+        viewModelScope.launch {
+            Utils.waitReady(isReady = ::isServiceStop)
+            thisApp.stopService(
+                Intent(thisApp, WenuLinkService::class.java)
+            )
+            _isServiceRunning.value = false
         }
     }
 
@@ -100,8 +91,8 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update GCS server address from user input
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
-            if (run) thisApp.droneService?.startMAVLinkService()
-            else thisApp.droneService?.stopMAVLinkService()
+            if (run) thisApp.wenuLinkService?.startMAVLinkService()
+            else thisApp.wenuLinkService?.stopMAVLinkService()
         }
     }
 
@@ -109,8 +100,8 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update signaling server address from user input
         // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
         viewModelScope.launch {
-            if (run) thisApp.droneService?.startWebRTCService()
-            else thisApp.droneService?.stopWebRTCService()
+            if (run) thisApp.wenuLinkService?.startWebRTCService()
+            else thisApp.wenuLinkService?.stopWebRTCService()
         }
     }
 

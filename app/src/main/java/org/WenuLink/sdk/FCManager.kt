@@ -7,6 +7,8 @@ import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.Utils
 import kotlin.getValue
 
 object FCManager {
@@ -14,8 +16,8 @@ object FCManager {
 
     var fcInstance: FlightController? = null
         private set
-    @Volatile private var serialNumber: String? = null
-    @Volatile private var fwVersion: String? = null
+    private var serialNumber: String? = null
+    private var fwVersion: String? = null
 
     @Synchronized
     fun updateSerialNumber(sn: String) {
@@ -76,8 +78,6 @@ object FCManager {
     }
 
     fun state2telemetry(state: FlightControllerState): TelemetryData {
-        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
-        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(state.flightMode)
         return TelemetryData(
             roll = state.attitude.roll,
             pitch = state.attitude.pitch,
@@ -85,12 +85,13 @@ object FCManager {
             latitude = state.aircraftLocation.latitude,
             longitude = state.aircraftLocation.longitude,
             altitude = state.aircraftLocation.altitude,
+            positionX = 0F,
+            positionY = 0F,
+            positionZ = 0F,
             velocityX = state.velocityX,
             velocityY = state.velocityY,
             velocityZ = state.velocityZ,
             flightTime = state.flightTimeInSeconds,
-            flightMode = customMode,
-            flightGuided = guidedFlag,
             takeOffAltitude = state.takeoffLocationAltitude,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
@@ -107,17 +108,17 @@ object FCManager {
         fcInstance?.setStateCallback(null)
     }
 
-    fun getHomePosition(): Triple<Double, Double, Int>? {
+    fun getHomePosition(): Coordinates3D? {
         val flightState = fcInstance!!.state
         if (!flightState.isHomeLocationSet) {
             return null
         }
 
         val homeLocation = flightState.homeLocation
-        return Triple(
-            first = homeLocation.latitude,
-            second = homeLocation.longitude,
-            third = flightState.goHomeHeight
+        return Coordinates3D(
+            homeLocation.latitude,
+            homeLocation.longitude,
+            flightState.goHomeHeight.toFloat()
         )
     }
 
@@ -143,12 +144,55 @@ object FCManager {
         }
     }
 
-    fun simpleTakeoff(onResult: (String?) -> Unit) {
-        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+    fun isFlying(): Boolean {
+        return fcInstance?.state?.isFlying ?: false
     }
 
-    fun simpleLanding(onResult: (String?) -> Unit) {
-        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
+    suspend fun waitForFlying(takingOff: Boolean): Boolean {
+        logger.d { "waitForFlying($takingOff)" }
+        fun isFlyingConditioned() = if (takingOff) isFlying() else !isFlying()
+        Utils.waitReady(isReady = ::isFlyingConditioned)
+        logger.d { "Aircraft is ${if (isFlyingConditioned()) "flying" else "on the ground"}" }
+        return isFlyingConditioned()
+    }
+
+    suspend fun simpleTakeoff(): Boolean {
+        logger.d { "Taking off" }
+//        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.startTakeoff { }
+        return waitForArmed(true)
+    }
+
+    suspend fun simpleLanding(): Boolean {
+        logger.d { "Landing" }
+//        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.startLanding { }
+        return waitForFlying(false)
+    }
+
+    fun areMotorsArmed(): Boolean {
+        return fcInstance?.state?.areMotorsOn() ?: false
+    }
+
+    suspend fun waitForArmed(arming: Boolean): Boolean {
+        fun areMotorsUpdated() = if (arming) areMotorsArmed() else !areMotorsArmed()
+        val motorsUpdated = Utils.waitTimeout(isReady = ::areMotorsUpdated)
+        logger.d { "Motors ${if (motorsUpdated) "armed" else "disarmed"}: $motorsUpdated" }
+        return motorsUpdated
+    }
+
+    suspend fun armMotors(): Boolean {
+        logger.d { "Arming motors" }
+//        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
+        return waitForArmed(true)
+    }
+
+    suspend fun disarmMotors(): Boolean {
+        logger.d { "Disarming motors" }
+//        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
+        return waitForArmed(false)
     }
 
 }

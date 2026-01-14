@@ -1,32 +1,72 @@
 package org.WenuLink.adapters
 
-import kotlinx.coroutines.CoroutineScope
+import com.MAVLink.Messages.MAVLinkMessage
+import com.MAVLink.common.msg_command_ack
+import com.MAVLink.enums.MAV_CMD
+import com.MAVLink.enums.MAV_RESULT
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 object Utils {
-    fun waitReadiness(
-        handlerScope: CoroutineScope,
+    suspend fun waitReadiness(
         delayTime: Long = 100,
-        maxTime: Long = 2000,
+        timeout: Long = 2000,
         invertCondition: Boolean = false,
         isReady: () -> Boolean,
         onResult: (Boolean) -> Unit
     ) {
-        handlerScope.launch {
-            val startTime = System.currentTimeMillis()
+        fun preparedReadyCondition() = if (invertCondition) isReady() else !isReady()
+        waitTimeout(delayTime, timeout, ::preparedReadyCondition)
+        onResult(preparedReadyCondition())
+    }
 
-            while (System.currentTimeMillis() - startTime < maxTime) {
-                var readyCondition = isReady()
-                if (invertCondition) readyCondition = !readyCondition
-                if (readyCondition) {
-                    onResult(true) // Indicate readiness
-                    return@launch // Exit the coroutine
-                }
-                delay(delayTime) // Wait for the next check
-            }
-            // If the timeout is reached without readiness
-            onResult(false) // Indicate not ready
+    suspend fun waitTimeout(
+        intervalTime: Long = 100,
+        timeout: Long = 2000,
+        isReady: () -> Boolean
+    ): Boolean {
+        val startTime = System.currentTimeMillis()
+
+        while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
+            delay(intervalTime) // Wait for the next check
+        }
+        return isReady()
+    }
+
+    suspend fun waitReady(
+        intervalTime: Long = 10,
+        isReady: () -> Boolean
+    ) {
+        while (!isReady()) {
+            delay(intervalTime) // Wait for the next check
         }
     }
+
+    fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
+
+    // float deg to deg E7
+    fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
+
+    // deg E7 to float
+    fun coordinateMAVLink2DJI(value: Int): Double  = value.toDouble() / 10_000_000.0
+
+    // meters to millimeters
+    fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).toInt()
+
+    fun commandAckMsg(messageID: Int, result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED, progress: Int = -1): MAVLinkMessage {
+        val msg = msg_command_ack()
+        msg.command = messageID
+        if (progress > -1) {
+            msg.result = MAV_RESULT.MAV_RESULT_IN_PROGRESS.toShort()
+            msg.progress = progress.toShort()
+        } else {
+            msg.result = result.toShort()
+        }
+        return msg
+    }
+
+    fun requestAckMsg(result: Int = MAV_RESULT.MAV_RESULT_DENIED, progress: Int = -1): MAVLinkMessage {
+        return commandAckMsg(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
+    }
+
 }

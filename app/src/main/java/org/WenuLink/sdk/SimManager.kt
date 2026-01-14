@@ -1,6 +1,5 @@
 package org.WenuLink.sdk
 
-import dji.common.flightcontroller.FlightMode
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.flightcontroller.simulator.InitializationData
 import dji.common.flightcontroller.simulator.SimulatorState
@@ -39,22 +38,22 @@ object SimManager {
         hasCallback = false
     }
 
+    @Synchronized
     fun state2telemetry(state: SimulatorState): TelemetryData {
-        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
-        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(FlightMode.GPS_WAYPOINT)
         return TelemetryData(
             roll = state.roll.toDouble(),
             pitch = state.pitch.toDouble(),
             yaw = state.yaw.toDouble(),
-            latitude = state.positionX.toDouble(),  // state.location.latitude,
-            longitude = state.positionY.toDouble(),  // state.location.longitude,
+            latitude = state.location.latitude,
+            longitude = state.location.longitude,
             altitude = state.positionZ,
+            positionX = state.positionX,
+            positionY = state.positionY,
+            positionZ = state.positionZ,
             velocityX = 0f,
             velocityY = 0f,
             velocityZ = 0f,
             flightTime = 0,
-            flightMode = customMode,
-            flightGuided = guidedFlag,
             takeOffAltitude = 0f,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),

@@ -62,28 +62,29 @@ object MissionManager {
     fun generateWaypointMissionBuilder(
         autoSpeed: Float = 2f,
         maxSpeed: Float = 6f,
-        curvedPath: Boolean = true
+        curvedPath: Boolean = true,
+        rtlWhenFinish: Boolean = false
     ): WaypointMission.Builder? {
         val wpBuilder = WaypointMission.Builder()
             .autoFlightSpeed(autoSpeed)
             .maxFlightSpeed(maxSpeed)
             .setExitMissionOnRCSignalLostEnabled(false)
-            .finishedAction(WaypointMissionFinishedAction.NO_ACTION)
             .gotoFirstWaypointMode(WaypointMissionGotoWaypointMode.SAFELY)
             .headingMode(WaypointMissionHeadingMode.AUTO)
             .repeatTimes(1)
 
-        if (curvedPath) {
-            wpBuilder.flightPathMode(WaypointMissionFlightPathMode.CURVED)
-        } else {
-            wpBuilder.flightPathMode(WaypointMissionFlightPathMode.NORMAL)
-        }
+        if (curvedPath) wpBuilder.flightPathMode(WaypointMissionFlightPathMode.CURVED)
+        else wpBuilder.flightPathMode(WaypointMissionFlightPathMode.NORMAL)
+
+        if (rtlWhenFinish) wpBuilder.finishedAction(WaypointMissionFinishedAction.GO_HOME)
+        else wpBuilder.finishedAction(WaypointMissionFinishedAction.NO_ACTION)
+
         return wpBuilder
     }
 
     fun addWaypoint(x: Double, y: Double, z: Float) {
         val waypoint = Waypoint(x, y, z)
-        logger.d { "Add waypoint: $waypoint" }
+        logger.d { "Add waypoint: $waypoint ($waypointItems)" }
         waypointItems.add(waypoint)
     }
 
@@ -131,24 +132,28 @@ object MissionManager {
         waypoint?.addAction(WaypointAction(WaypointActionType.STOP_RECORD, 0))
     }
 
+    fun getWaypointMissionState(): WaypointMissionState {
+        return getWaypointMissionOperator().currentState
+    }
+
     fun uploadWaypointMission(onResult: (Boolean, String?) -> Unit) {
         logger.i { "Uploading mission" }
         getWaypointMissionOperator().uploadMission(
             SDKUtils.createCompletionCallback { error ->
                 if (error == null) {
-                    while (getWaypointMissionOperator().currentState == WaypointMissionState.UPLOADING) {
+                    while (getWaypointMissionState() == WaypointMissionState.UPLOADING) {
                         try {
                             Thread.sleep(100)
                         } catch (_: InterruptedException) {
                             break
                         }
                     }
-                    if (getWaypointMissionOperator().currentState == WaypointMissionState.READY_TO_EXECUTE
+                    if (getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE
                     ) onResult(true, null)
                     else onResult(false, "Error uploading waypoint mission!")
                 } else onResult(
                     false,
-                    "Error uploading mission! $error (${getWaypointMissionOperator().currentState})"
+                    "Error uploading mission! $error (${getWaypointMissionState()})"
                 )
             }
         )
@@ -158,10 +163,12 @@ object MissionManager {
         autoSpeed: Float = 2f,
         maxSpeed: Float = 6f,
         curvedPath: Boolean = true,
+        rtlWhenFinish: Boolean = false,
         onResult: (Boolean, String?) -> Unit
     ) {
         // Generate MissionBuilder and add Waypoints
-        val missionBuilder = generateWaypointMissionBuilder(autoSpeed, maxSpeed, curvedPath)
+        logger.d { "buildMission" }
+        val missionBuilder = generateWaypointMissionBuilder(autoSpeed, maxSpeed, curvedPath, rtlWhenFinish)
 //        missionBuilder?.waypointList(waypointItems)?.waypointCount(waypointItems.size)
         waypointItems.forEach { missionBuilder?.addWaypoint(it!!) }
         missionBuilder?.waypointCount(waypointItems.size)
@@ -176,7 +183,7 @@ object MissionManager {
     }
 
     fun runMission(run: Boolean, onResult: (String?) -> Unit) {
-        if (run && getWaypointMissionOperator().currentState
+        if (run && getWaypointMissionState()
             in listOf<WaypointMissionState>(
                 WaypointMissionState.READY_TO_EXECUTE,
                 WaypointMissionState.EXECUTION_PAUSED
@@ -190,7 +197,7 @@ object MissionManager {
     }
 
     fun pauseMission(onResult: (String?) -> Unit) {
-        if (getWaypointMissionOperator().currentState == WaypointMissionState.EXECUTING
+        if (getWaypointMissionState() == WaypointMissionState.EXECUTING
         ) getWaypointMissionOperator().pauseMission(
             SDKUtils.createCompletionCallback(onResult)
         )

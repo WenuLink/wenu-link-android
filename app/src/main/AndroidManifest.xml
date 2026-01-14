@@ -82,7 +82,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".adapters.DroneService"
+            android:name=".adapters.WenuLinkService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location|connectedDevice" />
