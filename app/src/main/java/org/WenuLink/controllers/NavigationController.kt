@@ -27,7 +27,7 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.TelemetryHandler
-import org.WenuLink.adapters.Utils
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.sdk.MissionManager
 import kotlin.getValue
@@ -157,8 +157,8 @@ class NavigationController (
         logger.d { "populateMissionList: ${currentMission.waypointList.size} WP" }
         var itemSeq = 0
         for (wp in currentMission.waypointList) {
-            val coordX = Utils.coordinateDJI2MAVLink(wp.coordinate.latitude)
-            val coordY = Utils.coordinateDJI2MAVLink(wp.coordinate.longitude)
+            val coordX = MessageUtils.coordinateDJI2MAVLink(wp.coordinate.latitude)
+            val coordY = MessageUtils.coordinateDJI2MAVLink(wp.coordinate.longitude)
             val coordZ = wp.altitude
             // Assign the correct command
             if (itemSeq == 0) {
@@ -275,8 +275,8 @@ class NavigationController (
     }
 
     fun getItemCoordinates(itemMsg: msg_mission_item_int, aircraft: AircraftHandler): Coordinates3D {
-        val latitude = Utils.coordinateMAVLink2DJI(itemMsg.x)
-        val longitude = Utils.coordinateMAVLink2DJI(itemMsg.y)
+        val latitude = MessageUtils.coordinateMAVLink2DJI(itemMsg.x)
+        val longitude = MessageUtils.coordinateMAVLink2DJI(itemMsg.y)
         return Coordinates3D(latitude, longitude, itemMsg.z)
     }
 
@@ -299,7 +299,7 @@ class NavigationController (
             MissionManager.addLandingWP()
         } else {
             // TODO: reduce altitude first?
-            aircraft.landing()
+            aircraft.land()
         }
     }
 
@@ -333,7 +333,7 @@ class NavigationController (
             // TODO: should keep track of initial altitude? maybe is better to use the home location
             // TODO: take care of different frameReference
             // TODO: Limit to a max altitude and minimum altitude
-            // TODO check altitude conversion
+            // TODO: check altitude conversion
 
             logger.d { "Waypoint: (${coordinates.lat}, ${coordinates.long})  at ${coordinates.alt} : Yaw $yaw deg - Delay $delay" }
         } else {
@@ -544,9 +544,9 @@ class NavigationController (
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
         val coordinates = aircraft.getHomePosition() ?: return null
         val msg = msg_home_position()
-        msg.latitude = Utils.coordinateDJI2MAVLink(coordinates.lat)
-        msg.longitude = Utils.coordinateDJI2MAVLink(coordinates.long)
-        msg.altitude = Utils.altitudeDJI2MAVLink(coordinates.alt)
+        msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
+        msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
+        msg.altitude = MessageUtils.altitudeDJI2MAVLink(coordinates.alt)
         return msg
     }
 
@@ -560,14 +560,14 @@ class NavigationController (
     fun msgGlobalPositionInt(telemetry: TelemetryHandler): MAVLinkMessage? {
         val telemetryData = telemetry.getTelemetryData() ?: return null
         val msg = msg_global_position_int()
-        msg.lat = Utils.coordinateDJI2MAVLink(telemetryData.latitude)
-        msg.lon = Utils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = Utils.altitudeDJI2MAVLink(telemetryData.altitude)
+        msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
+        msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
+        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
         // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
         // but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)
         // DJI: relative altitude of the aircraft relative to take off location, measured by barometer, in meters.
-        msg.relative_alt = Utils.altitudeDJI2MAVLink(telemetryData.altitude)
+        msg.relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
         msg.vx = (telemetryData.velocityX * 100).toInt().toShort()
         msg.vy = (telemetryData.velocityY * 100).toInt().toShort()
         msg.vz = (telemetryData.velocityZ * 100).toInt().toShort()
@@ -586,9 +586,9 @@ class NavigationController (
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
             return msg
         }
-        msg.time_usec = Utils.getMicroTime()
-        msg.lat = Utils.coordinateDJI2MAVLink(telemetryData.latitude)
-        msg.lon = Utils.coordinateDJI2MAVLink(telemetryData.longitude)
+        msg.time_usec = MessageUtils.getMicroTime()
+        msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
+        msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
         msg.satellites_visible = telemetryData.satelliteCount.toShort()
         // DJI reports signal quality on a scale of 1-11
         // Mavlink has separate codes for fix type.

@@ -69,7 +69,11 @@ object SimManager {
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit
     ) {
-        logger.d { "Starting Simulation" }
+        if (isActive()) {
+            onResult(null)
+            return
+        }
+        logger.d { "Simulation run." }
         this.satelliteCount = satelliteCount
         simInstance?.start(
             InitializationData.createInstance(
@@ -82,7 +86,11 @@ object SimManager {
     }
 
     fun stop(onResult: (String?) -> Unit) {
-        logger.d { "Stopping Simulation" }
+        if (!isActive()) {
+            onResult(null)
+            return
+        }
+        logger.d { "Simulation stop." }
         simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
     }
 

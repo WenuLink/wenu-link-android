@@ -15,7 +15,7 @@ import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.WenuLinkService
 import org.WenuLink.adapters.TelemetryData
 import org.WenuLink.adapters.TelemetryHandler
-import org.WenuLink.adapters.Utils
+import org.WenuLink.adapters.AsyncUtils
 import kotlin.getValue
 
 
@@ -68,7 +68,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         startFunction(Intent(thisApp, WenuLinkService::class.java))
 
         viewModelScope.launch {
-            _isServiceRunning.value = Utils.waitTimeout(1000, 60000, ::isServiceReady)
+            _isServiceRunning.value = AsyncUtils.waitTimeout(1000, 60000, ::isServiceReady)
         }
     }
 
@@ -79,7 +79,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         runMAVLink(false)
         runWebRTC(false)
         viewModelScope.launch {
-            Utils.waitReady(isReady = ::isServiceStop)
+            AsyncUtils.waitReady(isReady = ::isServiceStop)
             thisApp.stopService(
                 Intent(thisApp, WenuLinkService::class.java)
             )

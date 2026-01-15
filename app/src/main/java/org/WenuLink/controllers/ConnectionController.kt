@@ -20,8 +20,8 @@ import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.TelemetryHandler
-import org.WenuLink.adapters.Utils
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.getValue
 import kotlin.math.pow
@@ -95,7 +95,7 @@ class ConnectionController (
 
     fun msgTimeSync(): MAVLinkMessage {
         val msg = msg_timesync()
-        msg.tc1 = Utils.getMicroTime()
+        msg.tc1 = MessageUtils.getMicroTime()
         return msg
     }
 
@@ -128,7 +128,7 @@ class ConnectionController (
         // mode definition
         // For base mode logic, see Copter::sendHeartBeat() in ArduCopter/GCS_Mavlink.cpp
         heartbeat.base_mode = aircraft.baseMode.toShort()
-        heartbeat.custom_mode = aircraft.customMode.mode
+        heartbeat.custom_mode = aircraft.copterFlightMode.mode
         return heartbeat
     }
 

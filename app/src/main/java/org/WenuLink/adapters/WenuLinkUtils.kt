@@ -7,7 +7,7 @@ import com.MAVLink.enums.MAV_RESULT
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-object Utils {
+object AsyncUtils {
     suspend fun waitReadiness(
         delayTime: Long = 100,
         timeout: Long = 2000,
@@ -41,7 +41,10 @@ object Utils {
             delay(intervalTime) // Wait for the next check
         }
     }
+}
 
+
+object MessageUtils {
     fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
 
     // float deg to deg E7

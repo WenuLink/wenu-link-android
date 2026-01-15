@@ -11,6 +11,7 @@ import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.getValue
 
@@ -69,15 +70,7 @@ class CommandController (
         result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
         progress: Int = -1
     ) {
-        val msg = msg_command_ack()
-        msg.command = messageID
-        if (progress > -1) {
-            msg.result = MAV_RESULT.MAV_RESULT_IN_PROGRESS.toShort()
-            msg.progress = progress.toShort()
-        } else {
-            msg.result = result.toShort()
-        }
-        client.sendMessage(msg)
+        client.sendMessage(MessageUtils.commandAckMsg(messageID, result, progress))
     }
 
     fun sendAutopilotAck() {
@@ -150,7 +143,7 @@ class CommandController (
 
     fun processLanding(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         logger.d { "processLanding: $commandMsg" }
-        aircraft.landing()
+        aircraft.land()
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
 

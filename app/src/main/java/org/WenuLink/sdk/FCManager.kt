@@ -7,9 +7,11 @@ import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
+import kotlinx.coroutines.delay
 import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.Utils
+import org.WenuLink.adapters.AsyncUtils
 import kotlin.getValue
+import kotlin.math.abs
 
 object FCManager {
     private val logger by taggedLogger("FlightControllerManager")
@@ -148,25 +150,47 @@ object FCManager {
         return fcInstance?.state?.isFlying ?: false
     }
 
+    suspend fun waitForAltitude(altitude: Float = 1.2F, margin: Float = 0.1F) {
+        fun hasDiffAltitude() = abs(fcInstance?.state?.aircraftLocation?.altitude?.minus(altitude) ?: margin) < margin
+        while (hasDiffAltitude()) {
+            logger.d { "hasDiffAltitude(${fcInstance?.state?.aircraftLocation?.altitude})" }
+            delay(100L)
+        }
+    }
+
     suspend fun waitForFlying(takingOff: Boolean): Boolean {
-        logger.d { "waitForFlying($takingOff)" }
+        logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
         fun isFlyingConditioned() = if (takingOff) isFlying() else !isFlying()
-        Utils.waitReady(isReady = ::isFlyingConditioned)
-        logger.d { "Aircraft is ${if (isFlyingConditioned()) "flying" else "on the ground"}" }
+        AsyncUtils.waitReady( 100L, isReady = ::isFlyingConditioned)
+        logger.d { "Aircraft is ${if (isFlyingConditioned() && takingOff) "flying" else "on the ground"}" }
         return isFlyingConditioned()
     }
 
     suspend fun simpleTakeoff(): Boolean {
-        logger.d { "Taking off" }
 //        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startTakeoff { }
-        return waitForArmed(true)
+        return waitForFlying(true)
     }
 
     suspend fun simpleLanding(): Boolean {
         logger.d { "Landing" }
 //        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startLanding { }
+
+        fun confirmationNeeded() = fcInstance?.state?.isLandingConfirmationNeeded == true
+
+        logger.d { "\t- Descending to 0.3m" }
+        AsyncUtils.waitReady(100L, ::confirmationNeeded)
+
+        // TODO: Assess if must ask to user to accept this confirmation
+        logger.d { "\t- Waiting for confirmation" }
+        fcInstance?.confirmLanding {
+            // for somehow these kind of actions does not return anything, possibly is a thread issue.
+            SDKUtils.createCompletionCallback { error ->
+                logger.d { "\t\tconfirmLanding error: $error" }
+            }
+        }
+
         return waitForFlying(false)
     }
 
@@ -176,8 +200,8 @@ object FCManager {
 
     suspend fun waitForArmed(arming: Boolean): Boolean {
         fun areMotorsUpdated() = if (arming) areMotorsArmed() else !areMotorsArmed()
-        val motorsUpdated = Utils.waitTimeout(isReady = ::areMotorsUpdated)
-        logger.d { "Motors ${if (motorsUpdated) "armed" else "disarmed"}: $motorsUpdated" }
+        val motorsUpdated = AsyncUtils.waitTimeout(isReady = ::areMotorsUpdated)
+        logger.d { "Motors ${if (motorsUpdated && arming) "armed" else "disarmed"}: $motorsUpdated" }
         return motorsUpdated
     }
 

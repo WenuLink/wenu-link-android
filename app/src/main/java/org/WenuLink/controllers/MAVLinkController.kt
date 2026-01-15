@@ -35,7 +35,8 @@ import kotlinx.coroutines.delay
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.TelemetryHandler
-import org.WenuLink.adapters.Utils
+import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.math.roundToInt
 
@@ -159,12 +160,16 @@ class MAVLinkController(
         controllers += NavigationController(client)
     }
 
-    // TODO: define booting sequence to update DroneHandler.mavlinkState accordingly
-
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
     // https://mavlink.io/en/services/
     fun processMessage(msg: MAVLinkMessage) {
-        logger.d { "Processing MAVLink message ID: ${msg.msgid}" }
+        // avoid eternal log with the station's heartbeat
+        if (!connectionController.isGCSPresent)
+            logger.d { "Processing MAVLink message ID: ${msg.msgid}" }
+        else {
+            if (msg.msgid != 0) logger.d { "Processing MAVLink message ID: ${msg.msgid}" }
+        }
+
         // Process message with registered Controllers
         val processed = controllers.any { it.processMessage(msg, aircraft) }
         if (processed) return
@@ -177,7 +182,7 @@ class MAVLinkController(
             else -> {
                 // Notify if no message ID definition was found in any Controller
                 logger.w { "Unhandled message ${msg.name()}" }
-                commandController.sendCommandAck(msg.msgid)
+                client.sendMessage(MessageUtils.commandAckMsg(msg.msgid))
             }
         }
     }
@@ -201,7 +206,7 @@ class MAVLinkController(
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
                 logger.w { "Unhandled command ID: ${commandMsg.name()}" }
-                commandController.sendCommandAck(commandMsg.command)
+                client.sendMessage(MessageUtils.commandAckMsg(commandMsg.command))
             }
         }
     }
@@ -229,7 +234,7 @@ class MAVLinkController(
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
                 logger.w { "Unhandled request ID: $requestID" }
-                commandController.sendCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE)
+                client.sendMessage(MessageUtils.requestAckMsg())
             }
         }
     }
@@ -241,7 +246,7 @@ class MAVLinkController(
             return
         }
 
-        val currentMicroTime = Utils.getMicroTime()
+        val currentMicroTime = MessageUtils.getMicroTime()
 
         if (messageRates.isEmpty()) return
 
@@ -310,7 +315,12 @@ class MAVLinkController(
         val newRate = setMessageRate(mavlinkMsgID, interval)
 //        logger.d { "\tnew currentRate:${newRate}" }
 
-        commandController.sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        client.sendMessage(
+            MessageUtils.commandAckMsg(
+                commandMsg.command,
+                MAV_RESULT.MAV_RESULT_ACCEPTED
+            )
+        )
     }
 
     fun notifySystemReady() {
@@ -325,17 +335,13 @@ class MAVLinkController(
         if (telemetry.isActive()) return true
         // Wait for data from SDK
         telemetry.launchTelemetry(true)
-        val telemetryUp = telemetry.waitTelemetryUp(timeout)
-        logger.i { "Telemetry started: $telemetryUp." }
-        return telemetryUp
+        return telemetry.waitTelemetryUp(timeout)
     }
 
     suspend fun waitTerminateTelemetry(timeout: Long = 5000L): Boolean {
         if (!telemetry.isActive()) return true
         telemetry.launchTelemetry(false)
-        val telemetryDown = telemetry.waitForTelemetryDown(timeout)
-        logger.i { "Telemetry stop: $telemetryDown." }
-        return telemetryDown
+        return telemetry.waitForTelemetryDown(timeout)
     }
 
     fun launchListening() {
@@ -355,8 +361,8 @@ class MAVLinkController(
         // Send heartbeat and wait for any GCS
         connectionController.sendHeartbeat(aircraft)
         logger.d { "Waiting for GCS." }
-        Utils.waitTimeout(10, timeout, ::isStationConnected)
-        logger.d { "GCS found?: ${isStationConnected()}." }
+        AsyncUtils.waitTimeout(10, timeout, ::isStationConnected)
+        logger.i { "GCS found?: ${isStationConnected()}." }
         return isStationConnected()
     }
 
@@ -372,8 +378,8 @@ class MAVLinkController(
         // https://docs.qgroundcontrol.com/master/en/qgc-dev-guide/communication_flow.html
         if (!isStationConnected()) return false
         logger.d { "Waiting for MAVLink microservices." }
-        val systemReady = Utils.waitTimeout(1000, timeout, ::isSystemReady)
-        if (systemReady) logger.d { "MAVLink microservices initialized." }
+        val systemReady = AsyncUtils.waitTimeout(1000, timeout, ::isSystemReady)
+        if (systemReady) logger.i { "MAVLink microservices initialized." }
         else logger.d { "Unable to check for Mission and Parameter request, possibly already set." }
 
         return isSystemReady()

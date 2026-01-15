@@ -64,7 +64,9 @@ class MAVLinkService {
 
     fun clientCanStart(): Boolean = clientExists() && !clientIsRunning()
 
-    fun isServiceRunning(): Boolean = hasTelemetryRunning() || clientIsRunning()
+    fun isServiceRunning(): Boolean = hasTelemetryRunning() && clientIsRunning()
+
+    fun isServiceStop(): Boolean = !(hasTelemetryRunning() || clientIsRunning())
 
     fun createClient(serviceScope: CoroutineScope) {
         logger.d { "Creating MAVLinkClient for udp://$endpointAddress." }
@@ -87,8 +89,8 @@ class MAVLinkService {
     }
 
     fun destroyClient() {
-        logger.d { "MAVLinkClient destroyed." }
         if (client == null) return
+        logger.d { "MAVLinkClient ended." }
         client?.closeSocket()
         client = null
     }
@@ -98,7 +100,6 @@ class MAVLinkService {
             logger.i { "MAVLinkClient is not ready, possibly is enabled or already running." }
             return
         }
-        logger.i { "MAVLinkClient created for udp://$endpointAddress." }
 
         if (!controller.launchAndWaitTelemetry(5000L)) {
             logger.i { "Telemetry was not launch." }
@@ -111,20 +112,20 @@ class MAVLinkService {
         listeningJob = mavlinkScope!!.launch { controller.launchListening() }
         sendingJob = mavlinkScope!!.launch { controller.launchSending(waitingTime) }
 
-        logger.d { "MAVLink (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
 
         // Wait for station's heartbeat and shutdown if no received after a while
         val currentStationConnected = controller.waitGroundStation(5000L)
         if (!currentStationConnected) return stopService()
 
-        logger.d { "MAVLink (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
 
         mavlinkScope!!.launch {
             isReady = controller.waitSystemReady(60000L)
             if (isReady) controller.notifySystemReady()
         }
 
-        logger.d { "MAVLink (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
 
         controller.waitBoot()
     }
@@ -141,7 +142,7 @@ class MAVLinkService {
             mavlinkScope = null
         }
         isReady = false
-        logger.d { "MAVLink (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
         sendingJob = null
         listeningJob = null
         controller.waitTerminateTelemetry(5000L)

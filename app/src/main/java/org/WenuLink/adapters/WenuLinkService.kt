@@ -34,10 +34,10 @@ class WenuLinkService : Service() {
         super.onCreate()
         (application as WenuLinkApp).wenuLinkService = this // Store the service reference
         // create WebRTC instance
-        if (WebRTCService.isEnabled && !::webRTC.isInitialized)
+        if (WebRTCService.isEnabled && !isWebRTCReady())
             webRTC = WebRTCService.getInstance()// create MAVLink instance if must
 
-        if (MAVLinkService.isEnabled && !::mavlink.isInitialized)
+        if (MAVLinkService.isEnabled && !isMAVLinkReady())
             mavlink = MAVLinkService()
 
         logger.i { "WenuLinkService created." }
@@ -104,13 +104,18 @@ class WenuLinkService : Service() {
     override fun onDestroy() {
         (application as WenuLinkApp).wenuLinkService = null // Clear the reference
         serviceScope.cancel()
-        logger.i { "WenuLinkService destroyed." }
+        logger.i { "WenuLinkService ended." }
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startWebRTC() {
+        if (!WebRTCService.isEnabled) {
+            logger.i { "Unable to start WebRTC, the service is not enabled." }
+            return
+        }
+
         if (!webRTC.canStartClient()) {
             logger.e { "WebRTC client not ready, check if is enabled and a camera is present." }
             return
@@ -125,15 +130,19 @@ class WenuLinkService : Service() {
         serviceScope.launch { startWebRTC() }
     }
 
+    fun isWebRTCReady() = ::webRTC.isInitialized
+
     fun stopWebRTCService() {
-        if (!::webRTC.isInitialized) return
+        if (!isWebRTCReady()) return
         serviceScope.launch { webRTC.runProcess(false) }
         logger.i { "WebRTC service stop." }
     }
 
-    fun getWebRTCState(): StateFlow<Boolean> = webRTC.isRunning
+    fun getWebRTCState(): StateFlow<Boolean>? = if (isWebRTCReady()) webRTC.isRunning else null
 
-    fun isWebRTCUp(): Boolean = webRTC.isServiceUp
+    fun isWebRTCUp(): Boolean = if (isWebRTCReady()) webRTC.isServiceUp else false
+
+    fun isMAVLinkReady() = ::mavlink.isInitialized
 
     fun startMAVLinkService(): Job? {
         if (!MAVLinkService.isEnabled) {
@@ -141,35 +150,33 @@ class WenuLinkService : Service() {
             return null
         }
 
+        if (mavlink.clientIsRunning()) return null
+
+        logger.d { "Start MAVLinkService protocol." }
         return serviceScope.launch {
-            if (mavlink.clientIsRunning()) return@launch
-            logger.d { "Start MAVLinkService protocol." }
             mavlink.createClient(serviceScope)
             mavlink.runProcess(true)
-            Utils.waitReady(isReady = ::isMAVLinkUp)
-            logger.i { "MAVLinkService started: ${isMAVLinkUp()}" }
+            AsyncUtils.waitReady(isReady = mavlink::isServiceRunning)
+            logger.i { "MAVLinkService started: ${mavlink.isServiceRunning()}" }
         }
     }
 
     fun stopMAVLinkService (): Job? {
-        if (!::mavlink.isInitialized) return null
-        logger.d { "Stop MAVLinkService protocol." }
+        if (!isMAVLinkReady()) return null
 
+        logger.d { "Stop MAVLinkService protocol." }
         return serviceScope.launch {
             mavlink.runProcess(false)
-            fun isMAVLinkDown() = !isMAVLinkUp()
-            Utils.waitReady(isReady = ::isMAVLinkDown)
+            AsyncUtils.waitReady(isReady = mavlink::isServiceStop)
             mavlink.destroyClient()
-            logger.i { "MAVLinkService stop: ${isMAVLinkDown()}" }
+            logger.i { "MAVLinkService stop: ${mavlink.isServiceStop()}" }
         }
     }
 
-    fun getMAVLinkState(): StateFlow<Boolean> = mavlink.isRunning
+    fun getMAVLinkState(): StateFlow<Boolean>? = if (isMAVLinkReady()) mavlink.isRunning else null
 
-    fun isMAVLinkUp(): Boolean = mavlink.isServiceRunning()
+    fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isRunning(): Boolean = isMAVLinkUp() || isWebRTCUp()
-
-    fun isReady(): Boolean = ::mavlink.isInitialized || ::webRTC.isInitialized
+    fun isReady(): Boolean = isMAVLinkReady() || isWebRTCReady()
 
 }
