@@ -1,23 +1,30 @@
 package org.WenuLink.sdk
 
+import dji.common.error.DJIError
 import dji.common.mission.waypoint.Waypoint
 import dji.common.mission.waypoint.WaypointAction
 import dji.common.mission.waypoint.WaypointActionType
 import dji.common.mission.waypoint.WaypointMission
+import dji.common.mission.waypoint.WaypointMissionDownloadEvent
+import dji.common.mission.waypoint.WaypointMissionExecuteState
+import dji.common.mission.waypoint.WaypointMissionExecutionEvent
 import dji.common.mission.waypoint.WaypointMissionFinishedAction
 import dji.common.mission.waypoint.WaypointMissionFlightPathMode
 import dji.common.mission.waypoint.WaypointMissionGotoWaypointMode
 import dji.common.mission.waypoint.WaypointMissionHeadingMode
 import dji.common.mission.waypoint.WaypointMissionState
+import dji.common.mission.waypoint.WaypointMissionUploadEvent
 import dji.sdk.mission.MissionControl
 import dji.sdk.mission.waypoint.WaypointMissionOperator
+import dji.sdk.mission.waypoint.WaypointMissionOperatorListener
 import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.mission.AssembledMission
+import org.WenuLink.adapters.mission.MissionAction
+import org.WenuLink.adapters.mission.MissionNode
 import kotlin.getValue
-
 
 object MissionManager {
     private val logger by taggedLogger("MissionManager")
-    private val waypointItems = ArrayList<Waypoint?>()
 
     fun getWaypointMissionOperator(): WaypointMissionOperator {
 //        return DJISDKManager.getInstance().missionControl.waypointMissionOperator
@@ -26,37 +33,6 @@ object MissionManager {
 
     fun getWaypointMission(): WaypointMission? {
         return getWaypointMissionOperator().loadedMission
-    }
-
-    private val waypointTypes = mapOf(
-        // movement
-//        Pair(10, WaypointActionType.MAV_CMD_NAV_TAKEOFF),
-//        Pair(11, WaypointActionType.MAV_CMD_NAV_WAYPOINT),
-        Pair(12, WaypointActionType.STAY),
-        // orientation
-        Pair(20, WaypointActionType.ROTATE_AIRCRAFT),
-        Pair(21, WaypointActionType.GIMBAL_PITCH),
-        Pair(21, WaypointActionType.FINE_TUNE_GIMBAL_PITCH),
-//          TODO: https://mavlink.io/en/services/gimbal_v2.html
-        // camera triggers
-        Pair(30, WaypointActionType.CAMERA_ZOOM),
-        Pair(31, WaypointActionType.CAMERA_FOCUS),
-        Pair(32, WaypointActionType.START_TAKE_PHOTO),
-        Pair(33, WaypointActionType.START_RECORD),
-        Pair(33, WaypointActionType.PHOTO_GROUPING),
-        Pair(34, WaypointActionType.STOP_RECORD),
-    )
-
-    fun waypointActionIndex(action: WaypointAction): Int {
-        //  Solution used direct access instead of ordinal for a better control of what is already implemented
-        return waypointTypes.entries
-            .firstOrNull { it.value == action.actionType }
-            ?.key ?: 11 // waypoint as default
-    }
-
-    fun flushWaypoints() {
-        getWaypointMission()?.waypointList?.clear()
-        waypointItems.clear()
     }
 
     fun generateWaypointMissionBuilder(
@@ -82,59 +58,20 @@ object MissionManager {
         return wpBuilder
     }
 
-    fun addWaypoint(x: Double, y: Double, z: Float) {
-        val waypoint = Waypoint(x, y, z)
-        logger.d { "Add waypoint: $waypoint ($waypointItems)" }
-        waypointItems.add(waypoint)
-    }
-
-    fun getLastWaypoint(): Waypoint? = waypointItems[waypointItems.size - 1]
-
-    fun addTakeoffWP(z: Float) {
-        val (currentLat, currentLong) = FCManager.getCurrentLocation()
-        addWaypoint(currentLat!!, currentLong!!, z)
-        logger.d { "Add waypoint takeoff: ${getLastWaypoint()}" }
-    }
-
-    fun addLandingWP(z: Float = 1.2f) {
-        val (currentLat, currentLong) = FCManager.getCurrentLocation()
-        addWaypoint(currentLat!!, currentLong!!, z)
-        logger.w { "Add fake waypoint landing: ${getLastWaypoint()}" }
-    }
-
-    fun addActionDelay(seconds: Int, waypoint: Waypoint? = getLastWaypoint()) {
-        val delayTime = kotlin.math.min(kotlin.math.max(seconds * 1000, 0), 32767)
-        waypoint?.addAction(WaypointAction(WaypointActionType.STAY, delayTime)) // milliseconds
-    }
-
-    /**
-     * Add a WaypointActionType
-     * @param degrees: the degree value between [-180, 180]
-     */
-    fun addActionRotate(degrees: Int, waypoint: Waypoint? = getLastWaypoint()) {
-        val clipDegrees = kotlin.math.min(kotlin.math.max(degrees, -180), 180)
-        waypoint?.addAction(WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, clipDegrees))
-    }
-
-    fun addActionGimbalPitch(pitch: Int, waypoint: Waypoint? = getLastWaypoint()) {
-        waypoint?.addAction(WaypointAction(WaypointActionType.GIMBAL_PITCH, pitch))
-    }
-
-    fun addActionTakePhoto(waypoint: Waypoint? = getLastWaypoint()) {
-        waypoint?.addAction(WaypointAction(WaypointActionType.START_TAKE_PHOTO, 0))
-    }
-
-    fun addActionStartRecord(waypoint: Waypoint? = getLastWaypoint()) {
-        waypoint?.addAction(WaypointAction(WaypointActionType.START_RECORD, 0))
-    }
-
-    fun addActionStopRecord(waypoint: Waypoint? = getLastWaypoint()) {
-        waypoint?.addAction(WaypointAction(WaypointActionType.STOP_RECORD, 0))
-    }
-
     fun getWaypointMissionState(): WaypointMissionState {
         return getWaypointMissionOperator().currentState
     }
+
+    fun isWaitingMission() = getWaypointMissionState() == WaypointMissionState.READY_TO_UPLOAD
+
+    fun isMissionReady() = getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE
+
+    fun isMissionStarted() = getWaypointMissionState() == WaypointMissionState.EXECUTING
+
+    fun canStartMission() = getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE ||
+            getWaypointMissionState() == WaypointMissionState.EXECUTION_PAUSED
+
+    fun isMissionPaused() = getWaypointMissionState() == WaypointMissionState.EXECUTION_PAUSED
 
     fun uploadWaypointMission(onResult: (Boolean, String?) -> Unit) {
         logger.i { "Uploading mission" }
@@ -148,8 +85,7 @@ object MissionManager {
                             break
                         }
                     }
-                    if (getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE
-                    ) onResult(true, null)
+                    if (isMissionReady()) onResult(true, null)
                     else onResult(false, "Error uploading waypoint mission!")
                 } else onResult(
                     false,
@@ -159,47 +95,128 @@ object MissionManager {
         )
     }
 
-    fun buildMission(
-        autoSpeed: Float = 2f,
-        maxSpeed: Float = 6f,
-        curvedPath: Boolean = true,
-        rtlWhenFinish: Boolean = false,
+    fun uploadMission(
+        mission: AssembledMission,
+        autoSpeed: Float,
         onResult: (Boolean, String?) -> Unit
     ) {
-        // Generate MissionBuilder and add Waypoints
-        logger.d { "buildMission" }
-        val missionBuilder = generateWaypointMissionBuilder(autoSpeed, maxSpeed, curvedPath, rtlWhenFinish)
-//        missionBuilder?.waypointList(waypointItems)?.waypointCount(waypointItems.size)
-        waypointItems.forEach { missionBuilder?.addWaypoint(it!!) }
-        missionBuilder?.waypointCount(waypointItems.size)
-        // Process WaypointMission
-        val buildResult = getWaypointMissionOperator().loadMission(
-            missionBuilder?.build() as WaypointMission
-        )
-        if (buildResult != null) {
-            logger.w { "Error in loading mission: $buildResult" }
-            onResult(false, buildResult.description)
-        } else uploadWaypointMission(onResult)
+        val builder = generateWaypointMissionBuilder(
+            autoSpeed = autoSpeed,
+            rtlWhenFinish = mission.rtlWhenFinish
+        ) ?: return onResult(false, "Builder error")
+
+        mission.nodes.forEach { node ->
+            when (node) {
+                is MissionNode.Takeoff -> {
+                    // No need to process taking off
+                }
+
+                is MissionNode.Land -> {
+                    // TODO?
+                }
+
+                is MissionNode.Waypoint -> {
+                    val coordinates = node.coordinates3D
+                    val wp = Waypoint(coordinates.lat, coordinates.long, coordinates.alt)
+                    node.actions.forEach { action ->
+                        wp.addAction(mapAction(action))
+                    }
+                    builder.addWaypoint(wp)
+                }
+
+            }
+        }
+
+        builder.waypointCount(mission.nWaypoints)
+        val error = getWaypointMissionOperator().loadMission(builder.build())
+        if (error != null) onResult(false, error.description)
+        else uploadWaypointMission(onResult)
     }
 
-    fun runMission(run: Boolean, onResult: (String?) -> Unit) {
-        if (run && getWaypointMissionState()
-            in listOf<WaypointMissionState>(
-                WaypointMissionState.READY_TO_EXECUTE,
-                WaypointMissionState.EXECUTION_PAUSED
-            )
-        ) getWaypointMissionOperator().startMission(
+    private fun mapAction(action: MissionAction): WaypointAction {
+        return when (action) {
+            is MissionAction.Delay ->
+                WaypointAction(WaypointActionType.STAY, action.seconds * 1000)
+
+            is MissionAction.Rotate ->
+                WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, action.degrees)
+
+            is MissionAction.GimbalPitch ->
+                WaypointAction(WaypointActionType.GIMBAL_PITCH, action.pitch)
+
+            MissionAction.TakePhoto ->
+                WaypointAction(WaypointActionType.START_TAKE_PHOTO, 0)
+
+            MissionAction.StartRecord ->
+                WaypointAction(WaypointActionType.START_RECORD, 0)
+
+            MissionAction.StopRecord ->
+                WaypointAction(WaypointActionType.STOP_RECORD, 0)
+        }
+    }
+
+    fun startMission(onResult: (String?) -> Unit) {
+        if (canStartMission()) getWaypointMissionOperator().startMission(
             SDKUtils.createCompletionCallback(onResult)
         )
-        else getWaypointMissionOperator().stopMission(
+        else onResult("No mission to start.")
+    }
+
+    fun stopMission(onResult: (String?) -> Unit) {
+        if (isMissionStarted()) getWaypointMissionOperator().stopMission(
             SDKUtils.createCompletionCallback(onResult)
         )
+        else onResult("Not executing mission.")
     }
 
     fun pauseMission(onResult: (String?) -> Unit) {
-        if (getWaypointMissionState() == WaypointMissionState.EXECUTING
-        ) getWaypointMissionOperator().pauseMission(
+        if (isMissionStarted()) getWaypointMissionOperator().pauseMission(
             SDKUtils.createCompletionCallback(onResult)
+        )
+        else onResult("Not executing mission.")
+    }
+
+    fun resumeMission(onResult: (String?) -> Unit) {
+        if (isMissionPaused()) getWaypointMissionOperator().resumeMission(
+            SDKUtils.createCompletionCallback(onResult)
+        )
+        else onResult("No mission to resume.")
+    }
+
+    fun addListeners(
+        onStart: () -> Unit,
+        onWaypointReach: (Int) -> Unit,
+        onFinish: (String?) -> Unit
+    ) {
+        logger.d { "addListeners" }
+        getWaypointMissionOperator().addListener(
+            object : WaypointMissionOperatorListener {
+
+                override fun onUploadUpdate(p0: WaypointMissionUploadEvent) {
+                }
+
+                override fun onDownloadUpdate(p0: WaypointMissionDownloadEvent) {
+                }
+
+                override fun onExecutionStart() {
+                    logger.d { "onExecutionStart" }
+                    onStart()
+                }
+
+                override fun onExecutionUpdate(p0: WaypointMissionExecutionEvent) {
+                    val progress = p0.progress ?: return
+                    logger.d { "onExecutionUpdate progress: $progress" }
+                    if (progress.executeState == WaypointMissionExecuteState.FINISHED_ACTION)
+                        onWaypointReach(progress.targetWaypointIndex + 1)
+                }
+
+                override fun onExecutionFinish(p0: DJIError?) {
+                    logger.d { "onExecutionFinish: $p0" }
+                    onFinish(p0?.description)
+                }
+
+            }
+
         )
     }
 }

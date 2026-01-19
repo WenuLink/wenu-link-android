@@ -1,6 +1,7 @@
 package org.WenuLink.controllers
 
 import com.MAVLink.Messages.MAVLinkMessage
+import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
@@ -22,15 +23,35 @@ interface IController {
         return false
     }
 
-    fun processCommand(commandMsg: msg_command_long, aircraft: AircraftHandler, serviceScope: CoroutineScope): Boolean {
+    fun processCommandLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler,
+        serviceScope: CoroutineScope
+    ): Boolean {
         return false
     }
 
-    fun processRequest(commandMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+    fun processCommandInt(
+        commandIntMsg: msg_command_int,
+        aircraft: AircraftHandler,
+        serviceScope: CoroutineScope
+    ): Boolean {
         return false
     }
 
-    fun createMessage(messageID: Int, telemetry: TelemetryHandler, aircraft: AircraftHandler): MAVLinkMessage? {
+    fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean {
+        return false
+    }
+
+    fun processRequestLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+        return false
+    }
+
+    fun createMessage(
+        messageID: Int,
+        telemetry: TelemetryHandler,
+        aircraft: AircraftHandler
+    ): MAVLinkMessage? {
         return null
     }
 }

@@ -76,6 +76,6 @@ data class Coordinates3D(
 
 data class MessageRate(
     val messageID: Int,
-    var timeInterval: Long,
+    var microSecondsInterval: Long,
     var lastUpdateStamp: Long = 0
 )

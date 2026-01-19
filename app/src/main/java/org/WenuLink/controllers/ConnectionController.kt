@@ -123,7 +123,7 @@ class ConnectionController (
         val heartbeat = msg_heartbeat()
         heartbeat.type = MAV_TYPE.MAV_TYPE_QUADROTOR.toShort()
         heartbeat.autopilot = MAV_AUTOPILOT.MAV_AUTOPILOT_ARDUPILOTMEGA.toShort()
-        heartbeat.system_status = aircraft.mavlinkState.toShort()
+        heartbeat.system_status = aircraft.state.mavlink.toShort()
         heartbeat.mavlink_version = 3
         // mode definition
         // For base mode logic, see Copter::sendHeartBeat() in ArduCopter/GCS_Mavlink.cpp

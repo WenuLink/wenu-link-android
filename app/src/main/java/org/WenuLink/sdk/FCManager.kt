@@ -124,11 +124,6 @@ object FCManager {
         )
     }
 
-    fun getCurrentLocation(): Pair<Double?, Double?> {
-        return Pair(fcInstance?.state?.aircraftLocation?.latitude,
-            fcInstance?.state?.aircraftLocation?.longitude)
-    }
-
     fun setHomePosition(
         latitude: Double? = null,
         longitude: Double? = null,
@@ -150,73 +145,38 @@ object FCManager {
         return fcInstance?.state?.isFlying ?: false
     }
 
-    suspend fun waitForAltitude(altitude: Float = 1.2F, margin: Float = 0.1F) {
-        fun hasDiffAltitude() = abs(fcInstance?.state?.aircraftLocation?.altitude?.minus(altitude) ?: margin) < margin
-        while (hasDiffAltitude()) {
-            logger.d { "hasDiffAltitude(${fcInstance?.state?.aircraftLocation?.altitude})" }
-            delay(100L)
-        }
-    }
+    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded ?: false
 
-    suspend fun waitForFlying(takingOff: Boolean): Boolean {
-        logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
-        fun isFlyingConditioned() = if (takingOff) isFlying() else !isFlying()
-        AsyncUtils.waitReady( 100L, isReady = ::isFlyingConditioned)
-        logger.d { "Aircraft is ${if (isFlyingConditioned() && takingOff) "flying" else "on the ground"}" }
-        return isFlyingConditioned()
-    }
-
-    suspend fun simpleTakeoff(): Boolean {
-//        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+    fun startTakeoff() {
+        //        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startTakeoff { }
-        return waitForFlying(true)
     }
 
-    suspend fun simpleLanding(): Boolean {
-        logger.d { "Landing" }
+    fun startLanding() {
 //        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startLanding { }
 
-        fun confirmationNeeded() = fcInstance?.state?.isLandingConfirmationNeeded == true
+    }
 
-        logger.d { "\t- Descending to 0.3m" }
-        AsyncUtils.waitReady(100L, ::confirmationNeeded)
-
-        // TODO: Assess if must ask to user to accept this confirmation
-        logger.d { "\t- Waiting for confirmation" }
-        fcInstance?.confirmLanding {
-            // for somehow these kind of actions does not return anything, possibly is a thread issue.
-            SDKUtils.createCompletionCallback { error ->
-                logger.d { "\t\tconfirmLanding error: $error" }
-            }
-        }
-
-        return waitForFlying(false)
+    fun confirmLanding(onResult: (String?) -> Unit) {
+        // for somehow these kind of actions does not return anything, possibly is a thread issue.
+        fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
     }
 
     fun areMotorsArmed(): Boolean {
         return fcInstance?.state?.areMotorsOn() ?: false
     }
 
-    suspend fun waitForArmed(arming: Boolean): Boolean {
-        fun areMotorsUpdated() = if (arming) areMotorsArmed() else !areMotorsArmed()
-        val motorsUpdated = AsyncUtils.waitTimeout(isReady = ::areMotorsUpdated)
-        logger.d { "Motors ${if (motorsUpdated && arming) "armed" else "disarmed"}: $motorsUpdated" }
-        return motorsUpdated
-    }
-
-    suspend fun armMotors(): Boolean {
+    fun armMotors() {
         logger.d { "Arming motors" }
 //        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
-        return waitForArmed(true)
     }
 
-    suspend fun disarmMotors(): Boolean {
+    fun disarmMotors() {
         logger.d { "Disarming motors" }
 //        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
-        return waitForArmed(false)
     }
 
 }

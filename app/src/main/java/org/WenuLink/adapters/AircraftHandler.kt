@@ -1,8 +1,6 @@
 package org.WenuLink.adapters
 
-import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_MODE_FLAG
-import com.MAVLink.enums.MAV_STATE
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -37,22 +35,11 @@ class AircraftHandler {
         private set
     var copterFlightMode = ArduCopterFlightMode.STABILIZE
         private set
-    var mavlinkState: Int = MAV_STATE.MAV_STATE_UNINIT
-        private set
-    var landedState: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED
-        private set
+    var state = AircraftStateMachine()
     var sensorsOk = false
         private set
     var preArmCheckOk = false
         private set
-    val systemStandby: Boolean
-        get() { return mavlinkState == MAV_STATE.MAV_STATE_STANDBY }
-    val systemArmed: Boolean
-        get() { return mavlinkState == MAV_STATE.MAV_STATE_ACTIVE }
-    val systemFlying: Boolean
-        get() { return landedState == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR }
-    val systemOnGround: Boolean
-        get() { return landedState == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND }
 
     private val _isArmed = MutableStateFlow(false)
     val isArmed: StateFlow<Boolean> = _isArmed.asStateFlow()
@@ -72,21 +59,26 @@ class AircraftHandler {
 
     fun modeTransition(copterMode: Long): Boolean {
         val newMode = ArduCopterFlightMode.from(copterMode)
-        logger.d { "Transition: customMode=${copterFlightMode}->${newMode}" }
+        logger.d { "Transition: copterFlightMode=${copterFlightMode}->${newMode}" }
         if (newMode == null) return false
         // TODO: check if transition conditions are met
         // TODO: request for necessary internal changes
         updateModeIfArmed(newMode)
 
         // Performs actions if needed
-        if (copterFlightMode == ArduCopterFlightMode.LAND && systemArmed) land()
+        if (copterFlightMode == ArduCopterFlightMode.LAND && state.isArmed()) land()
 
         return true
     }
 
     fun updateModeIfArmed(newMode: ArduCopterFlightMode? = null) {
         if (newMode != null) copterFlightMode = newMode
-        baseMode = baseModeFor(copterFlightMode, systemArmed)
+        baseMode = baseModeFor(copterFlightMode, state.isArmed())
+    }
+
+    fun stateTransition(state: AircraftState) {
+        this.state.dispatch(state)
+        updateModeIfArmed()
     }
 
     fun readComponentsData(): Boolean {
@@ -105,7 +97,7 @@ class AircraftHandler {
     }
 
     fun checkSensors(): Boolean {
-        mavlinkState = MAV_STATE.MAV_STATE_CALIBRATING
+        stateTransition(AircraftState.Calibration)
         sensorsOk = true
         // TODO: check sensor calibration
         // https://developer.dji.com/api-reference/android-api/Components/Compass/DJICompass.html
@@ -117,28 +109,27 @@ class AircraftHandler {
     // check for home location and set
     fun getHomePosition(): Coordinates3D? = FCManager.getHomePosition()
 
-    fun updateHomePositionFromAircraft(): Coordinates3D? {
+    fun updateHomePositionFromAircraft() {
         // Ask for home position
         logger.d { "Requesting home position update with aircraft's location." }
         FCManager.setHomePosition { error ->
             if (error == null) isHomeSet = true
             if (error != null) logger.w { "Unable to set home position: $error" }
         }
-        return getHomePosition()
     }
 
     suspend fun waitForHomeLocation() {
         isHomeSet = false
         logger.d { "waitForHomeLocation" }
-        while (updateHomePositionFromAircraft() == null) {
+        while (!isHomeSet || getHomePosition() == null) {
+            if (!isHomeSet) updateHomePositionFromAircraft()
             delay(1000L)
         }
-        isHomeSet = getHomePosition() != null
         logger.d { "waitForHomeLocation: OK ${getHomePosition()}" }
     }
 
     suspend fun boot() {
-        mavlinkState = MAV_STATE.MAV_STATE_BOOT
+        stateTransition(AircraftState.Boot)
         preArmCheckOk = false
         logger.d { "Aircraft booting..." }
 
@@ -150,15 +141,15 @@ class AircraftHandler {
         if (!checkCompatibility()) return
         logger.d { "\tLoading capabilities: TBD" }
         if (!checkSensors()) return
-        logger.d { "\tSensors status: YBD" }
+        logger.d { "\tSensors status: TBD" }
 
         preArmCheckOk = true
-        landedState = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND // assumes it boots from the ground
+        stateTransition(AircraftState.OnGround)
         logger.d { "Aircraft boot: OK" }
 
         waitForHomeLocation()
 
-        standby()
+        standby()  // possibly must be threaded for waiting standby mode
     }
 
     fun standby() {
@@ -167,15 +158,14 @@ class AircraftHandler {
             return // only standby after prearm check condition ok
         }
 
-        if (!systemOnGround) {
+        if (!state.isOnTheGround()) {
             logger.i { "Unable to do, aircraft is not on the ground" }
             return // only standby on ground
         }
 
         logger.i { "Aircraft is standby" }
         // All seems ok
-        mavlinkState = MAV_STATE.MAV_STATE_STANDBY
-        updateModeIfArmed()
+        stateTransition(AircraftState.Standby)
     }
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
@@ -196,33 +186,46 @@ class AircraftHandler {
         _isArmed.value = mustArm
     }
 
+    suspend fun waitArmTransition(mustArm: Boolean): Boolean {
+        fun areMotorsUpdated() = if (mustArm) FCManager.areMotorsArmed() else !FCManager.areMotorsArmed()
+        val motorsUpdated = AsyncUtils.waitTimeout(isReady = ::areMotorsUpdated)
+        logger.d { "Motors ${if (mustArm) "armed" else "disarmed"}: $motorsUpdated" }
+
+        if (mustArm && FCManager.areMotorsArmed()) {
+            stateTransition(AircraftState.Arm)
+        }
+
+        if (!mustArm && !FCManager.areMotorsArmed()) {
+            standby()
+        }
+
+        return motorsUpdated
+    }
+
     suspend fun fcArmMotors(mustArm: Boolean) {
         logger.i { "Arming motors: $mustArm" }
         if (mustArm) {
-            if (!systemStandby){
+            if (!state.isStandBy()){
                 logger.i { "Unable to arm, aircraft is not ready" }
                 return // only arm from standby
             }
-            if (!systemOnGround) {
+            if (!state.isOnTheGround()) {
                 logger.i { "Invalid arm motors call, aircraft is not on the ground" }
                 return // only arm from the ground
             }
-
-            // will attempt to arm motors only if this is present mode
             // TODO: update according to each mode
             // https://ardupilot.org/copter/docs/arming_the_motors.html
-            var armed = copterFlightMode == ArduCopterFlightMode.GUIDED  // mandatory for arm_disarm message using automatic takeoff
-            if (copterFlightMode == ArduCopterFlightMode.STABILIZE)  // will actually arm the motors first
-                armed = FCManager.armMotors()
-
-            if (!armed) return
-
-            mavlinkState = MAV_STATE.MAV_STATE_ACTIVE
-            updateModeIfArmed()
-
+            if (copterFlightMode == ArduCopterFlightMode.STABILIZE) {
+                // Manual takeoff
+                FCManager.armMotors()
+                waitArmTransition(true)
+            }
+            else if (copterFlightMode == ArduCopterFlightMode.GUIDED)// automatic takeoff
+                stateTransition(AircraftState.Arm)
         }
         else {
-            if (FCManager.disarmMotors()) standby()
+            FCManager.disarmMotors()
+            waitArmTransition(false)
         }
 
         logger.i {
@@ -243,19 +246,39 @@ class AircraftHandler {
         return Coordinates3D(location.longitude, location.latitude, location.altitude)
     }
 
+    suspend fun waitLandedStateTransition(takingOff: Boolean): Boolean {
+        logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
+        fun isFlyingConditioned() = if (takingOff) FCManager.isFlying() else !FCManager.isFlying()
+        AsyncUtils.waitReady( 100L, isReady = ::isFlyingConditioned)
+
+        if (takingOff && FCManager.isFlying()) {
+            stateTransition(AircraftState.InAir)
+            logger.d { "Aircraft is flying" }
+        }
+
+        if (!takingOff && !FCManager.isFlying()) {
+            stateTransition(AircraftState.OnGround)
+            logger.d { "Aircraft is on the ground" }
+            armMotors(false)
+        }
+
+        return isFlyingConditioned()
+    }
+
     suspend fun fcTakeOff() {
-        // TODO: verify or enforce arm first?
-        if (!systemArmed) return // need to arm first
+        if (!state.isArmed()) return // need to arm first
+
+        if (!state.isOnTheGround()) return // need to be on the ground
 
         logger.d { "Aircraft is taking off"}
-        landedState = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
+        FCManager.startTakeoff()
+        stateTransition(AircraftState.Takeoff)
 
-        if (FCManager.simpleTakeoff()) {
-            landedState = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
-            logger.d { "\t success" }
+        if (waitLandedStateTransition(true)) {
+            logger.d { "\tsuccess" }
         }
         else {
-            logger.d { "\t error, disarming" }
+            logger.d { "\terror, disarming" }
             armMotors(false)
         }
 
@@ -269,27 +292,38 @@ class AircraftHandler {
         _isLanding.value = true
     }
 
+    suspend fun waitLandingConfirmation() {
+        // https://developer.dji.com/api-reference/android-api/Components/FlightController/DJIFlightController.html#djiflightcontroller_confirmlanding_inline
+        logger.d { "\tWaiting altitude of 0.3m" }
+        AsyncUtils.waitReady(100L, FCManager::needLandingConfirmation)
+
+        FCManager.confirmLanding {
+            logger.d { "\tLanding confirm"}
+        }
+    }
+
     suspend fun fcLanding() {
         // need to be armed or flying
-        if (!systemArmed) {
-            logger.i { "Not ready to land, current state $mavlinkState != ${MAV_STATE.MAV_STATE_ACTIVE}" }
+        if (!state.isArmed()) {
+            logger.d { "Invalid call, aircraft is not armed" }
             return
         }
 
         // need to be in air
-        if (!systemFlying) {
-            logger.i { "Invalid landing call, aircraft is not in air" }
+        if (!state.isFlying()) {
+            logger.d { "Invalid landing call, aircraft is not in air" }
             return
         }
 
-        mavlinkState = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION
-        landedState = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
-
         logger.d { "Aircraft is landing"}
-        if (FCManager.simpleLanding()) {
-            landedState = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+        FCManager.startLanding()
+        stateTransition(AircraftState.Land)
+
+        // Landing confirmation when 0.3 altitude is reached
+        waitLandingConfirmation()
+
+        if (waitLandedStateTransition(false)) {
             logger.d { "\ton the ground"}
-            armMotors(false)
         }
         else logger.d { "\terror" }
 
