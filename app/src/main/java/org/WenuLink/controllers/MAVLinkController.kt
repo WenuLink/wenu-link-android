@@ -39,7 +39,6 @@ import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.math.roundToInt
 
@@ -70,22 +69,15 @@ class MAVLinkController(
             1_000_000L
         )
     )
-    private val commandController: CommandController
-        get() {
-            return controllers.filterIsInstance<CommandController>().first()
-        }
     private val connectionController: ConnectionController
         get() {
             return controllers.filterIsInstance<ConnectionController>().first()
-        }
-    val isReceivingMessages: Boolean
-        get() {
-            return client.mustReceiveMessages.get()
         }
 
     /**
      * Data definition based on
      * https://ardupilot.org/dev/docs/mavlink-requesting-data.html#using-srx-parameters
+     * TODO: move to ConnectionController or possible a new TelemetryController?
      */
     val availableDataList = mapOf(
         MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_SENSORS to listOf(
@@ -155,7 +147,6 @@ class MAVLinkController(
     init {
         telemetry.registerHandlerScope(serviceScope)
         aircraft.registerHandlerScope(serviceScope)
-        MissionHandler.getInstance().registerHandlerScope(serviceScope)
 
         // TODO: move to lazy loading?
         controllers += ConnectionController(client)
@@ -416,7 +407,7 @@ class MAVLinkController(
     fun isSystemReady(): Boolean {
         val navigation = controllers.filterIsInstance<NavigationController>().first()
         val parameter = controllers.filterIsInstance<ParameterController>().first()
-        // TODO: Values must persist, once connected QGC does not ask for mission or parameter items
+        // TODO: Values must persist. Once connected, QGC does not ask for mission or parameter items twice
         // TODO: Implement as a setting or app-level variable
         return navigation.wasRequested && parameter.wasRequested && aircraft.isHomeSet
     }
@@ -452,6 +443,7 @@ class MAVLinkController(
         logger.d { "Stop listening and sending processes." }
         client.stopSending()
         client.stopListening()
+        // TODO: unload handlers if must
     }
 
 }

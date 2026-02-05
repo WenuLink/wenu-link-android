@@ -62,6 +62,11 @@ class TelemetryHandler {
     fun enableSimulation(enable: Boolean) {
         logger.i { "Enable Simulation $enable" }
 
+        if (isActive()) {
+            logger.e { "Unable to set, Telemetry is active." }
+            return
+        }
+
         if (!isSimulationReady()) {
             logger.e { "Unable to set, Simulation is not available." }
             return
@@ -77,6 +82,8 @@ class TelemetryHandler {
         SimManager.unregisterStateCallback()
         if (register) SimManager.registerStateCallback { state ->
             // TODO: Some telemetry values such as velocities must be updated
+            if (lastTelemetryData != null)
+                SimManager.completeTelemetryData(lastTelemetryData!!, state)
             updateTelemetryData(SimManager.state2telemetry(state))
         }
     }
@@ -215,6 +222,11 @@ class TelemetryHandler {
         // TODO: Maybe include some custom battery level
         return if (runSimulation) RCManager.getBatteryData()
         else AircraftManager.getBatteryData()
+    }
+
+    fun getAirlinkSignal(): IntArray {
+        return if (runSimulation) intArrayOf(98, 95)
+        else AircraftManager.getAirlinkData()
     }
 
 }

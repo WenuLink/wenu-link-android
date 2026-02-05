@@ -16,6 +16,15 @@ object SimManager {
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
+    private var velocityX: Float = 0F
+    private var velocityY: Float = 0F
+    private var velocityZ: Float = 0F
+    private var flightTime: Int = 0
+    private var takeOffAltitude: Float = 0F
+    private var initStamp: Long = 0L
+    private var updateStamp: Long = 0L
+    private var takeOffStamp: Long = 0L
+    private var landStamp: Long = 0L
 
     @Synchronized
     fun init(flightController: FlightController) {
@@ -38,6 +47,24 @@ object SimManager {
         hasCallback = false
     }
 
+    fun completeTelemetryData(telemetryT: TelemetryData, state: SimulatorState) {
+        val stamp = System.currentTimeMillis() / 1000  // to seconds
+        val dT = stamp - updateStamp
+        velocityX = (state.positionX - telemetryT.positionX) / dT
+        velocityY = (state.positionY - telemetryT.positionY) / dT
+        velocityZ = (state.positionZ - telemetryT.positionZ) / dT
+
+        if (state.isFlying && !telemetryT.isFlying) {
+            takeOffStamp = stamp
+            landStamp = stamp
+        }
+
+        if (state.isFlying && telemetryT.isFlying) landStamp = stamp
+
+        flightTime = (landStamp - takeOffStamp).toInt()
+        updateStamp = stamp
+    }
+
     @Synchronized
     fun state2telemetry(state: SimulatorState): TelemetryData {
         return TelemetryData(
@@ -50,11 +77,11 @@ object SimManager {
             positionX = state.positionX,
             positionY = state.positionY,
             positionZ = state.positionZ,
-            velocityX = 0f,
-            velocityY = 0f,
-            velocityZ = 0f,
-            flightTime = 0,
-            takeOffAltitude = 0f,
+            velocityX = velocityX,
+            velocityY = velocityY,
+            velocityZ = velocityZ,
+            flightTime = flightTime,
+            takeOffAltitude = takeOffAltitude,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
             satelliteCount = satelliteCount,
@@ -75,6 +102,14 @@ object SimManager {
         }
         logger.d { "Simulation run." }
         this.satelliteCount = satelliteCount
+        initStamp = System.currentTimeMillis() / 1000  // to seconds
+        updateStamp = initStamp
+        velocityX = 0F
+        velocityY = 0F
+        velocityZ = 0F
+        flightTime = 0
+        takeOffAltitude = 0F
+
         simInstance?.start(
             InitializationData.createInstance(
                 LocationCoordinate2D(lat, long),

@@ -155,7 +155,6 @@ object FCManager {
     fun startLanding() {
 //        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startLanding { }
-
     }
 
     fun confirmLanding(onResult: (String?) -> Unit) {

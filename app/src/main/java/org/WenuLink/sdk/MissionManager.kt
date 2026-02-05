@@ -23,17 +23,19 @@ import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionNode
 import kotlin.getValue
 
+
+/**
+ * Object class to comply with DJI ref
+ * https://developer.dji.com/api-reference/android-api/Components/Missions/DJIWaypointMissionOperator.html
+ */
 object MissionManager {
     private val logger by taggedLogger("MissionManager")
-
-    fun getWaypointMissionOperator(): WaypointMissionOperator {
-//        return DJISDKManager.getInstance().missionControl.waypointMissionOperator
-        return MissionControl.getInstance().waypointMissionOperator
-    }
-
-    fun getWaypointMission(): WaypointMission? {
-        return getWaypointMissionOperator().loadedMission
-    }
+    private val operator: WaypointMissionOperator
+        get() = MissionControl.getInstance().waypointMissionOperator
+    val currentState: WaypointMissionState
+        get() = operator.currentState
+    val loadedMission: WaypointMission?
+        get() = operator.loadedMission
 
     fun generateWaypointMissionBuilder(
         autoSpeed: Float = 2f,
@@ -58,27 +60,23 @@ object MissionManager {
         return wpBuilder
     }
 
-    fun getWaypointMissionState(): WaypointMissionState {
-        return getWaypointMissionOperator().currentState
-    }
+    fun isWaitingMission() = currentState == WaypointMissionState.READY_TO_UPLOAD
 
-    fun isWaitingMission() = getWaypointMissionState() == WaypointMissionState.READY_TO_UPLOAD
+    fun isMissionReady() = currentState == WaypointMissionState.READY_TO_EXECUTE
 
-    fun isMissionReady() = getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE
+    fun isMissionStarted() = currentState == WaypointMissionState.EXECUTING
 
-    fun isMissionStarted() = getWaypointMissionState() == WaypointMissionState.EXECUTING
+    fun canStartMission() = currentState == WaypointMissionState.READY_TO_EXECUTE ||
+            currentState == WaypointMissionState.EXECUTION_PAUSED
 
-    fun canStartMission() = getWaypointMissionState() == WaypointMissionState.READY_TO_EXECUTE ||
-            getWaypointMissionState() == WaypointMissionState.EXECUTION_PAUSED
-
-    fun isMissionPaused() = getWaypointMissionState() == WaypointMissionState.EXECUTION_PAUSED
+    fun isMissionPaused() = currentState == WaypointMissionState.EXECUTION_PAUSED
 
     fun uploadWaypointMission(onResult: (Boolean, String?) -> Unit) {
         logger.i { "Uploading mission" }
-        getWaypointMissionOperator().uploadMission(
+        operator.uploadMission(
             SDKUtils.createCompletionCallback { error ->
                 if (error == null) {
-                    while (getWaypointMissionState() == WaypointMissionState.UPLOADING) {
+                    while (currentState == WaypointMissionState.UPLOADING) {
                         try {
                             Thread.sleep(100)
                         } catch (_: InterruptedException) {
@@ -89,7 +87,7 @@ object MissionManager {
                     else onResult(false, "Error uploading waypoint mission!")
                 } else onResult(
                     false,
-                    "Error uploading mission! $error (${getWaypointMissionState()})"
+                    "Error uploading mission! $error (${currentState})"
                 )
             }
         )
@@ -128,7 +126,7 @@ object MissionManager {
         }
 
         builder.waypointCount(mission.nWaypoints)
-        val error = getWaypointMissionOperator().loadMission(builder.build())
+        val error = operator.loadMission(builder.build())
         if (error != null) onResult(false, error.description)
         else uploadWaypointMission(onResult)
     }
@@ -156,28 +154,28 @@ object MissionManager {
     }
 
     fun startMission(onResult: (String?) -> Unit) {
-        if (canStartMission()) getWaypointMissionOperator().startMission(
+        if (canStartMission()) operator.startMission(
             SDKUtils.createCompletionCallback(onResult)
         )
         else onResult("No mission to start.")
     }
 
     fun stopMission(onResult: (String?) -> Unit) {
-        if (isMissionStarted()) getWaypointMissionOperator().stopMission(
+        if (isMissionStarted()) operator.stopMission(
             SDKUtils.createCompletionCallback(onResult)
         )
         else onResult("Not executing mission.")
     }
 
     fun pauseMission(onResult: (String?) -> Unit) {
-        if (isMissionStarted()) getWaypointMissionOperator().pauseMission(
+        if (isMissionStarted()) operator.pauseMission(
             SDKUtils.createCompletionCallback(onResult)
         )
         else onResult("Not executing mission.")
     }
 
     fun resumeMission(onResult: (String?) -> Unit) {
-        if (isMissionPaused()) getWaypointMissionOperator().resumeMission(
+        if (isMissionPaused()) operator.resumeMission(
             SDKUtils.createCompletionCallback(onResult)
         )
         else onResult("No mission to resume.")
@@ -189,7 +187,7 @@ object MissionManager {
         onFinish: (String?) -> Unit
     ) {
         logger.d { "addListeners" }
-        getWaypointMissionOperator().addListener(
+        operator.addListener(
             object : WaypointMissionOperatorListener {
 
                 override fun onUploadUpdate(p0: WaypointMissionUploadEvent) {
@@ -207,7 +205,7 @@ object MissionManager {
                     val progress = p0.progress ?: return
                     logger.d { "onExecutionUpdate progress: $progress" }
                     if (progress.executeState == WaypointMissionExecuteState.FINISHED_ACTION)
-                        onWaypointReach(progress.targetWaypointIndex + 1)
+                        onWaypointReach(progress.targetWaypointIndex)
                 }
 
                 override fun onExecutionFinish(p0: DJIError?) {

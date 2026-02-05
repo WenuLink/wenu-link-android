@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import org.WenuLink.sdk.FCManager
+import org.WenuLink.sdk.MissionActionManager
+import org.WenuLink.sdk.MissionManager
 import kotlin.getValue
 
 class AircraftHandler {
@@ -40,6 +43,10 @@ class AircraftHandler {
         private set
     var preArmCheckOk = false
         private set
+    private var controlAuthority = ControlAuthority.NONE
+    var mission = MissionHandler.getInstance()
+    val missionState: Int
+        get() = mission.currentState
 
     private val _isArmed = MutableStateFlow(false)
     val isArmed: StateFlow<Boolean> = _isArmed.asStateFlow()
@@ -47,8 +54,6 @@ class AircraftHandler {
     private val _isFlying = MutableStateFlow(false)
     val isFlying: StateFlow<Boolean> = _isFlying.asStateFlow()
 
-    private val _isLanding = MutableStateFlow(false)
-    val isLanding: StateFlow<Boolean> = _isLanding.asStateFlow()
 
     fun baseModeFor(
         flightMode: ArduCopterFlightMode,
@@ -67,8 +72,20 @@ class AircraftHandler {
 
         // Performs actions if needed
         if (copterFlightMode == ArduCopterFlightMode.LAND && state.isArmed()) land()
+        if (controlAuthority == ControlAuthority.WAYPOINT_MISSION &&
+            copterFlightMode == ArduCopterFlightMode.AUTO &&
+            mission.isMissionRunning
+        ) mission.resume()
 
         return true
+    }
+
+    fun controlTransition(authority: ControlAuthority) {
+        if (controlAuthority == ControlAuthority.WAYPOINT_MISSION) {
+            // Decide policy: reject or stop mission
+            MissionManager.stopMission {}
+        }
+        controlAuthority = authority
     }
 
     fun updateModeIfArmed(newMode: ArduCopterFlightMode? = null) {
@@ -81,7 +98,7 @@ class AircraftHandler {
         updateModeIfArmed()
     }
 
-    fun readComponentsData(): Boolean {
+    fun readCurrentState(): Boolean {
         // TODO: read components metadata
         return true
     }
@@ -91,7 +108,7 @@ class AircraftHandler {
         return true
     }
 
-    fun checkCompatibility(): Boolean {
+    fun enableFeatures(): Boolean {
         // TODO: cross check aircraft capabilities vs app features
         return true
     }
@@ -134,11 +151,12 @@ class AircraftHandler {
         logger.d { "Aircraft booting..." }
 
         // TODO perform all required checks and aircraft's initialization
-        if (!readComponentsData()) return
+        // TODO: initialize from current flightControlState for correct reinitialization if needed
+        if (!readCurrentState()) return
         logger.d { "\tLoading info: TBD" }
         if (!processUserPreferences()) return
         logger.d { "\tLoading preferences: TBD" }
-        if (!checkCompatibility()) return
+        if (!enableFeatures()) return
         logger.d { "\tLoading capabilities: TBD" }
         if (!checkSensors()) return
         logger.d { "\tSensors status: TBD" }
@@ -170,16 +188,75 @@ class AircraftHandler {
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
         isArmed.distinctUntilChangedBy { it }
-            .onEach { fcArmMotors(it) }
+            .onEach {
+                if (it) fcArmMotors()
+                else fcDisarmMotors()
+            }
             .launchIn(handlerScope)
 
         isFlying.distinctUntilChangedBy { it }
-            .onEach { if (it) fcTakeOff() }
+            .onEach {
+                if (it) fcTakeOff()
+                else fcLanding()
+            }
             .launchIn(handlerScope)
 
-        isLanding.distinctUntilChangedBy { it }
-            .onEach { if (it) fcLanding() }
-            .launchIn(handlerScope)
+        registerMissionListeners(handlerScope)
+    }
+
+    private fun registerMissionListeners(handlerScope: CoroutineScope) {
+        mission.registerListeners(
+            onStart = {
+                handlerScope.launch {
+                    logger.d { "Mission started" }
+                    controlTransition(ControlAuthority.WAYPOINT_MISSION)
+                    // Must validate to which state must transit, assumes that starts from the ground
+                    // Possibly change to waitAltitude
+                    waitLandedStateTransition(true)
+                    logger.d { "MissionManager state: ${MissionManager.currentState}" }
+                }
+            },
+            onWaypointReach = { index ->
+                handlerScope.launch {
+                    logger.d { "Waypoint reached" }
+
+                    if (index == 1 && controlAuthority == ControlAuthority.WAYPOINT_MISSION)
+                    // Call pause only for second element, assumes 0 = arm, 1 = takeoff/initial alt.
+                        mission.pause()
+
+                    // Wait for AUTO mode transition
+//                    fun isAutoMode() = copterFlightMode == ArduCopterFlightMode.AUTO
+//                    AsyncUtils.waitReady(100L, ::isAutoMode)
+//                    mission.resume()
+                }
+            },
+            onFinish = { error ->
+                handlerScope.launch {
+                    logger.d { "Mission finish" }
+                    if (error != null) {
+                        logger.i { "Mission finished with error: $error" }
+                        return@launch
+                    }
+
+                    logger.d { "MissionManager state: ${MissionManager.currentState}" }
+                    controlTransition(ControlAuthority.NONE)
+                }
+            }
+        )
+
+        MissionActionManager.registerGoHomeFinished {
+            handlerScope.launch {
+                // This assumes RTL ends with landing confirmation
+                waitLandingConfirmation()
+                waitLandedStateTransition(false)
+            }
+        }
+
+        MissionActionManager.startListener {
+            // onError
+            logger.e { "Action failed: $it" }
+            controlAuthority = ControlAuthority.NONE
+        }
     }
 
     fun armMotors(mustArm: Boolean) {
@@ -199,43 +276,48 @@ class AircraftHandler {
             standby()
         }
 
-        return motorsUpdated
-    }
-
-    suspend fun fcArmMotors(mustArm: Boolean) {
-        logger.i { "Arming motors: $mustArm" }
-        if (mustArm) {
-            if (!state.isStandBy()){
-                logger.i { "Unable to arm, aircraft is not ready" }
-                return // only arm from standby
-            }
-            if (!state.isOnTheGround()) {
-                logger.i { "Invalid arm motors call, aircraft is not on the ground" }
-                return // only arm from the ground
-            }
-            // TODO: update according to each mode
-            // https://ardupilot.org/copter/docs/arming_the_motors.html
-            if (copterFlightMode == ArduCopterFlightMode.STABILIZE) {
-                // Manual takeoff
-                FCManager.armMotors()
-                waitArmTransition(true)
-            }
-            else if (copterFlightMode == ArduCopterFlightMode.GUIDED)// automatic takeoff
-                stateTransition(AircraftState.Arm)
-        }
-        else {
-            FCManager.disarmMotors()
-            waitArmTransition(false)
-        }
-
         logger.i {
             "Aircraft (isArmed=${FCManager.areMotorsArmed()}) (isFlying=${FCManager.isFlying()})"
         }
+
+        return motorsUpdated
+    }
+
+    suspend fun fcArmMotors() {
+        if (!state.isStandBy()){
+            logger.i { "Unable to arm, aircraft is not ready" }
+            return // only arm from standby
+        }
+        if (!state.isOnTheGround()) {
+            logger.i { "Invalid arm motors call, aircraft is not on the ground" }
+            return // only arm from the ground
+        }
+        logger.d { "Arming motors" }
+        // TODO: update according to each mode
+        // https://ardupilot.org/copter/docs/arming_the_motors.html
+        if (copterFlightMode == ArduCopterFlightMode.STABILIZE) {
+            // Manual takeoff
+            FCManager.armMotors()
+            waitArmTransition(true)
+        }
+        else if (copterFlightMode == ArduCopterFlightMode.GUIDED)// automatic takeoff
+            stateTransition(AircraftState.Arm)
+    }
+
+    suspend fun fcDisarmMotors() {
+        if (state.isStandBy()) return
+        logger.d { "Disarming motors" }
+
+        if (state.isFlying()) {
+            logger.w { "Invalid disarm motors call, aircraft still flying" }
+            return // only arm from the ground
+        }
+        FCManager.disarmMotors()
+        waitArmTransition(false)
     }
 
     fun takeOff() {
         _isFlying.value = true
-        _isLanding.value = false
     }
 
     fun getCurrentCoordinates(): Coordinates3D? {
@@ -262,6 +344,10 @@ class AircraftHandler {
             armMotors(false)
         }
 
+        logger.i {
+            "Aircraft (isArmed=${FCManager.areMotorsArmed()}) (isFlying=${FCManager.isFlying()})"
+        }
+
         return isFlyingConditioned()
     }
 
@@ -281,15 +367,10 @@ class AircraftHandler {
             logger.d { "\terror, disarming" }
             armMotors(false)
         }
-
-        logger.i {
-            "Aircraft (isArmed=${FCManager.areMotorsArmed()}) (isFlying=${FCManager.isFlying()})"
-        }
     }
 
     fun land() {
         _isFlying.value = false
-        _isLanding.value = true
     }
 
     suspend fun waitLandingConfirmation() {
@@ -309,37 +390,43 @@ class AircraftHandler {
             return
         }
 
-        // need to be in air
+        // need to be flying
         if (!state.isFlying()) {
-            logger.d { "Invalid landing call, aircraft is not in air" }
+            logger.d { "Invalid landing call, aircraft is not flying" }
             return
         }
 
         logger.d { "Aircraft is landing"}
-        FCManager.startLanding()
+//        FCManager.startLanding()
         stateTransition(AircraftState.Land)
+        doLand()
 
         // Landing confirmation when 0.3 altitude is reached
-        waitLandingConfirmation()
+//        waitLandingConfirmation()
 
         if (waitLandedStateTransition(false)) {
             logger.d { "\ton the ground"}
         }
         else logger.d { "\terror" }
 
-        logger.i {
-            "Aircraft (isArmed=${FCManager.areMotorsArmed()}) (isFlying=${FCManager.isFlying()})"
+    }
+
+    fun doReposition(
+        target: Coordinates3D,
+        speed: Float?
+    ) {
+        controlTransition(ControlAuthority.TIMELINE_COMMAND)
+        mission.doReposition(target, speed ?: mission.flightSpeed) { error ->
+            logger.i { "Reposition completed: $error" }
+            controlAuthority = ControlAuthority.NONE
         }
     }
 
-
-    fun flyTo(handlerScope: CoroutineScope) {
-        TODO("new method")
+    fun doLand() {
+        controlTransition(ControlAuthority.TIMELINE_COMMAND)
+        mission.doLand { error ->
+            logger.i { "Landedd:$error" }
+            controlAuthority = ControlAuthority.NONE
+        }
     }
-
-    fun returnToLaunch(handlerScope: CoroutineScope) {
-        TODO("new method")
-    }
-
-    // TODO: all movement methods
 }

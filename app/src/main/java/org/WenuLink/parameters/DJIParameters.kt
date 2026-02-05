@@ -343,5 +343,4 @@ object DJIParametersProvider : ParameterProvider {
             setter = { v, cb -> fc.setYawControlMode(v) }
         ),
     )
-
 }

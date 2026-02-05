@@ -3,6 +3,11 @@ package org.WenuLink.adapters
 import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_STATE
 
+enum class ControlAuthority {
+    NONE,
+    WAYPOINT_MISSION,
+    TIMELINE_COMMAND
+}
 
 sealed interface AircraftState {
     object Boot : AircraftState

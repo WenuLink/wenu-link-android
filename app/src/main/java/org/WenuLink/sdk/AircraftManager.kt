@@ -84,6 +84,11 @@ object AircraftManager {
     }
 
     @Synchronized
+    fun getAirlinkData(): IntArray {
+        return lastAirLinkQuality
+    }
+
+    @Synchronized
     private fun updateAirlink(downLink: Int?, upLink: Int?) {
         if (downLink != null) lastAirLinkQuality[0] = downLink
         if (upLink != null) lastAirLinkQuality[1] = upLink

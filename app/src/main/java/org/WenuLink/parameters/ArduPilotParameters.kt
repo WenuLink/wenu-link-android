@@ -287,4 +287,3 @@ object ArduPilotParametersProvider : ParameterProvider {
         )
     }
 }
-

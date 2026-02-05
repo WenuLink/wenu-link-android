@@ -4,6 +4,7 @@ import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_altitude
 import com.MAVLink.common.msg_attitude
 import com.MAVLink.common.msg_battery_status
+import com.MAVLink.common.msg_extended_sys_state
 import com.MAVLink.common.msg_mag_cal_report
 import com.MAVLink.common.msg_power_status
 import com.MAVLink.common.msg_radio_status
@@ -17,6 +18,7 @@ import com.MAVLink.enums.MAV_AUTOPILOT
 import com.MAVLink.enums.MAV_SENSOR_ORIENTATION
 import com.MAVLink.enums.MAV_SYS_STATUS_SENSOR
 import com.MAVLink.enums.MAV_TYPE
+import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AircraftHandler
@@ -25,6 +27,7 @@ import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.getValue
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -44,6 +47,7 @@ class ConnectionController (
             return hasGCS && isRecent
         }
 
+    // TODO: move where it belongs, AircraftHandler
     val sensorsPresent = MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_GYRO or
             MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_ACCEL or
             MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_MAG or
@@ -81,9 +85,10 @@ class ConnectionController (
             msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(telemetry)
             msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
             msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(telemetry)
-            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus()
+            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(telemetry)
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
             msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(telemetry)
+            msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
 //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null
         }
@@ -214,7 +219,7 @@ class ConnectionController (
         msg.heading = heading.toInt().toShort()
         // vertical info
         msg.throttle = rcData.throttleSetting
-        msg.alt = telemetryData.altitude
+        msg.alt = -telemetryData.altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down
         msg.climb = -telemetryData.velocityZ
@@ -222,12 +227,13 @@ class ConnectionController (
         return msg
     }
 
-    fun msgRadioStatus():  MAVLinkMessage {
+    fun msgRadioStatus(telemetry: TelemetryHandler):  MAVLinkMessage {
+        val airlinkSignal = telemetry.getAirlinkSignal()
         val msg = msg_radio_status()
         // DJI represent the signal quality in percent with range [0, 100], where 100 is the best quality.
         // MAVLink uses [0, 254] as uint8_t
-        msg.rssi = 0 // TODO: work out units conversion maybe from AirLink's DownLinkSignalQuality
-        msg.remrssi = 0 // TODO: work out units conversion from AirLink's UpLinkSignalQuality
+        msg.rssi = ((airlinkSignal[0] / 100F) * 255F).roundToInt().toShort() // AirLink's DownLinkSignalQuality
+        msg.remrssi = ((airlinkSignal[1] / 100F) * 255F).roundToInt().toShort() // AirLink's UpLinkSignalQuality
         return msg
 //        client.sendMessage(msg)
     }
@@ -245,6 +251,13 @@ class ConnectionController (
         msg.current_battery = (aircraftBattery.current * 10).toShort()
         msg.battery_remaining = (aircraftBattery.chargeRemaining.toFloat() / aircraftBattery.fullChargeCapacity.toFloat() * 100.0F).toInt().toByte()
 //        client.sendMessage(msg)
+        return msg
+    }
+
+    fun msgExtendedSys(aircraft: AircraftHandler): MAVLinkMessage {
+        val msg = msg_extended_sys_state()
+        msg.landed_state = aircraft.state.landed.toShort()
+        msg.vtol_state = MAV_VTOL_STATE.MAV_VTOL_STATE_MC.toShort()
         return msg
     }
 

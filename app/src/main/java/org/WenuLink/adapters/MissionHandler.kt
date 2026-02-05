@@ -4,11 +4,10 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
 import org.WenuLink.sdk.MissionManager
+import org.WenuLink.sdk.MissionActionManager
 import kotlin.getValue
 import kotlin.math.max
 import kotlin.math.min
@@ -28,7 +27,8 @@ class MissionHandler {
 
     private val logger by taggedLogger("MissionHandler")
     private val assembler = MissionAssembler()
-    private var flightSpeed: Float = 5.0F
+    var flightSpeed: Float = 5.0F
+        private set
     var currentSequence = 0
         private set
     var isMissionRunning = false
@@ -40,67 +40,9 @@ class MissionHandler {
     val currentId: Long
         get() { return 202512 }
 
-    suspend fun onStart() {
-        logger.d { "Mission started" }
-        isMissionRunning = true
-        updateState()
-        // Must validate to which state must transit, assumes that starts from the ground
-        // Possibly change to waitAltitude
-        AircraftHandler.getInstance().waitLandedStateTransition(true)
-        logger.d { "MissionManager state: ${MissionManager.getWaypointMissionState()}" }
-    }
-
-    suspend fun onFinish(error: String?) {
-        logger.d { "Mission finish" }
-        if (error != null) {
-            logger.i { "Mission finished with error: $error" }
-            return
-        }
-        // TODO: wait for launch location reaching when RTL, onFinish is called earlier
-        // This also assumes landing when finish always
-        AircraftHandler.getInstance().waitLandingConfirmation()
-
-        AircraftHandler.getInstance().waitLandedStateTransition(false)
-        logger.d { "MissionManager state: ${MissionManager.getWaypointMissionState()}" }
-        isMissionRunning = false
-        updateState()
-    }
-
-    suspend fun onWaypointReach(nextIndex: Int) {
-        logger.d { "Waypoint reached" }
-        currentSequence = nextIndex
-        updateState()
-
-        if (nextIndex != 1) return
-        // Call pause only for first element
-        pause()
-
-        // Wait for AUTO mode to resume
-//        handlerScope.launch {
-        fun isAutoMode() = AircraftHandler.getInstance().copterFlightMode == ArduCopterFlightMode.AUTO
-        AsyncUtils.waitReady(100L, ::isAutoMode)
-        resume()
-//        }
-    }
-
-    fun registerHandlerScope(handlerScope: CoroutineScope) {
-        MissionManager.addListeners(
-            onStart = {
-                handlerScope.launch { onStart() }
-            },
-            onWaypointReach = { index ->
-                handlerScope.launch { onWaypointReach(index) }
-            },
-            onFinish = { error ->
-                handlerScope.launch { onFinish(error) }
-            }
-        )
-        updateState()
-    }
-
     @Synchronized
     fun updateState() {
-        logger.d { "updateMissionState: ${MissionManager.getWaypointMissionState()}" }
+        logger.d { "updateMissionState: ${MissionManager.currentState}" }
         if (MissionManager.isWaitingMission())
             currentState = MISSION_STATE.MISSION_STATE_NO_MISSION
         else if (MissionManager.isMissionReady())
@@ -125,6 +67,8 @@ class MissionHandler {
     fun getWaypointNode(index: Int) = assembler.getNode(index)
 
     fun hasWaypointNodes() = assembler.hasNodes()
+
+    fun canCreateMission() = currentState == MISSION_STATE.MISSION_STATE_NO_MISSION
 
     fun reset() {
         assembler.reset()
@@ -227,6 +171,7 @@ class MissionHandler {
         currentSequence = 0
         MissionManager.startMission { error ->
             if (error != null) logger.i { "Unable to start the mission" }
+            updateState()
         }
     }
 
@@ -234,6 +179,66 @@ class MissionHandler {
         if (!isMissionRunning) return
         MissionManager.resumeMission { error ->
             if (error != null) logger.i { "Unable to resume the mission" }
+            updateState()
         }
+    }
+
+    fun registerListeners(
+        onStart: () -> Unit,
+        onWaypointReach: (Int) -> Unit,
+        onFinish: (String?) -> Unit
+    ) {
+        MissionManager.addListeners(
+            onStart = {
+                onStart()
+                isMissionRunning = true
+                updateState()
+            },
+            onWaypointReach = { index ->
+                currentSequence = index
+                updateState()
+                onWaypointReach(currentSequence)
+            },
+            onFinish = { error ->
+                onFinish(error)
+                isMissionRunning = false
+                updateState()
+            }
+        )
+    }
+
+    fun doReposition(
+        target: Coordinates3D,
+        speed: Float?,
+        onResult: (String?) -> Unit
+    ) {
+
+        MissionActionManager.clear()
+        val error = MissionActionManager.scheduleGoTo(
+            coordinates = target,
+            speed = speed
+        )
+
+        if (error != null) {
+            onResult("Error in reposition: ${error.description}")
+            return
+        }
+
+        MissionActionManager.registerGoToFinished {
+            onResult(null)
+        }
+
+        MissionActionManager.start()
+    }
+
+    fun doLand(onResult: (String?) -> Unit) {
+        MissionActionManager.clear()
+        MissionActionManager.scheduleLand()
+
+        MissionActionManager.registerLandFinished {
+            onResult(null)
+        }
+
+        MissionActionManager.start()
     }
 }

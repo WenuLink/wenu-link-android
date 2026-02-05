@@ -94,7 +94,6 @@ class CommandController (
     fun sendAutopilotVersion() {
         val msg = msg_autopilot_version()
         msg.capabilities =
-//            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT.toLong()
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET.toLong() or
@@ -102,7 +101,6 @@ class CommandController (
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2.toLong()
-                    //MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_RALLY.toLong() or
         msg.flight_sw_version = packVersion(
             4,
             18,
