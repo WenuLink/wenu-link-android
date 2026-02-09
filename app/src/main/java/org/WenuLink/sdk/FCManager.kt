@@ -7,15 +7,19 @@ import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
+import kotlinx.coroutines.delay
+import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.AsyncUtils
 import kotlin.getValue
+import kotlin.math.abs
 
 object FCManager {
     private val logger by taggedLogger("FlightControllerManager")
 
     var fcInstance: FlightController? = null
         private set
-    @Volatile private var serialNumber: String? = null
-    @Volatile private var fwVersion: String? = null
+    private var serialNumber: String? = null
+    private var fwVersion: String? = null
 
     @Synchronized
     fun updateSerialNumber(sn: String) {
@@ -76,8 +80,6 @@ object FCManager {
     }
 
     fun state2telemetry(state: FlightControllerState): TelemetryData {
-        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
-        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(state.flightMode)
         return TelemetryData(
             roll = state.attitude.roll,
             pitch = state.attitude.pitch,
@@ -85,12 +87,13 @@ object FCManager {
             latitude = state.aircraftLocation.latitude,
             longitude = state.aircraftLocation.longitude,
             altitude = state.aircraftLocation.altitude,
+            positionX = 0F,
+            positionY = 0F,
+            positionZ = 0F,
             velocityX = state.velocityX,
             velocityY = state.velocityY,
             velocityZ = state.velocityZ,
             flightTime = state.flightTimeInSeconds,
-            flightMode = customMode,
-            flightGuided = guidedFlag,
             takeOffAltitude = state.takeoffLocationAltitude,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
@@ -107,23 +110,18 @@ object FCManager {
         fcInstance?.setStateCallback(null)
     }
 
-    fun getHomePosition(): Triple<Double, Double, Int>? {
+    fun getHomePosition(): Coordinates3D? {
         val flightState = fcInstance!!.state
         if (!flightState.isHomeLocationSet) {
             return null
         }
 
         val homeLocation = flightState.homeLocation
-        return Triple(
-            first = homeLocation.latitude,
-            second = homeLocation.longitude,
-            third = flightState.goHomeHeight
+        return Coordinates3D(
+            homeLocation.latitude,
+            homeLocation.longitude,
+            flightState.goHomeHeight.toFloat()
         )
-    }
-
-    fun getCurrentLocation(): Pair<Double?, Double?> {
-        return Pair(fcInstance?.state?.aircraftLocation?.latitude,
-            fcInstance?.state?.aircraftLocation?.longitude)
     }
 
     fun setHomePosition(
@@ -143,12 +141,41 @@ object FCManager {
         }
     }
 
-    fun simpleTakeoff(onResult: (String?) -> Unit) {
-        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+    fun isFlying(): Boolean {
+        return fcInstance?.state?.isFlying ?: false
     }
 
-    fun simpleLanding(onResult: (String?) -> Unit) {
-        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
+    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded ?: false
+
+    fun startTakeoff() {
+        //        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.startTakeoff { }
+    }
+
+    fun startLanding() {
+//        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.startLanding { }
+    }
+
+    fun confirmLanding(onResult: (String?) -> Unit) {
+        // for somehow these kind of actions does not return anything, possibly is a thread issue.
+        fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
+    }
+
+    fun areMotorsArmed(): Boolean {
+        return fcInstance?.state?.areMotorsOn() ?: false
+    }
+
+    fun armMotors() {
+        logger.d { "Arming motors" }
+//        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
+    }
+
+    fun disarmMotors() {
+        logger.d { "Disarming motors" }
+//        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
+        fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
     }
 
 }

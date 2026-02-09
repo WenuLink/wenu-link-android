@@ -1,6 +1,5 @@
 package org.WenuLink.sdk
 
-import dji.common.flightcontroller.FlightMode
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.flightcontroller.simulator.InitializationData
 import dji.common.flightcontroller.simulator.SimulatorState
@@ -17,6 +16,15 @@ object SimManager {
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
+    private var velocityX: Float = 0F
+    private var velocityY: Float = 0F
+    private var velocityZ: Float = 0F
+    private var flightTime: Int = 0
+    private var takeOffAltitude: Float = 0F
+    private var initStamp: Long = 0L
+    private var updateStamp: Long = 0L
+    private var takeOffStamp: Long = 0L
+    private var landStamp: Long = 0L
 
     @Synchronized
     fun init(flightController: FlightController) {
@@ -39,23 +47,41 @@ object SimManager {
         hasCallback = false
     }
 
+    fun completeTelemetryData(telemetryT: TelemetryData, state: SimulatorState) {
+        val stamp = System.currentTimeMillis() / 1000  // to seconds
+        val dT = stamp - updateStamp
+        velocityX = (state.positionX - telemetryT.positionX) / dT
+        velocityY = (state.positionY - telemetryT.positionY) / dT
+        velocityZ = (state.positionZ - telemetryT.positionZ) / dT
+
+        if (state.isFlying && !telemetryT.isFlying) {
+            takeOffStamp = stamp
+            landStamp = stamp
+        }
+
+        if (state.isFlying && telemetryT.isFlying) landStamp = stamp
+
+        flightTime = (landStamp - takeOffStamp).toInt()
+        updateStamp = stamp
+    }
+
+    @Synchronized
     fun state2telemetry(state: SimulatorState): TelemetryData {
-        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
-        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(FlightMode.GPS_WAYPOINT)
         return TelemetryData(
             roll = state.roll.toDouble(),
             pitch = state.pitch.toDouble(),
             yaw = state.yaw.toDouble(),
-            latitude = state.positionX.toDouble(),  // state.location.latitude,
-            longitude = state.positionY.toDouble(),  // state.location.longitude,
+            latitude = state.location.latitude,
+            longitude = state.location.longitude,
             altitude = state.positionZ,
-            velocityX = 0f,
-            velocityY = 0f,
-            velocityZ = 0f,
-            flightTime = 0,
-            flightMode = customMode,
-            flightGuided = guidedFlag,
-            takeOffAltitude = 0f,
+            positionX = state.positionX,
+            positionY = state.positionY,
+            positionZ = state.positionZ,
+            velocityX = velocityX,
+            velocityY = velocityY,
+            velocityZ = velocityZ,
+            flightTime = flightTime,
+            takeOffAltitude = takeOffAltitude,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
             satelliteCount = satelliteCount,
@@ -70,8 +96,20 @@ object SimManager {
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit
     ) {
-        logger.d { "Starting Simulation" }
+        if (isActive()) {
+            onResult(null)
+            return
+        }
+        logger.d { "Simulation run." }
         this.satelliteCount = satelliteCount
+        initStamp = System.currentTimeMillis() / 1000  // to seconds
+        updateStamp = initStamp
+        velocityX = 0F
+        velocityY = 0F
+        velocityZ = 0F
+        flightTime = 0
+        takeOffAltitude = 0F
+
         simInstance?.start(
             InitializationData.createInstance(
                 LocationCoordinate2D(lat, long),
@@ -83,7 +121,11 @@ object SimManager {
     }
 
     fun stop(onResult: (String?) -> Unit) {
-        logger.d { "Stopping Simulation" }
+        if (!isActive()) {
+            onResult(null)
+            return
+        }
+        logger.d { "Simulation stop." }
         simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
     }
 

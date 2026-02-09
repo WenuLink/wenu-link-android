@@ -11,11 +11,11 @@ import android.util.Log
 
 import org.WenuLink.sdk.SDKManager
 import io.getstream.log.AndroidStreamLogger
-import org.WenuLink.adapters.DroneService
+import org.WenuLink.adapters.WenuLinkService
 
 class WenuLinkApp : Application() {
     private val TAG: String = WenuLinkApp::class.java.simpleName
-    var droneService: DroneService? = null
+    var wenuLinkService: WenuLinkService? = null
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {

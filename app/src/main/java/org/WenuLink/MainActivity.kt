@@ -39,7 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
-import org.WenuLink.adapters.ControlViewModel
+import org.WenuLink.views.HomeViewModel
 import org.WenuLink.sdk.SDKManager
 import org.WenuLink.ui.theme.WenuLinkTheme
 import org.WenuLink.views.ServicesViewModel
@@ -59,11 +59,11 @@ class MainActivity : ComponentActivity() {
 
     private val TAG: String = MainActivity::class.java.simpleName
 
-    private val controlViewModel: ControlViewModel by viewModels()
+    private val homeViewModel: HomeViewModel by viewModels()
     private val servicesViewModel: ServicesViewModel by viewModels()
 
     private fun checkAndRequestPermissions() {
-        controlViewModel.updateWorkflow("Checking permissions")
+        homeViewModel.updateWorkflow("Checking permissions")
         var permissionsList = arrayOf(
             Manifest.permission.VIBRATE,
             Manifest.permission.INTERNET,
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (missingPermissions.isNotEmpty()) {
-            controlViewModel.updateWorkflow("Waiting for pending permissions")
+            homeViewModel.updateWorkflow("Waiting for pending permissions")
             val requestPermissionLauncher =
                 registerForActivityResult(ActivityResultContracts.
                 RequestMultiplePermissions()) { permissionsMap ->
@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
                     MainScreen(
-                        viewModel = controlViewModel,
+                        viewModel = homeViewModel,
                         modifier = Modifier
                             .padding(innerPadding)
                             .fillMaxSize()
@@ -135,28 +135,28 @@ class MainActivity : ComponentActivity() {
 
     private fun onPermissionsGranted() {
         Log.i(TAG, "All permissions granted")
-        controlViewModel.updatePermission(true)
-        controlViewModel.updateWorkflow("Waiting for SDK")
-        controlViewModel.startSDK(applicationContext)
+        homeViewModel.updatePermission(true)
+        homeViewModel.updateWorkflow("Waiting for SDK")
+        homeViewModel.startSDK(applicationContext)
     }
 
     private fun onPermissionsDenied() {
         Log.e(TAG, "Some permissions denied")
-        controlViewModel.updatePermission(false)
-        controlViewModel.updateWorkflow("Missing permission(s), please restart the app.")
+        homeViewModel.updatePermission(false)
+        homeViewModel.updateWorkflow("Missing permission(s), please restart the app.")
     }
 
     override fun onStop() {
         super.onStop()
         // Deinitialize sdk only when no service is running
         if(!servicesViewModel.isServiceRunning.value){
-            controlViewModel.stopSDK(applicationContext)
+            homeViewModel.stopSDK(applicationContext)
         }
         // TODO: mostrar aviso para forzar salida
     }
 
     @Composable
-    fun MainScreen(viewModel: ControlViewModel, modifier: Modifier = Modifier) {
+    fun MainScreen(viewModel: HomeViewModel, modifier: Modifier = Modifier) {
         // Basic
         val isPermissionsGranted by viewModel.isPermissionsGranted.observeAsState(false)
         val workflowStatus by viewModel.workflowStatus.observeAsState("Idle")
