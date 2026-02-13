@@ -51,6 +51,10 @@ object MissionActionManager {
         missionControl.stopTimeline()
     }
 
+    fun pause() {
+        missionControl.pauseTimeline()
+    }
+
     // ---- Actions ----
 
     fun scheduleTakeOff(): DJIError? {

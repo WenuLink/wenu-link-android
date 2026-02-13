@@ -94,7 +94,7 @@ class CommandController (
     fun sendAutopilotVersion() {
         val msg = msg_autopilot_version()
         msg.capabilities =
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT.toLong()
+                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET.toLong() or
                     MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED.toLong() or

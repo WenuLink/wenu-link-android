@@ -40,7 +40,26 @@ data class RCData(
     val buttonC2: Boolean,
     val buttonC3: Boolean,
     val mode: FlightModeSwitch?
-)
+) {
+    fun toMAVLink(): RCData {
+        val currRC = this.copy(
+            throttleSetting = (this.throttleSetting + 660) / 1320,  // TODO: check this value
+            // Mavlink: 1000 to 2000 with 1500 = 1.5ms as center...
+            leftStickVertical = (this.leftStickVertical * 0.8).toInt() + 1500,
+            leftStickHorizontal = (this.leftStickHorizontal * 0.8).toInt() + 1500,
+            rightStickVertical = (this.rightStickVertical * 0.8).toInt() + 1500,
+            rightStickHorizontal = (this.rightStickHorizontal * 0.8).toInt() + 1500,
+        )
+        return currRC
+    }
+
+    fun hasCenteredJoystick(): Boolean {
+        return this.leftStickVertical == 0 &&
+                this.leftStickHorizontal == 0 &&
+                this.rightStickVertical == 0 &&
+                this.rightStickHorizontal == 0
+    }
+}
 
 data class BatteryData(
     var percentCharge: Int = -1,

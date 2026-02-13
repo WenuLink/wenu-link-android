@@ -77,17 +77,17 @@ class ConnectionController (
         return processed
     }
 
-    override fun createMessage(messageID: Int, telemetry: TelemetryHandler, aircraft: AircraftHandler): MAVLinkMessage? {
+    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
         return when (messageID) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(aircraft)
-            msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(telemetry, aircraft)
-            msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(telemetry)
-            msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(telemetry)
+            msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(aircraft.telemetry)
+            msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(aircraft.telemetry)
+            msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(aircraft.telemetry)
             msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
-            msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(telemetry)
-            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(telemetry)
+            msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(aircraft.telemetry)
+            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(aircraft.telemetry)
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
-            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(telemetry)
+            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(aircraft.telemetry)
             msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
 //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null
@@ -141,7 +141,7 @@ class ConnectionController (
         client.sendMessage(msgHeartbeat(aircraft))
     }
 
-    fun msgSysStatus(telemetry: TelemetryHandler, aircraft: AircraftHandler): MAVLinkMessage {
+    fun msgSysStatus(telemetry: TelemetryHandler): MAVLinkMessage {
         val aircraftBattery = telemetry.getAircraftBattery()
         val msg = msg_sys_status()
 
@@ -173,7 +173,7 @@ class ConnectionController (
     }
 
     fun msgAttitude(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getTelemetryData() ?: return null
+        val telemetryData = telemetry.getData() ?: return null
 
         val msg = msg_attitude()
         // TODO: this next line causes an exception
@@ -189,7 +189,7 @@ class ConnectionController (
     }
 
     fun msgAltitude(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val data = telemetry.getTelemetryData() ?: return null
+        val data = telemetry.getData() ?: return null
         val msg = msg_altitude()
         msg.altitude_relative = data.altitude
 //        client.sendMessage(msg)
@@ -202,7 +202,7 @@ class ConnectionController (
     }
 
     fun msgHUD(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getTelemetryData() ?: return null
+        val telemetryData = telemetry.getData() ?: return null
         val rcData = telemetry.getRCData() ?: return null
         val msg = msg_vfr_hud()
         // Mavlink: Current airspeed in m/s
@@ -218,7 +218,7 @@ class ConnectionController (
         if (heading < 0) heading += 360
         msg.heading = heading.toInt().toShort()
         // vertical info
-        msg.throttle = rcData.throttleSetting
+        msg.throttle = rcData.toMAVLink().throttleSetting
         msg.alt = -telemetryData.altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down

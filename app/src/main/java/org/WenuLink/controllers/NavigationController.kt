@@ -3,7 +3,6 @@ package org.WenuLink.controllers
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
-import com.MAVLink.common.msg_extended_sys_state
 import com.MAVLink.common.msg_global_position_int
 import com.MAVLink.common.msg_gps_global_origin
 import com.MAVLink.common.msg_gps_raw_int
@@ -25,7 +24,6 @@ import com.MAVLink.enums.MAV_MISSION_RESULT
 import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
-import com.MAVLink.enums.MAV_VTOL_STATE
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
@@ -78,19 +76,19 @@ class NavigationController (
     ): Boolean {
         var processed = true
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, aircraft.mission)
+            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, aircraft)
             else -> processed = false
         }
         return processed
     }
 
-    override fun createMessage(messageID: Int, telemetry: TelemetryHandler, aircraft: AircraftHandler): MAVLinkMessage? {
+    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
         return when (messageID) {
             msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT -> msgMissionCurrent(aircraft.mission)
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION -> msgHomePosition(aircraft)
-            msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT -> msgRawGPSInt(telemetry)
-            msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT -> msgGlobalPositionInt(telemetry)
-            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed(telemetry, aircraft)
+            msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT -> msgRawGPSInt(aircraft.telemetry)
+            msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT -> msgGlobalPositionInt(aircraft.telemetry)
+            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed(aircraft)
             msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN -> msgGpsGlobalOrigin(aircraft)
             else -> null
         }
@@ -241,7 +239,7 @@ class NavigationController (
             requestMissionItem(expectedSeq + 1)
         } else {
             // reached the end of the mission items
-            mission.upload{ error ->
+            mission.uploadWaypoints{ error ->
                 if (error != null) sendStatusText(error, MAV_SEVERITY.MAV_SEVERITY_ERROR)
             }
             sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, mission)
@@ -263,9 +261,9 @@ class NavigationController (
         client.sendMessage(msg)
     }
 
-    fun missionStart(msg: MAVLinkMessage, mission: MissionHandler) {
+    fun missionStart(msg: MAVLinkMessage, aircraft: AircraftHandler) {
         // TODO: Process init seq to custom first mission element
-        mission.start()
+        aircraft.doMission()
         client.sendMessage(
             MessageUtils.msgCommandAck(
                 MAV_CMD.MAV_CMD_MISSION_START,
@@ -323,7 +321,7 @@ class NavigationController (
 
 
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
-        val coordinates = aircraft.getHomePosition() ?: return null
+        val coordinates = aircraft.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
@@ -332,7 +330,7 @@ class NavigationController (
     }
 
     fun msgGlobalPositionInt(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getTelemetryData() ?: return null
+        val telemetryData = telemetry.getData() ?: return null
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
@@ -353,10 +351,10 @@ class NavigationController (
     }
 
     fun msgRawGPSInt(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getTelemetryData() ?: return null
+        val telemetryData = telemetry.getData() ?: return null
 
         val msg = msg_gps_raw_int()
-        if (telemetry.isSimulationActive()) {
+        if (telemetry.isSimulationActive) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
             return msg
         }
@@ -381,8 +379,8 @@ class NavigationController (
         return msg
     }
 
-    fun msgLocalPositionNed(telemetry: TelemetryHandler, aircraft: AircraftHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getTelemetryData() ?: return null
+    fun msgLocalPositionNed(aircraft: AircraftHandler): MAVLinkMessage? {
+        val telemetryData = aircraft.telemetry.getData() ?: return null
         val msg = msg_local_position_ned()
         msg.time_boot_ms = aircraft.systemBootTime
         msg.x = telemetryData.positionX
@@ -395,7 +393,7 @@ class NavigationController (
     }
 
     fun msgGpsGlobalOrigin(aircraft: AircraftHandler): MAVLinkMessage? {
-        val homeLoc = aircraft.getHomePosition() ?: return null
+        val homeLoc = aircraft.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)

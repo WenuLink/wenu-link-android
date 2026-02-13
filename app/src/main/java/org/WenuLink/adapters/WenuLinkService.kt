@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
@@ -29,10 +30,24 @@ class WenuLinkService : Service() {
     private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
+    private lateinit var aircraft: AircraftHandler
+    val mavlinkStateFlow: StateFlow<Boolean>?
+        get() = if (isMAVLinkReady()) mavlink.isRunning else null
+    val webRTCStateFlow: StateFlow<Boolean>?
+        get() = if (isWebRTCReady()) webRTC.isRunning else null
 
     override fun onCreate() {
         super.onCreate()
         (application as WenuLinkApp).wenuLinkService = this // Store the service reference
+
+        // create the aircraft instance
+        serviceScope.launch {
+            aircraft = AircraftHandler.getInstance(serviceScope)
+            // TODO: wait for boot sequence
+            aircraft.boot()
+            AsyncUtils.waitReady(1000L, aircraft.state::isStandBy)
+        }
+
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady())
             webRTC = WebRTCService.getInstance()// create MAVLink instance if must
@@ -55,11 +70,11 @@ class WenuLinkService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
-        val notification: Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, channelId)
-        } else {
-            Notification.Builder(this)
-        }
+        val notification: Notification.Builder =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                Notification.Builder(this, channelId)
+            else
+                Notification.Builder(this)
 
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -72,16 +87,18 @@ class WenuLinkService : Service() {
         if (::mavlink.isInitialized)
             contentText = "Sending periodic heartbeats to GCS\n"
         if (::webRTC.isInitialized)
-           contentText += "WebRTC streaming: ${webRTC.mediaOptions.VIDEO_CAMERA_NAME}"
-       // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
+            contentText += "WebRTC streaming: ${webRTC.mediaOptions.VIDEO_CAMERA_NAME}"
+        // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
         // TODO: update according to each present service
-        startForeground(1, notification
-            .setContentTitle("WenuLink service is running")
-            .setContentText(contentText)
-            .setSmallIcon(R.drawable.ic_menu_compass)
-            .setContentIntent(pendingIntent) // Open MainActivity when tapped
-            .setOngoing(true)
-            .build())
+        startForeground(
+            1, notification
+                .setContentTitle("WenuLink service is running")
+                .setContentText(contentText)
+                .setSmallIcon(R.drawable.ic_menu_compass)
+                .setContentIntent(pendingIntent) // Open MainActivity when tapped
+                .setOngoing(true)
+                .build()
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,6 +126,14 @@ class WenuLinkService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    fun isAircraftReady() = ::aircraft.isInitialized
+
+    fun stopCommands() {
+        // mission's logic already stop according to the mission kind
+        serviceScope.launch { aircraft.cancelMission() }
+        // TODO: add RTL/LAND according to settings
+    }
 
     private fun startWebRTC() {
         if (!WebRTCService.isEnabled) {
@@ -138,8 +163,6 @@ class WenuLinkService : Service() {
         logger.i { "WebRTC service stop." }
     }
 
-    fun getWebRTCState(): StateFlow<Boolean>? = if (isWebRTCReady()) webRTC.isRunning else null
-
     fun isWebRTCUp(): Boolean = if (isWebRTCReady()) webRTC.isServiceUp else false
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
@@ -150,33 +173,52 @@ class WenuLinkService : Service() {
             return null
         }
 
-        if (mavlink.clientIsRunning()) return null
+        if (mavlink.isServiceRunning()) return null
 
         logger.d { "Start MAVLinkService protocol." }
         return serviceScope.launch {
+            val telemOk = aircraft.waitTelemetry(5000L)
+            if (!telemOk) {
+                logger.w { "Unable to start service, no telemetry." }
+                return@launch
+            }
             mavlink.createClient(serviceScope)
             mavlink.runProcess(true)
-            AsyncUtils.waitReady(isReady = mavlink::isServiceRunning)
-            logger.i { "MAVLinkService started: ${mavlink.isServiceRunning()}" }
+            mavlink.waitStart()
+            watchRCInput(100L)
         }
     }
 
-    fun stopMAVLinkService (): Job? {
+    fun stopMAVLinkService(): Job? {
         if (!isMAVLinkReady()) return null
 
         logger.d { "Stop MAVLinkService protocol." }
         return serviceScope.launch {
+            stopCommands()
             mavlink.runProcess(false)
-            AsyncUtils.waitReady(isReady = mavlink::isServiceStop)
+            mavlink.waitStop()
             mavlink.destroyClient()
+            aircraft.unload()
             logger.i { "MAVLinkService stop: ${mavlink.isServiceStop()}" }
         }
     }
 
-    fun getMAVLinkState(): StateFlow<Boolean>? = if (isMAVLinkReady()) mavlink.isRunning else null
-
     fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isReady(): Boolean = isMAVLinkReady() || isWebRTCReady()
+    fun isReady(): Boolean = isAircraftReady() && (isMAVLinkReady() || isWebRTCReady())
+
+    fun isPowerOff(): Boolean = aircraft.isPowerOff
+
+    suspend fun watchRCInput(intervalTime: Long = 100L) {
+        while(!aircraft.isPowerOff) {
+            // Watch for joystick inputs
+            aircraft.rcInput?.hasCenteredJoystick()?.let {
+                serviceScope.launch {
+                    if (!it) aircraft.controlManual() // stop everything an gain the control back
+                }
+            }
+            delay(intervalTime)
+        }
+    }
 
 }

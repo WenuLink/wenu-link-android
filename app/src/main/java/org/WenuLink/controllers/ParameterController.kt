@@ -39,6 +39,8 @@ class ParameterController (
         wasInitialized = true
     }
 
+    fun isLoaded() = wasInitialized
+
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
         var processed = true
         when (msg.msgid) {
