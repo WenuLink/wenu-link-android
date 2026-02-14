@@ -52,7 +52,6 @@ object RCManager {
 
     @Synchronized
     private fun updateData(data: RCData?) {
-        // TODO: safety: bajar MAVLink si detecta control de usuario
         lastData = data
     }
 
@@ -69,7 +68,7 @@ object RCManager {
 
     private fun startHardwareListener() {
         logger.d { "Starting RC HardwareListener" }
-        rcInstance?.setHardwareStateCallback { hardwareState -> // DJI: range [-660,660]
+        rcInstance?.setHardwareStateCallback { hardwareState ->
             updateData(
                 RCData(
                     throttleSetting = hardwareState.leftStick!!.verticalPosition,
