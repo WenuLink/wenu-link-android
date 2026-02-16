@@ -2,16 +2,17 @@ package org.WenuLink.sdk
 
 import org.WenuLink.adapters.TelemetryData
 import dji.common.error.DJIError
+import dji.common.flightcontroller.CompassCalibrationState
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.imu.SensorState
 import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.delay
 import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.SensorState as AppSensorState
+import org.WenuLink.adapters.IMUState as AppIMUState
 import kotlin.getValue
-import kotlin.math.abs
 
 object FCManager {
     private val logger by taggedLogger("FlightControllerManager")
@@ -148,13 +149,7 @@ object FCManager {
     fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded ?: false
 
     fun startTakeoff() {
-        //        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
         fcInstance?.startTakeoff { }
-    }
-
-    fun startLanding() {
-//        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.startLanding { }
     }
 
     fun confirmLanding(onResult: (String?) -> Unit) {
@@ -168,14 +163,84 @@ object FCManager {
 
     fun armMotors() {
         logger.d { "Arming motors" }
-//        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOnMotors { } // ignored callback, async wait for state change
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
-//        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOffMotors { } // same than armMotors, async wait required
+    }
+
+    fun sensorState(sensorState: SensorState?): AppSensorState {
+        return when (sensorState) {
+            SensorState.DISCONNECTED,
+            SensorState.CALIBRATING,
+            SensorState.CALIBRATION_FAILED,
+            SensorState.WARMING_UP
+                -> AppSensorState.BOOT
+
+            SensorState.DATA_EXCEPTION,
+            SensorState.IN_MOTION,
+            SensorState.LARGE_BIAS
+                -> AppSensorState.CALIBRATION_NEEDED
+
+            SensorState.NORMAL_BIAS,
+            SensorState.MEDIUM_BIAS,
+            SensorState.UNKNOWN
+                -> AppSensorState.OK
+
+            null -> AppSensorState.BOOT
+        }
+    }
+
+
+    fun registerIMUState(onSensor: (AppIMUState) -> Unit) {
+        val nSensors = fcInstance?.imuCount ?: 0
+        logger.d { "Listening sensor: $nSensors IMU(s)" }
+        val state = AppIMUState()
+        if (nSensors > 0) fcInstance?.setIMUStateCallback { p0 ->
+            // The callback is executed one time per sensor, with -1 indicating the list's end
+            if (p0.index != -1) {
+                // assumes same number gyros and accel
+                if (state.gyroscope.getOrNull(p0.index) == null)
+                    state.gyroscope.add(sensorState(p0.gyroscopeState))
+                else
+                    state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
+
+                if (state.accelerometer.getOrNull(p0.index) == null)
+                    state.accelerometer.add(sensorState(p0.accelerometerState))
+                else
+                    state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
+            } else {
+                // Publish a copy after receiving the entire list
+                onSensor(
+                    AppIMUState().copy(
+                        gyroscope = state.gyroscope,
+                        accelerometer = state.accelerometer
+                    )
+                )
+            }
+        }
+        else logger.i { "No IMU sensor found!" }
+    }
+
+    fun unregisterIMUState() {
+        logger.d { "Stop listening sensor: ${fcInstance?.imuCount} IMU(s)" }
+        if ((fcInstance?.imuCount ?: 0) > 0)
+            fcInstance?.setIMUStateCallback(null)
+    }
+
+    fun compassOk(): Boolean {
+        val nSensors = fcInstance?.compassCount ?: 0
+        var compassOk = false
+        logger.d { "Reading sensor: $nSensors compasses" }
+        if (nSensors > 0) {
+            val hasError = fcInstance?.compass?.hasError() ?: true
+            val calState = fcInstance?.compass?.calibrationState
+            compassOk = !hasError && calState == CompassCalibrationState.NOT_CALIBRATING
+        } else logger.i { "No Compass sensor found!" }
+
+        return compassOk
     }
 
 }

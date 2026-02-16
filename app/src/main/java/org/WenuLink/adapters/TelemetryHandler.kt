@@ -34,6 +34,7 @@ class TelemetryHandler {
     private val _isListeningAircraft = MutableStateFlow(false)
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private var lastTelemetryData: TelemetryData? = null
+    private var lastIMUState: IMUState? = null
     val isSimulationAvailable: Boolean
         get() = SimManager.isAvailable()
     val isSimulationActive: Boolean
@@ -78,8 +79,7 @@ class TelemetryHandler {
         // Always clear first
         SimManager.unregisterStateCallback()
         if (register) SimManager.registerStateCallback { state ->
-            // TODO: Some telemetry values such as velocities must be updated
-            updateTelemetryData(SimManager.state2telemetry(state))
+            updateTelemetryData(SimManager.state2telemetry(state, lastTelemetryData))
         }
     }
 
@@ -102,6 +102,8 @@ class TelemetryHandler {
         logger.d { "registerStateListeners: $register (runSimulation: $mustRunSimulation)" }
         if (mustRunSimulation) registerSimState(register)
         else registerRealState(register)
+        // Sensor listeners
+        registerSensorState(register)
     }
 
     fun listenRemoteController(listen: Boolean) {
@@ -129,6 +131,28 @@ class TelemetryHandler {
         if (mustRunSimulation) listenSimulation(listen)
         else listenAircraft(listen)
     }
+
+    fun registerSensorState(listen: Boolean) {
+        FCManager.unregisterIMUState()  // always clear first
+        if (listen) FCManager.registerIMUState { imuState ->
+            updateIMUState(imuState)
+        }
+        else updateIMUState(null)
+    }
+
+    @Synchronized
+    fun isReadingSensors() = lastIMUState != null
+
+    @Synchronized
+    fun getIMUState() = lastIMUState
+
+    @Synchronized
+    fun updateIMUState(imuState: IMUState?) {
+        lastIMUState = imuState
+    }
+
+    @Synchronized
+    fun isCompassOk() = FCManager.compassOk()
 
     fun startBroadcast() {
         if (isReadingData()) {
@@ -179,7 +203,7 @@ class TelemetryHandler {
     }
 
     fun isReadingData(): Boolean {
-        // RC should always exists
+        // RC should always exist
         var isFlowing = RCManager.isUpdated()
         // If simulation activated, must wait for its startup
         isFlowing = isFlowing &&

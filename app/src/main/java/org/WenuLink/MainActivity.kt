@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
                     })
                 }
 
-                if (isSimulationReady && !isMAVLinkRunning) {
+                if (isSimulationReady && !isServiceRunning) {
                     Button(onClick = {
                         servicesViewModel.runService(run = true, simEnabled = true)
                     }) {

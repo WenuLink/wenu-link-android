@@ -89,7 +89,6 @@ class ConnectionController (
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
             msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(aircraft.telemetry)
             msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
-//            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null
         }
     }
@@ -203,7 +202,7 @@ class ConnectionController (
 
     fun msgHUD(telemetry: TelemetryHandler): MAVLinkMessage? {
         val telemetryData = telemetry.getData() ?: return null
-        val rcData = telemetry.getRCData() ?: return null
+        val rcData = telemetry.getRCData()?.toMAVLink() ?: return null
         val msg = msg_vfr_hud()
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
@@ -218,12 +217,11 @@ class ConnectionController (
         if (heading < 0) heading += 360
         msg.heading = heading.toInt().toShort()
         // vertical info
-        msg.throttle = rcData.toMAVLink().throttleSetting
+        msg.throttle = rcData.throttleSetting
         msg.alt = -telemetryData.altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down
         msg.climb = -telemetryData.velocityZ
-//        client.sendMessage(msg)
         return msg
     }
 
@@ -235,7 +233,6 @@ class ConnectionController (
         msg.rssi = ((airlinkSignal[0] / 100F) * 255F).roundToInt().toShort() // AirLink's DownLinkSignalQuality
         msg.remrssi = ((airlinkSignal[1] / 100F) * 255F).roundToInt().toShort() // AirLink's UpLinkSignalQuality
         return msg
-//        client.sendMessage(msg)
     }
 
     fun msgPowerStatus(): MAVLinkMessage {
@@ -250,7 +247,6 @@ class ConnectionController (
         msg.temperature = (aircraftBattery.temperature * 100.0).toInt().toShort()
         msg.current_battery = (aircraftBattery.current * 10).toShort()
         msg.battery_remaining = (aircraftBattery.chargeRemaining.toFloat() / aircraftBattery.fullChargeCapacity.toFloat() * 100.0F).toInt().toByte()
-//        client.sendMessage(msg)
         return msg
     }
 

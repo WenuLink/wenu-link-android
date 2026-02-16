@@ -16,13 +16,8 @@ object SimManager {
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
-    private var velocityX: Float = 0F
-    private var velocityY: Float = 0F
-    private var velocityZ: Float = 0F
-    private var flightTime: Int = 0
     private var takeOffAltitude: Float = 0F
     private var initStamp: Long = 0L
-    private var updateStamp: Long = 0L
     private var takeOffStamp: Long = 0L
     private var landStamp: Long = 0L
 
@@ -47,27 +42,9 @@ object SimManager {
         hasCallback = false
     }
 
-    fun completeTelemetryData(telemetryT: TelemetryData, state: SimulatorState) {
-        val stamp = System.currentTimeMillis() / 1000  // to seconds
-        val dT = stamp - updateStamp
-        velocityX = (state.positionX - telemetryT.positionX) / dT
-        velocityY = (state.positionY - telemetryT.positionY) / dT
-        velocityZ = (state.positionZ - telemetryT.positionZ) / dT
-
-        if (state.isFlying && !telemetryT.isFlying) {
-            takeOffStamp = stamp
-            landStamp = stamp
-        }
-
-        if (state.isFlying && telemetryT.isFlying) landStamp = stamp
-
-        flightTime = (landStamp - takeOffStamp).toInt()
-        updateStamp = stamp
-    }
-
     @Synchronized
-    fun state2telemetry(state: SimulatorState): TelemetryData {
-        return TelemetryData(
+    fun state2telemetry(state: SimulatorState, previousData: TelemetryData? = null): TelemetryData {
+        val data = TelemetryData(
             roll = state.roll.toDouble(),
             pitch = state.pitch.toDouble(),
             yaw = state.yaw.toDouble(),
@@ -77,21 +54,39 @@ object SimManager {
             positionX = state.positionX,
             positionY = state.positionY,
             positionZ = state.positionZ,
-            velocityX = velocityX,
-            velocityY = velocityY,
-            velocityZ = velocityZ,
-            flightTime = flightTime,
+            velocityX = 0F,
+            velocityY = 0F,
+            velocityZ = 0F,
+            flightTime = 0,
             takeOffAltitude = takeOffAltitude,
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
             satelliteCount = satelliteCount,
             gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
         )
+        // complete data from previous one
+        if (previousData == null) return data
+
+        // perform updates comparing previous and current state
+        if (data.isFlying) {
+            if (!previousData.isFlying) takeOffStamp = data.timestamp
+            landStamp = data.timestamp
+        }
+
+        // compute velocities
+        val dT = (data.timestamp - previousData.timestamp).toFloat() / 1000F // to seconds
+        return data.copy(
+            flightTime = (landStamp - takeOffStamp).toInt(),
+            velocityX = (data.positionX - previousData.positionX) / dT,
+            velocityY = (data.positionY - previousData.positionY) / dT,
+            velocityZ = (data.positionZ - previousData.positionZ) / dT
+        )
     }
 
     fun run(
         lat: Double = -8.066478642777481,
         long: Double = -34.98744367551871,
+        alt: Float = 24.0F,
         updateFrequency: Int = 10,
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit
@@ -103,12 +98,7 @@ object SimManager {
         logger.d { "Simulation run." }
         this.satelliteCount = satelliteCount
         initStamp = System.currentTimeMillis() / 1000  // to seconds
-        updateStamp = initStamp
-        velocityX = 0F
-        velocityY = 0F
-        velocityZ = 0F
-        flightTime = 0
-        takeOffAltitude = 0F
+        takeOffAltitude = alt
 
         simInstance?.start(
             InitializationData.createInstance(

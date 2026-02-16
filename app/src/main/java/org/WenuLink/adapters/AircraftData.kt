@@ -62,8 +62,11 @@ val flightMode2baseMode = mapOf(
     ArduCopterFlightMode.LOITER to MANUAL_FLAGS,
     ArduCopterFlightMode.GUIDED to GUIDED_FLAGS,
     ArduCopterFlightMode.GUIDED_NOGPS to GUIDED_FLAGS,
+    ArduCopterFlightMode.BRAKE to AUTO_FLAGS,
     ArduCopterFlightMode.AUTO to AUTO_FLAGS,
     ArduCopterFlightMode.RTL to AUTO_FLAGS,
     ArduCopterFlightMode.LAND to AUTO_FLAGS,
     ArduCopterFlightMode.SMART_RTL to AUTO_FLAGS,
 )
+
+fun toBaseMode(flightMode: ArduCopterFlightMode) = flightMode2baseMode.getValue(flightMode)

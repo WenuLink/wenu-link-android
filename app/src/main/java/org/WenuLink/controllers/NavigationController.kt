@@ -25,7 +25,6 @@ import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.TelemetryHandler
@@ -71,8 +70,7 @@ class NavigationController (
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
+        aircraft: AircraftHandler
     ): Boolean {
         var processed = true
         when (commandLongMsg.command) {
@@ -96,8 +94,7 @@ class NavigationController (
 
     override fun processCommandInt(
         commandIntMsg: msg_command_int,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
+        aircraft: AircraftHandler
     ): Boolean {
         var processed = true
         when (commandIntMsg.command) {
@@ -279,7 +276,7 @@ class NavigationController (
 
         aircraft.doReposition(
             target = coordinate,
-            speed = if (commandIntMsg.param1 != -1F) commandIntMsg.param1 else  null
+            speed = if (commandIntMsg.param1 != -1F) commandIntMsg.param1 else null
         )
 
         client.sendMessage(
@@ -334,7 +331,7 @@ class NavigationController (
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
+        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude + telemetryData.takeOffAltitude)
         // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
         // but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)

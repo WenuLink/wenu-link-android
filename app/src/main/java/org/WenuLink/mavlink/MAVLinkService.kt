@@ -9,51 +9,37 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.controllers.MAVLinkController
 import kotlin.getValue
 
-class MAVLinkService {
+class MAVLinkService (
+    aircraft: AircraftHandler
+) {
     companion object {
         var isEnabled: Boolean = true
             private set
     }
     private val logger by taggedLogger("MAVLinkService")
 
-    private var client: MAVLinkClient? = null
-    private lateinit var controller: MAVLinkController
-    private var endpointAddress = "192.168.1.220:14550"
     private var mavlinkScope: CoroutineScope? = null
+    private var controller: MAVLinkController = MAVLinkController(aircraft)
+    private var endpointAddress = "192.168.1.220:14550"
+    private var client: MAVLinkClient? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
-    var waitingTime: Long = 100L // Called ever 100ms...
-        private set
     var isReady: Boolean = false
         private set
+    val hasStationConnected: Boolean
+        get() = controller.isStationConnected()
 
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun runProcess(isRunning: Boolean) {
-        _isRunning.value = isRunning
-    }
-
     fun updateServerAddress(serverAddress: String) {
         endpointAddress = serverAddress
-    }
-
-    fun hasStationConnected(): Boolean {
-        if (!::controller.isInitialized) return false
-        return controller.isStationConnected()
-    }
-
-    fun hasTelemetryRunning(): Boolean {
-        if (!::controller.isInitialized) return false
-        return controller.isTelemetryRunning()
     }
 
     fun clientExists(): Boolean = client != null
@@ -67,94 +53,114 @@ class MAVLinkService {
 
     fun isServiceStop(): Boolean = listeningJob == null && sendingJob == null
 
-    fun createClient(serviceScope: CoroutineScope) {
+    fun createClient() {
+        if (clientExists()){
+            logger.d { "MAVLinkClient already created for udp://$endpointAddress." }
+            return
+        }
         logger.d { "Creating MAVLinkClient for udp://$endpointAddress." }
-
-        if (client != null) return
 
         val targetIp = endpointAddress.split(":")[0]
         val targetPort = endpointAddress.split(":")[1].toInt()
 
         client = MAVLinkClient(targetIp, targetPort)
-        controller = MAVLinkController(client!!, serviceScope)
-
-        isRunning.distinctUntilChangedBy { it }
-            .onEach {
-                logger.d { "Requesting to ${if (it) "launch" else "stop"} MAVLinkService." }
-                if (it) launchService()
-                else stopService()
-            }
-            .launchIn(serviceScope)
     }
 
     fun destroyClient() {
         if (client == null) return
-        logger.d { "MAVLinkClient ended." }
         client?.closeSocket()
         client = null
+        logger.d { "MAVLinkClient ended." }
     }
 
-    suspend fun launchService() {
+    fun launchListeningJob(): Job {
+        // Start listening for messages
+        return mavlinkScope!!.launch {
+            client?.startListening(controller::processMessage)
+        }
+    }
+
+    fun launchSendingJob(): Job {
+        // Start sending messages
+        return mavlinkScope!!.launch {
+            client?.startSending(controller::sendMessages)
+        }
+    }
+
+    suspend fun launchService(onResult: (String?) -> Unit) {
+        logger.d { "Requesting to launch MAVLinkService." }
+        // notify UI
+        _isRunning.value = true
+        // Start client
+        createClient()
         if (!clientCanStart()) {
             logger.i { "MAVLinkClient is not ready, possibly is disabled or already running." }
+            onResult("MAVLinkClient is not ready, possibly is disabled or already running.")
             return
         }
-
-        if (!hasTelemetryRunning()) {
-            logger.i { "Telemetry was not launch." }
-            return
-        }
-        logger.i { "Telemetry is broadcasting data." }
-
-        // Input and Output jobs in a IO scope
+        // Initialize controllers
+        controller.attachClient(client!!)
+        // IO jobs and scope
         mavlinkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        listeningJob = mavlinkScope!!.launch { controller.launchListening() }
-        sendingJob = mavlinkScope!!.launch { controller.launchSending(waitingTime) }
+        listeningJob = launchListeningJob()
+        sendingJob = launchSendingJob()
 
-        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected}) (listening?=${listeningJob?.isActive}) (sending?=${sendingJob?.isActive})" }
 
-        // Wait for station's heartbeat and shutdown if no received after a while
+        // Wait for station's heartbeat or shutdown if no received after a while
         val currentStationConnected = controller.waitGroundStation(5000L)
-        if (!currentStationConnected) return stopService()
+        if (!currentStationConnected) {
+            onResult("No ground control station found, stoping")
+            stopService()
+            return
+        }
 
-        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected}) (listening?=${listeningJob?.isActive}) (sending?=${sendingJob?.isActive})" }
 
-        val hasParams = controller.waitParameters()
+        // Wait for service's boot up
+        val hasParams = controller.loadParameters()
         if (hasParams) logger.d { "Parameters loaded" }
 
-        isReady = controller.waitSystemReady(60000L)
-        if (isReady) controller.notifySystemReady()
+        mavlinkScope!!.launch {
+            isReady = controller.waitSystemReady(60000L)
+            if (isReady) controller.notifySystemReady()
 
-        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+            logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected}) (listening?=${listeningJob?.isActive}) (sending?=${sendingJob?.isActive})" }
 
-        val hasHome = controller.waitHomePosition()
-        if (hasHome) logger.d { "Home position acquired" }
+            val hasHome = controller.waitHomePosition()
+            if (hasHome) logger.d { "Home position acquired" }
+            onResult(null)
+        }
     }
 
-    suspend fun stopService() {
-        if (mavlinkScope != null) {
-            // Wait for stop client
-            mavlinkScope!!.launch {
-                controller.shutdown()
-                sendingJob?.join()
-                listeningJob?.join()
-            }.join()
-            mavlinkScope?.cancel()
-            mavlinkScope = null
+    suspend fun stopClient() {
+        if (isServiceStop()) return // nothing to stop
+
+        mavlinkScope?.launch {
+            logger.d { "Stop client listening" }
+            client?.stopListening()
+            listeningJob?.join()
         }
-        isReady = false
-        logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
+        mavlinkScope?.launch {
+            logger.d { "Stop client sending" }
+            client?.stopSending()
+            sendingJob?.join()
+        }
+        logger.d { "Waiting 5s for client to stop" }
+        val hasStop = AsyncUtils.waitTimeout(500L, 5000L, ::clientCanStart)
+        if (!hasStop) logger.i { "Forcing stop client" }
+        mavlinkScope?.cancel()
         sendingJob = null
         listeningJob = null
     }
 
-    suspend fun waitStart() {
-        AsyncUtils.waitReady(isReady = ::isServiceRunning)
-        logger.i { "MAVLinkService started: ${isServiceRunning()}" }
+    suspend fun stopService() {
+        logger.d { "Requesting to stop MAVLinkService." }
+        // Wait for stop client
+        stopClient()
+        destroyClient()
+        _isRunning.value = false
+        isReady = false
     }
 
-    suspend fun waitStop() {
-        AsyncUtils.waitReady(isReady = ::isServiceStop)
-        logger.i { "MAVLinkService stop: ${isServiceStop()}" }
-    }
 }

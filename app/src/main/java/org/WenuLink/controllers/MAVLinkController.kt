@@ -18,6 +18,7 @@ import com.MAVLink.common.msg_mission_current
 import com.MAVLink.common.msg_nav_controller_output
 import com.MAVLink.common.msg_onboard_computer_status
 import com.MAVLink.common.msg_power_status
+import com.MAVLink.common.msg_radio_status
 import com.MAVLink.common.msg_raw_rpm
 import com.MAVLink.common.msg_rc_channels_raw
 import com.MAVLink.common.msg_rc_channels_scaled
@@ -32,7 +33,6 @@ import com.MAVLink.enums.MAV_DATA_STREAM
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.AsyncUtils
@@ -52,24 +52,21 @@ import kotlin.math.roundToInt
  * - NavigationController: Mission Protocol
  */
 class MAVLinkController(
-    private val client: MAVLinkClient,
-    private val serviceScope: CoroutineScope
+    private val aircraft: AircraftHandler,
 ) {
 
     private val logger by taggedLogger("MAVLinkController")
-    private var aircraft = AircraftHandler.getInstance()
-    private var controllers: MutableList<IController> = mutableListOf()
+    private val controllers: MutableList<IController> = mutableListOf()
+    private var client: MAVLinkClient? = null
     private var readOnlyMessageRate = true
-    private var messageRates: MutableList<MessageRate> = mutableListOf(
+    private val messageRates: MutableList<MessageRate> = mutableListOf(
         MessageRate( // began with Heartbeat at 1Hz
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT,
             1_000_000L
         )
     )
     private val connectionController: ConnectionController
-        get() {
-            return controllers.filterIsInstance<ConnectionController>().first()
-        }
+        get() = controllers.filterIsInstance<ConnectionController>().first()
 
     /**
      * Data definition based on
@@ -107,6 +104,7 @@ class MAVLinkController(
             msg_rc_channels_scaled.MAVLINK_MSG_ID_RC_CHANNELS_SCALED,
             msg_rc_channels_raw.MAVLINK_MSG_ID_RC_CHANNELS_RAW,
 //            msg_servo_output_raw.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW
+            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS
         ),
 
         MAV_DATA_STREAM.MAV_DATA_STREAM_POSITION to listOf(
@@ -141,8 +139,10 @@ class MAVLinkController(
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
 
-    init {
-        // TODO: move to lazy loading?
+    fun attachClient(client: MAVLinkClient) {
+        this.client = client
+        // Initialize controllers
+        controllers.clear()
         controllers += ConnectionController(client)
         controllers += CommandController(client)
         controllers += ParameterController(client)
@@ -172,13 +172,13 @@ class MAVLinkController(
             else -> {
                 // Notify if no message ID definition was found in any Controller
                 logger.w { "Unhandled message ${msg.name()}" }
-                client.sendMessage(MessageUtils.msgCommandAck(msg.msgid))
+                client?.sendMessage(MessageUtils.msgCommandAck(msg.msgid))
             }
         }
     }
 
     // TODO: fix routing
-    fun isTargetSystem(msgTargetSystem: Int) = msgTargetSystem == 0 || msgTargetSystem == client.systemID
+    fun isTargetSystem(msgTargetSystem: Int) = msgTargetSystem == 0 || msgTargetSystem == client?.systemID
 
     fun processCommandLong(msg: MAVLinkMessage) {
         if (msg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return
@@ -188,7 +188,7 @@ class MAVLinkController(
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
-        val processed = controllers.any { it.processCommandLong(commandMsg, aircraft, serviceScope) }
+        val processed = controllers.any { it.processCommandLong(commandMsg, aircraft) }
         if (processed) return
 
         when (commandMsg.command) {
@@ -198,7 +198,7 @@ class MAVLinkController(
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
                 logger.w { "Unhandled COMMAND_LONG ID: ${commandMsg.command}" }
-                client.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
+                client?.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
             }
         }
     }
@@ -211,14 +211,14 @@ class MAVLinkController(
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
-        val processed = controllers.any { it.processCommandInt(commandMsg, aircraft, serviceScope) }
+        val processed = controllers.any { it.processCommandInt(commandMsg, aircraft) }
         if (processed) return
 
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestInt(commandMsg)
             else -> {
                 logger.w { "Unhandled COMMAND_INT ID: ${commandMsg.command}" }
-                client.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
+                client?.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
             }
         }
     }
@@ -246,7 +246,7 @@ class MAVLinkController(
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
                 logger.w { "Unhandled REQUEST_LONG ID: $requestID" }
-                client.sendMessage(MessageUtils.msgRequestAck())
+                client?.sendMessage(MessageUtils.msgRequestAck())
             }
         }
     }
@@ -262,14 +262,14 @@ class MAVLinkController(
         when (requestID) {
             else -> {
                 logger.w { "Unhandled REQUEST_INT ID: $requestID" }
-                client.sendMessage(MessageUtils.msgRequestAck())
+                client?.sendMessage(MessageUtils.msgRequestAck())
             }
         }
     }
 
     @Synchronized
     fun sendMessages() {
-        if (!client.mustProcessMessages()) {
+        if (!(client?.mustProcessMessages() ?: false)) {
             logger.w { "MAVLink client is not ready!" }
             return
         }
@@ -293,10 +293,10 @@ class MAVLinkController(
                 continue
             }
 
-            // if a message is created, check if must sent and update
+            // if a message is created, check if it must send and update
             if ((currentMicroTime - rate.lastUpdateStamp) >= rate.microSecondsInterval) {
                 rate.lastUpdateStamp = currentMicroTime
-                client.sendMessage(message)
+                client?.sendMessage(message)
             }
         }
     }
@@ -304,7 +304,6 @@ class MAVLinkController(
     @Synchronized
     fun setMessageRate(messageID: Int, microSecondsInterval: Long): MessageRate {
         var currentRate = messageRates.find { it.messageID == messageID }
-//        logger.d { "\tcurrentRate:${currentRate}" }
         if (currentRate == null) {
             currentRate = MessageRate(messageID, microSecondsInterval)
             messageRates.add(currentRate)
@@ -344,9 +343,8 @@ class MAVLinkController(
         val mavlinkMsgID = commandMsg.param1.toInt()
         val interval = commandMsg.param2.toLong()  // already in micro seconds
         val newRate = setMessageRate(mavlinkMsgID, interval)
-//        logger.d { "\tnew currentRate:${newRate}" }
 
-        client.sendMessage(
+        client?.sendMessage(
             MessageUtils.msgCommandAck(
                 commandMsg.command,
                 MAV_RESULT.MAV_RESULT_ACCEPTED
@@ -360,22 +358,7 @@ class MAVLinkController(
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent
 
-    fun isTelemetryRunning() = aircraft.telemetry.isActive()
-
-    fun launchListening() {
-        if (!isTelemetryRunning()) return
-        // Start listening for messages
-        client.startListening(this@MAVLinkController::processMessage)
-    }
-
-    suspend fun launchSending(intervalTime: Long) {
-        if (!isTelemetryRunning()) return
-        // Start sending messages
-        client.startSending(intervalTime, this@MAVLinkController::sendMessages)
-    }
-
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
-        if (!isTelemetryRunning()) return false
         // prevent to send data before initialization
         readOnlyMessageRate = true
         // Send heartbeat and wait for any GCS
@@ -405,7 +388,7 @@ class MAVLinkController(
         return isSystemReady()
     }
 
-    suspend fun waitParameters(): Boolean {
+    suspend fun loadParameters(): Boolean {
         // Load and wait parameters
         logger.d { "Waiting for parameters" }
         val paramController = controllers.filterIsInstance<ParameterController>().first()
@@ -419,20 +402,13 @@ class MAVLinkController(
         aircraft.waitHome()
         // Send origin coordinates
         val navController = controllers.filterIsInstance<NavigationController>().first()
-        client.sendMessage(navController.msgGpsGlobalOrigin(aircraft)!!)
+        client?.sendMessage(navController.msgGpsGlobalOrigin(aircraft)!!)
         // update message rate of HOME_POSITION
         setMessageRate(
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION,
             1_000_000L
         )
         return true
-    }
-
-    fun shutdown() {
-        logger.d { "Stop listening and sending processes." }
-        client.stopSending()
-        client.stopListening()
-        // TODO: unload handlers if must
     }
 
 }

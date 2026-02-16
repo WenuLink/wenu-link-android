@@ -144,7 +144,10 @@ class MissionHandler {
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) {
-        if (!MissionManager.isWaitingMission()) return
+        if (!MissionManager.isWaitingMission()) {
+            onResult("Unable to upload mission, another mission was already uploaded")
+            return
+        }
 
         val mission = assembler.build()
         MissionManager.uploadMission(
@@ -274,6 +277,24 @@ class MissionHandler {
         logger.i { "scheduleLand" }
 
         MissionActionManager.registerLandFinished {
+            onResult(null)
+        }
+
+        MissionActionManager.start()
+    }
+
+    fun doGoHome(onResult: (String?) -> Unit) {
+        MissionActionManager.clear()
+        val error = MissionActionManager.scheduleGoHome()
+
+        if (error != null) {
+            onResult("Error in Land: ${error.description}")
+            return
+        }
+
+        logger.i { "scheduleGoHome" }
+
+        MissionActionManager.registerGoHomeFinished {
             onResult(null)
         }
 

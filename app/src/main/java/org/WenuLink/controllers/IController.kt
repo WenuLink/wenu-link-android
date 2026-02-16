@@ -3,7 +3,6 @@ package org.WenuLink.controllers
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
-import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -18,23 +17,14 @@ interface IController {
     val client: MAVLinkClient
 
     fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        // TODO: centralize client sending answer messages
         return false
     }
 
-    fun processCommandLong(
-        commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
-    ): Boolean {
+    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
         return false
     }
 
-    fun processCommandInt(
-        commandIntMsg: msg_command_int,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
-    ): Boolean {
+    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean {
         return false
     }
 
@@ -46,10 +36,7 @@ interface IController {
         return false
     }
 
-    fun createMessage(
-        messageID: Int,
-        aircraft: AircraftHandler
-    ): MAVLinkMessage? {
+    fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
         return null
     }
 }

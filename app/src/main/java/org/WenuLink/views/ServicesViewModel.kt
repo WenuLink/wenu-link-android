@@ -1,8 +1,6 @@
 package org.WenuLink.views
 
 import android.app.Application
-import android.content.Intent
-import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -14,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.WenuLinkService
 import org.WenuLink.adapters.TelemetryData
 import org.WenuLink.adapters.AsyncUtils
 import kotlin.getValue
@@ -46,31 +43,26 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     private val _isSimReady = MutableStateFlow(false)
     val isSimReady: StateFlow<Boolean> = _isSimReady.asStateFlow()
 
-    fun isSimulationReady(): Boolean = aircraft.telemetry.isSimulationAvailable
-
-    fun isServiceRunning(): Boolean = thisApp.wenuLinkService?.isRunning() ?: false
-
-    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
-
     init {
         viewModelScope.launch {
             // Wait for flag change
+            // TODO: move to a reactive value set
             _isSimReady.value = AsyncUtils.waitTimeout(1000, 60000, ::isSimulationReady)
         }
     }
 
+    fun isSimulationReady(): Boolean = aircraft.telemetry.isSimulationAvailable
+
+    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
+
     fun startService() {
-        if (thisApp.wenuLinkService != null) return
-
-        val startFunction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            thisApp::startForegroundService
-        } else {
-            thisApp::startService
-        }
-        startFunction(Intent(thisApp, WenuLinkService::class.java))
-
+        thisApp.launchWenulinkService()
+        // Async wait and update for state change
         viewModelScope.launch {
-            _isServiceRunning.value = AsyncUtils.waitTimeout(1000, 60000, ::isServiceReady)
+            _isServiceRunning.value = AsyncUtils.waitTimeout(1000, 60000L, ::isServiceReady)
+            thisApp.wenuLinkService?.runServices { error ->
+                logger.d { "runServices error: $error" }
+            }
         }
     }
 
@@ -78,14 +70,10 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         if (thisApp.wenuLinkService == null) return
 
         // Stop services and wait for shutdown
-        runMAVLink(false)
-        runWebRTC(false)
         viewModelScope.launch {
-            AsyncUtils.waitReady(isReady = thisApp.wenuLinkService!!::isPowerOff)
+            thisApp.wenuLinkService?.terminate()
             aircraft.telemetry.enableSimulation(false) // always disable
-            thisApp.stopService(
-                Intent(thisApp, WenuLinkService::class.java)
-            )
+            thisApp.stopWenulinkService()
             _isServiceRunning.value = false
         }
     }
@@ -101,8 +89,10 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update GCS server address from user input
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
-            if (run) thisApp.wenuLinkService?.startMAVLinkService()
-            else thisApp.wenuLinkService?.stopMAVLinkService()
+            if (run) thisApp.wenuLinkService?.startMAVLinkService { error ->
+                logger.d { "startMAVLinkService error: $error" }
+            }
+            else thisApp.wenuLinkService?.stopMAVLinkService()?.join()
         }
     }
 

@@ -55,4 +55,21 @@ class WenuLinkApp : Application() {
         AndroidStreamLogger.installOnDebuggableApp(this)
     }
 
+    fun launchWenulinkService() {
+        if (wenuLinkService != null) return
+
+        val startFunction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            this::startForegroundService
+        } else {
+            this::startService
+        }
+        startFunction(Intent(this, WenuLinkService::class.java))
+    }
+
+    fun stopWenulinkService() {
+        stopService(
+            Intent(this, WenuLinkService::class.java)
+        )
+    }
+
 }

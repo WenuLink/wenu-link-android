@@ -35,6 +35,8 @@ class ParameterController (
         private set
 
     suspend fun load() {
+        if (wasInitialized) return
+
         registry.loadParameters()
         wasInitialized = true
     }

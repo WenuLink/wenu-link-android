@@ -27,7 +27,8 @@ object AsyncUtils {
     ): Boolean {
         val startTime = System.currentTimeMillis()
 
-        while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
+        if (timeout == -1L) waitReady(intervalTime, isReady)
+        else while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
             delay(intervalTime) // Wait for the next check
         }
         return isReady()
@@ -55,6 +56,18 @@ object MessageUtils {
 
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
+
+    fun packVersion(
+        major: Int,
+        minor: Int,
+        patch: Int,
+        type: Int
+    ): Long {
+        return ((major shl 24) or
+                (minor shl 16) or
+                (patch shl 8) or
+                (type and 0xFF)).toLong()
+    }
 
     fun msgCommandAck(messageID: Int, result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED, progress: Int = -1): MAVLinkMessage {
         val msg = msg_command_ack()

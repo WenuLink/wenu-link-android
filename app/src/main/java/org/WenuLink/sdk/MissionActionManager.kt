@@ -28,7 +28,7 @@ object MissionActionManager {
         val event: TimelineEvent
     )
 
-    private val logger by taggedLogger("TimelineMissionManager")
+    private val logger by taggedLogger("MissionActionManager")
 
     private val missionControl: MissionControl
         get() = MissionControl.getInstance()
@@ -53,6 +53,10 @@ object MissionActionManager {
 
     fun pause() {
         missionControl.pauseTimeline()
+    }
+
+    fun resume() {
+        missionControl.resumeTimeline()
     }
 
     // ---- Actions ----
@@ -80,6 +84,14 @@ object MissionActionManager {
             autoConfirmLandingEnabled = autoConfirm
         }
         return missionControl.scheduleElement(land)
+    }
+
+    fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? {
+        val goHome = GoHomeAction().apply {
+            autoConfirmLandingEnabled = autoConfirm
+
+        }
+        return missionControl.scheduleElement(goHome)
     }
 
     // ---- Listener and callbacks ----

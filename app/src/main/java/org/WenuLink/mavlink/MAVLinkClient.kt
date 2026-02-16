@@ -25,12 +25,10 @@ class MAVLinkClient(
     private val logger by taggedLogger("MAVLinkClient")
     private var socket: DatagramSocket = DatagramSocket(localPort)
     private val mavlinkParser = Parser()
-    private val clientScope = CoroutineScope(Dispatchers.IO)
+    private val clientScope = CoroutineScope(Dispatchers.IO) // TODO: Use mavlinkScope
     val mustReceiveMessages: AtomicBoolean = AtomicBoolean(false)
     val mustSendMessages: AtomicBoolean = AtomicBoolean(false)
     var systemID = 1
-        private set
-    var gcsID = 255
         private set
 
     init {
@@ -73,8 +71,8 @@ class MAVLinkClient(
 
     fun stopSending() = mustSendMessages.set(false)
 
-    suspend fun startSending(intervalTime: Long, sendMessagesFunction: () -> Unit) {
-        logger.d { "Calling sendMessagesFunction every $intervalTime ms" }
+    suspend fun startSending(sendMessagesFunction: () -> Unit) {
+        logger.d { "Sending messages loop 1ms" }
         mustSendMessages.set(true)
         while (mustSendMessages.get() && !socket.isClosed) {
             try {
@@ -82,7 +80,7 @@ class MAVLinkClient(
             } catch (e: Exception) {
                 logger.e { "Error in outgoingMessages $e" }
             } finally {
-                delay(intervalTime)
+                delay(1)
             }
         }
         logger.d { "Sending end" }
@@ -90,10 +88,6 @@ class MAVLinkClient(
 
     fun mustProcessMessages(): Boolean {
         return mustReceiveMessages.get() || mustSendMessages.get()
-    }
-
-    fun mustStart(): Boolean {
-        return mustProcessMessages() && !socket.isClosed
     }
 
     fun sendMessage(msg: MAVLinkMessage) {
@@ -115,9 +109,5 @@ class MAVLinkClient(
                 logger.e { "Failed to send: ${e.message}" }
             }
         }
-    }
-
-    fun isTargetSystem(targetID: Short): Boolean {
-        return systemID.toShort() == targetID
     }
 }

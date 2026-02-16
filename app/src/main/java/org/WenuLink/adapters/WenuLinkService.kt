@@ -41,19 +41,15 @@ class WenuLinkService : Service() {
         (application as WenuLinkApp).wenuLinkService = this // Store the service reference
 
         // create the aircraft instance
-        serviceScope.launch {
-            aircraft = AircraftHandler.getInstance(serviceScope)
-            // TODO: wait for boot sequence
-            aircraft.boot()
-            AsyncUtils.waitReady(1000L, aircraft.state::isStandBy)
-        }
+        aircraft = AircraftHandler.getInstance(serviceScope)
 
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady())
-            webRTC = WebRTCService.getInstance()// create MAVLink instance if must
+            webRTC = WebRTCService.getInstance()
 
+        // create MAVLink instance
         if (MAVLinkService.isEnabled && !isMAVLinkReady())
-            mavlink = MAVLinkService()
+            mavlink = MAVLinkService(aircraft)
 
         logger.i { "WenuLinkService created." }
     }
@@ -112,8 +108,16 @@ class WenuLinkService : Service() {
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
 
-        startMAVLinkService()
-        startWebRTCService()
+        // Start Aircraft
+        serviceScope.launch {
+            aircraft.boot()
+            val bootOk = AsyncUtils.waitTimeout(1000L, 10000L, aircraft.state::isStandBy)
+            // Prevent infinite waiting. Terminating all services if the Aircraft is not ready.
+            if (!bootOk) {
+                terminate()
+                onDestroy()
+            }
+        }
 
         return START_STICKY // The service will continue running
     }
@@ -157,17 +161,20 @@ class WenuLinkService : Service() {
 
     fun isWebRTCReady() = ::webRTC.isInitialized
 
-    fun stopWebRTCService() {
-        if (!isWebRTCReady()) return
-        serviceScope.launch { webRTC.runProcess(false) }
-        logger.i { "WebRTC service stop." }
+    fun stopWebRTCService(): Job? {
+        if (!isWebRTCReady()) return null
+
+        return serviceScope.launch {
+            webRTC.runProcess(false)
+            logger.i { "WebRTC service stop." }
+        }
     }
 
     fun isWebRTCUp(): Boolean = if (isWebRTCReady()) webRTC.isServiceUp else false
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 
-    fun startMAVLinkService(): Job? {
+    fun startMAVLinkService(onResult: (String?) -> Unit): Job? {
         if (!MAVLinkService.isEnabled) {
             logger.i { "Unable to start MAVLink, the service is not enabled." }
             return null
@@ -177,14 +184,12 @@ class WenuLinkService : Service() {
 
         logger.d { "Start MAVLinkService protocol." }
         return serviceScope.launch {
-            val telemOk = aircraft.waitTelemetry(5000L)
-            if (!telemOk) {
+            if (!aircraft.waitTelemetry(5000L)) {
                 logger.w { "Unable to start service, no telemetry." }
+                stopMAVLinkService()
                 return@launch
             }
-            mavlink.createClient(serviceScope)
-            mavlink.runProcess(true)
-            mavlink.waitStart()
+            mavlink.launchService(onResult)
             watchRCInput(100L)
         }
     }
@@ -192,29 +197,45 @@ class WenuLinkService : Service() {
     fun stopMAVLinkService(): Job? {
         if (!isMAVLinkReady()) return null
 
-        logger.d { "Stop MAVLinkService protocol." }
+        stopCommands()
         return serviceScope.launch {
-            stopCommands()
-            mavlink.runProcess(false)
-            mavlink.waitStop()
-            mavlink.destroyClient()
-            aircraft.unload()
+            mavlink.stopService()
             logger.i { "MAVLinkService stop: ${mavlink.isServiceStop()}" }
         }
     }
 
     fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isReady(): Boolean = isAircraftReady() && (isMAVLinkReady() || isWebRTCReady())
+    fun isReady(): Boolean = isAircraftReady() // && (isMAVLinkReady() || isWebRTCReady())
 
     fun isPowerOff(): Boolean = aircraft.isPowerOff
 
+    fun runServices(
+        onMAVLinkResult: (String?) -> Unit,
+//        onWebRTCResult: (String?) -> Unit
+    ) {
+        // Start services
+        startMAVLinkService(onMAVLinkResult)
+        startWebRTCService()
+    }
+
+    suspend fun terminate() {
+        // TODO: perform RTL or LAND before: aircraft.unload()
+        serviceScope.launch {
+            aircraft.manualControl()
+            stopWebRTCService()?.join()
+            stopMAVLinkService()?.join()
+            aircraft.unload()
+        }
+        AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
+    }
+
     suspend fun watchRCInput(intervalTime: Long = 100L) {
-        while(!aircraft.isPowerOff) {
+        while(!isPowerOff()) {
             // Watch for joystick inputs
             aircraft.rcInput?.hasCenteredJoystick()?.let {
                 serviceScope.launch {
-                    if (!it) aircraft.controlManual() // stop everything an gain the control back
+                    if (!it) aircraft.manualControl() // stop everything and gain the control back
                 }
             }
             delay(intervalTime)
