@@ -33,10 +33,8 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageRate
-import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
@@ -59,7 +57,6 @@ class MAVLinkController(
 ) {
 
     private val logger by taggedLogger("MAVLinkController")
-    private var telemetry = TelemetryHandler.getInstance()
     private var aircraft = AircraftHandler.getInstance()
     private var controllers: MutableList<IController> = mutableListOf()
     private var readOnlyMessageRate = true
@@ -145,9 +142,6 @@ class MAVLinkController(
     )
 
     init {
-        telemetry.registerHandlerScope(serviceScope)
-        aircraft.registerHandlerScope(serviceScope)
-
         // TODO: move to lazy loading?
         controllers += ConnectionController(client)
         controllers += CommandController(client)
@@ -289,7 +283,7 @@ class MAVLinkController(
 
             // create the message from controllers definitions
             val message = controllers.asSequence()
-                .mapNotNull { it.createMessage(rate.messageID, telemetry, aircraft) }
+                .mapNotNull { it.createMessage(rate.messageID, aircraft) }
                 .firstOrNull()
 
             if (message == null) {
@@ -366,36 +360,24 @@ class MAVLinkController(
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent
 
-    fun isTelemetryRunning() = telemetry.isActive()
-
-    suspend fun launchAndWaitTelemetry(timeout: Long = 5000L): Boolean {
-        if (telemetry.isActive()) return true
-        // Wait for data from SDK
-        telemetry.launchTelemetry(true)
-        return telemetry.waitTelemetryUp(timeout)
-    }
-
-    suspend fun waitTerminateTelemetry(timeout: Long = 5000L): Boolean {
-        if (!telemetry.isActive()) return true
-        telemetry.launchTelemetry(false)
-        readOnlyMessageRate = true
-        return telemetry.waitForTelemetryDown(timeout)
-    }
+    fun isTelemetryRunning() = aircraft.telemetry.isActive()
 
     fun launchListening() {
-        if (!telemetry.isActive()) return
+        if (!isTelemetryRunning()) return
         // Start listening for messages
         client.startListening(this@MAVLinkController::processMessage)
     }
 
     suspend fun launchSending(intervalTime: Long) {
-        if (!telemetry.isActive()) return
+        if (!isTelemetryRunning()) return
         // Start sending messages
         client.startSending(intervalTime, this@MAVLinkController::sendMessages)
     }
 
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
-        if (!telemetry.isActive()) return false
+        if (!isTelemetryRunning()) return false
+        // prevent to send data before initialization
+        readOnlyMessageRate = true
         // Send heartbeat and wait for any GCS
         connectionController.sendHeartbeat(aircraft)
         logger.d { "Waiting for GCS." }
@@ -409,7 +391,7 @@ class MAVLinkController(
         val parameter = controllers.filterIsInstance<ParameterController>().first()
         // TODO: Values must persist. Once connected, QGC does not ask for mission or parameter items twice
         // TODO: Implement as a setting or app-level variable
-        return navigation.wasRequested && parameter.wasRequested && aircraft.isHomeSet
+        return navigation.wasRequested && parameter.wasRequested && aircraft.state.isHomeSet()
     }
 
     suspend fun waitSystemReady(timeout: Long = 60000L): Boolean {
@@ -423,12 +405,18 @@ class MAVLinkController(
         return isSystemReady()
     }
 
-    suspend fun waitBoot() {
-        // Load and wait parameters for aircraft boot
+    suspend fun waitParameters(): Boolean {
+        // Load and wait parameters
+        logger.d { "Waiting for parameters" }
         val paramController = controllers.filterIsInstance<ParameterController>().first()
         paramController.load()
-        while (!paramController.wasInitialized) delay(1000L)
-        aircraft.boot()
+        AsyncUtils.waitReady(1000L, paramController::isLoaded)
+        return paramController.isLoaded()
+    }
+
+    suspend fun waitHomePosition(): Boolean {
+        // Wait for home position and add messages
+        aircraft.waitHome()
         // Send origin coordinates
         val navController = controllers.filterIsInstance<NavigationController>().first()
         client.sendMessage(navController.msgGpsGlobalOrigin(aircraft)!!)
@@ -437,6 +425,7 @@ class MAVLinkController(
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION,
             1_000_000L
         )
+        return true
     }
 
     fun shutdown() {

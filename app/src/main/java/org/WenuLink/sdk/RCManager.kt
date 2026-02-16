@@ -52,7 +52,6 @@ object RCManager {
 
     @Synchronized
     private fun updateData(data: RCData?) {
-        // TODO: safety: bajar MAVLink si detecta control de usuario
         lastData = data
     }
 
@@ -69,15 +68,14 @@ object RCManager {
 
     private fun startHardwareListener() {
         logger.d { "Starting RC HardwareListener" }
-        rcInstance?.setHardwareStateCallback { hardwareState -> // DJI: range [-660,660]
+        rcInstance?.setHardwareStateCallback { hardwareState ->
             updateData(
                 RCData(
-                    throttleSetting = (hardwareState.leftStick!!.verticalPosition + 660) / 1320,
-                    // Mavlink: 1000 to 2000 with 1500 = 1.5ms as center...
-                    leftStickVertical = (hardwareState.leftStick!!.verticalPosition * 0.8).toInt() + 1500,
-                    leftStickHorizontal = (hardwareState.leftStick!!.horizontalPosition * 0.8).toInt() + 1500,
-                    rightStickVertical = (hardwareState.rightStick!!.verticalPosition * 0.8).toInt() + 1500,
-                    rightStickHorizontal = (hardwareState.rightStick!!.horizontalPosition * 0.8).toInt() + 1500,
+                    throttleSetting = hardwareState.leftStick!!.verticalPosition,
+                    leftStickVertical = hardwareState.leftStick!!.verticalPosition,
+                    leftStickHorizontal = hardwareState.leftStick!!.horizontalPosition,
+                    rightStickVertical = hardwareState.rightStick!!.verticalPosition,
+                    rightStickHorizontal = hardwareState.rightStick!!.horizontalPosition,
                     buttonC1 = hardwareState.c1Button?.isClicked ?: false,
                     buttonC2 = hardwareState.c2Button?.isClicked ?: false,
                     buttonC3 = hardwareState.c3Button?.isClicked ?: false,

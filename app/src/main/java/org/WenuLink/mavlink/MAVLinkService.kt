@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.controllers.MAVLinkController
 import kotlin.getValue
 
@@ -57,16 +58,14 @@ class MAVLinkService {
 
     fun clientExists(): Boolean = client != null
 
-    fun clientIsRunning(): Boolean {
+    fun isServiceRunning(): Boolean {
         val hasJob = listeningJob?.isActive ?: false || sendingJob?.isActive ?: false
         return clientExists() && hasJob
     }
 
-    fun clientCanStart(): Boolean = clientExists() && !clientIsRunning()
+    fun clientCanStart(): Boolean = clientExists() && !isServiceRunning()
 
-    fun isServiceRunning(): Boolean = hasTelemetryRunning() && clientIsRunning()
-
-    fun isServiceStop(): Boolean = !(hasTelemetryRunning() || clientIsRunning())
+    fun isServiceStop(): Boolean = listeningJob == null && sendingJob == null
 
     fun createClient(serviceScope: CoroutineScope) {
         logger.d { "Creating MAVLinkClient for udp://$endpointAddress." }
@@ -97,11 +96,11 @@ class MAVLinkService {
 
     suspend fun launchService() {
         if (!clientCanStart()) {
-            logger.i { "MAVLinkClient is not ready, possibly is enabled or already running." }
+            logger.i { "MAVLinkClient is not ready, possibly is disabled or already running." }
             return
         }
 
-        if (!controller.launchAndWaitTelemetry(5000L)) {
+        if (!hasTelemetryRunning()) {
             logger.i { "Telemetry was not launch." }
             return
         }
@@ -120,14 +119,16 @@ class MAVLinkService {
 
         logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
 
-        mavlinkScope!!.launch {
-            isReady = controller.waitSystemReady(60000L)
-            if (isReady) controller.notifySystemReady()
-        }
+        val hasParams = controller.waitParameters()
+        if (hasParams) logger.d { "Parameters loaded" }
+
+        isReady = controller.waitSystemReady(60000L)
+        if (isReady) controller.notifySystemReady()
 
         logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
 
-        controller.waitBoot()
+        val hasHome = controller.waitHomePosition()
+        if (hasHome) logger.d { "Home position acquired" }
     }
 
     suspend fun stopService() {
@@ -145,7 +146,15 @@ class MAVLinkService {
         logger.d { "MAVLinkService (ready?=$isReady) (GCS?=${hasStationConnected()}) (listening?=${listeningJob?.isActive}) (sending=${sendingJob?.isActive})" }
         sendingJob = null
         listeningJob = null
-        controller.waitTerminateTelemetry(5000L)
     }
 
+    suspend fun waitStart() {
+        AsyncUtils.waitReady(isReady = ::isServiceRunning)
+        logger.i { "MAVLinkService started: ${isServiceRunning()}" }
+    }
+
+    suspend fun waitStop() {
+        AsyncUtils.waitReady(isReady = ::isServiceStop)
+        logger.i { "MAVLinkService stop: ${isServiceStop()}" }
+    }
 }

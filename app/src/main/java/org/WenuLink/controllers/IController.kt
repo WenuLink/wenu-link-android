@@ -5,7 +5,6 @@ import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -49,7 +48,6 @@ interface IController {
 
     fun createMessage(
         messageID: Int,
-        telemetry: TelemetryHandler,
         aircraft: AircraftHandler
     ): MAVLinkMessage? {
         return null

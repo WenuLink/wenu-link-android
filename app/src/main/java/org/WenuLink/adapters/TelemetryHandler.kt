@@ -34,18 +34,22 @@ class TelemetryHandler {
     private val _isListeningAircraft = MutableStateFlow(false)
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private var lastTelemetryData: TelemetryData? = null
-    private var runSimulation: Boolean = false
+    val isSimulationAvailable: Boolean
+        get() = SimManager.isAvailable()
+    val isSimulationActive: Boolean
+        get() = SimManager.isActive()
+    private var mustRunSimulation: Boolean = false
 
     private val _isBroadcasting = MutableStateFlow(false)
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
 
     @Synchronized
-    fun hasTelemetryData(): Boolean {
+    fun hasData(): Boolean {
         return lastTelemetryData != null
     }
 
     @Synchronized
-    fun getTelemetryData(): TelemetryData? {
+    fun getData(): TelemetryData? {
         return lastTelemetryData
     }
 
@@ -54,27 +58,20 @@ class TelemetryHandler {
         lastTelemetryData = telemetry
     }
 
-    fun isSimulationReady(): Boolean = SimManager.isAvailable()
-
-    fun isSimulationActive(): Boolean = SimManager.isActive()
-
     @Synchronized
     fun enableSimulation(enable: Boolean) {
-        logger.i { "Enable Simulation $enable" }
-
         if (isActive()) {
-            logger.e { "Unable to set, Telemetry is active." }
+            logger.e { "Unable to set runSimulation=$enable, Telemetry is active." }
             return
         }
 
-        if (!isSimulationReady()) {
-            logger.e { "Unable to set, Simulation is not available." }
+        if (!isSimulationAvailable) {
+            logger.e { "Unable to set runSimulation=$enable, Simulation is not available." }
             return
         }
 
-        if (runSimulation == enable) return
-
-        runSimulation = enable
+        mustRunSimulation = enable
+        logger.i { "Enable Simulation $mustRunSimulation" }
     }
 
     fun registerSimState(register: Boolean) {
@@ -82,8 +79,6 @@ class TelemetryHandler {
         SimManager.unregisterStateCallback()
         if (register) SimManager.registerStateCallback { state ->
             // TODO: Some telemetry values such as velocities must be updated
-            if (lastTelemetryData != null)
-                SimManager.completeTelemetryData(lastTelemetryData!!, state)
             updateTelemetryData(SimManager.state2telemetry(state))
         }
     }
@@ -104,8 +99,8 @@ class TelemetryHandler {
 
     @Synchronized
     fun registerStateListeners(register: Boolean) {
-        logger.d { "registerStateListeners: $register (runSimulation: $runSimulation)" }
-        if (runSimulation) registerSimState(register)
+        logger.d { "registerStateListeners: $register (runSimulation: $mustRunSimulation)" }
+        if (mustRunSimulation) registerSimState(register)
         else registerRealState(register)
     }
 
@@ -131,7 +126,7 @@ class TelemetryHandler {
     }
 
     fun listenVehicleState(listen: Boolean) {
-        if (runSimulation) listenSimulation(listen)
+        if (mustRunSimulation) listenSimulation(listen)
         else listenAircraft(listen)
     }
 
@@ -188,28 +183,32 @@ class TelemetryHandler {
         var isFlowing = RCManager.isUpdated()
         // If simulation activated, must wait for its startup
         isFlowing = isFlowing &&
-                if (runSimulation) isSimulationActive()
+                if (mustRunSimulation) isSimulationActive
         // Assumes that if not sim, Aircraft is present
         else AircraftManager.isUpdated()
         return isFlowing
     }
 
-    suspend fun waitTelemetryUp(timeout: Long = 5000L): Boolean {
+    suspend fun waitDataReading(timeout: Long = 5000L): Boolean {
         // First check wait for listeners transfer data
-        val listenersOk = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::isReadingData)
+        var listenersOk = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::isReadingData)
         if (!listenersOk) return false
 
         // Second wait to receive the data ready for broadcast
-        return AsyncUtils.waitTimeout(timeout = timeout, isReady = ::hasTelemetryData)
+        listenersOk = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::hasData)
+        logger.d { "Telemetry is broadcasting data: $listenersOk" }
+        return listenersOk
     }
 
-    suspend fun waitForTelemetryDown(timeout: Long = 5000L): Boolean {
+    suspend fun waitDataRemoving(delay: Long = 1000L): Boolean {
         // Wait for listeners to stop receiving data
         fun stopReading() = !isReadingData()
-        AsyncUtils.waitReady(timeout, isReady = ::stopReading)
+        AsyncUtils.waitReady(delay, isReady = ::stopReading)
         // reset the telemetry info
         updateTelemetryData(null)
-        return !(isReadingData() || hasTelemetryData())
+        val listenersOk = !(isReadingData() || hasData())
+        logger.d { "Telemetry stop: $listenersOk" }
+        return listenersOk
     }
 
     fun launchTelemetry(start: Boolean) {
@@ -220,12 +219,12 @@ class TelemetryHandler {
 
     fun getAircraftBattery(): BatteryData {
         // TODO: Maybe include some custom battery level
-        return if (runSimulation) RCManager.getBatteryData()
+        return if (mustRunSimulation) RCManager.getBatteryData()
         else AircraftManager.getBatteryData()
     }
 
     fun getAirlinkSignal(): IntArray {
-        return if (runSimulation) intArrayOf(98, 95)
+        return if (mustRunSimulation) intArrayOf(98, 95)
         else AircraftManager.getAirlinkData()
     }
 

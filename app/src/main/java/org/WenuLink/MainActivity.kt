@@ -161,8 +161,7 @@ class MainActivity : ComponentActivity() {
         val isPermissionsGranted by viewModel.isPermissionsGranted.observeAsState(false)
         val workflowStatus by viewModel.workflowStatus.observeAsState("Idle")
         val isServiceRunning by servicesViewModel.isServiceRunning.collectAsState(false)
-        var isSimulationReady by remember { mutableStateOf(servicesViewModel.isSimulationReady()) }
-        var isSimulationActive by remember { mutableStateOf(servicesViewModel.isSimulationActive()) }
+        val isSimulationReady by servicesViewModel.isSimReady.collectAsState(false)
         // DJI
         val isSDKOk by viewModel.isRegistered.observeAsState(false)
         val sdkStatus by viewModel.sdkStatus.observeAsState("Idle")
@@ -203,32 +202,30 @@ class MainActivity : ComponentActivity() {
             if(isSDKOk){
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
-                    servicesViewModel.runService(!isServiceRunning)
+                    servicesViewModel.runService(!isServiceRunning, false)
                 }) {
                     Text(if (isServiceRunning) {
-                        "Stop Drone Service"
+                        "Stop WenuLink Service"
                     } else {
-                        "Start Drone Service"
+                        "Start WenuLink Service"
                     })
                 }
 
-//                if (isSimulationReady) {
-                // TODO: Improve simulation enable/disable UI/UX
+                if (isSimulationReady && !isMAVLinkRunning) {
                     Button(onClick = {
-                        servicesViewModel.enableSimulation(!isSimulationActive)
-                        isSimulationActive = !isSimulationActive
+                        servicesViewModel.runService(run = true, simEnabled = true)
                     }) {
-                        Text(
-                            if (!isSimulationActive) {
-                                "Enable simulation"
-                            } else {
-                                "Disable simulation"
-                            }
-                        )
+                        Text("Start SIM WenuLink Service")
                     }
-//                }
+                }
 
                 if (isServiceRunning) {
+                    HorizontalDivider()
+                    Button(onClick = {
+                        servicesViewModel.forceStop()
+                    }) {
+                        Text("FORCE STOP")
+                    }
                     HorizontalDivider()
                     Button(onClick = {
                         servicesViewModel.runMAVLink(!isMAVLinkRunning)

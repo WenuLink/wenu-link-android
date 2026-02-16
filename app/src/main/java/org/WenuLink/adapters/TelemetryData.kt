@@ -1,7 +1,7 @@
 package org.WenuLink.adapters
 
-
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
+import kotlin.math.roundToInt
 
 /**
  * Data class to hold telemetry info.
@@ -40,7 +40,37 @@ data class RCData(
     val buttonC2: Boolean,
     val buttonC3: Boolean,
     val mode: FlightModeSwitch?
-)
+) {
+    private fun stickValue2percent(value: Int): Int {
+        // transform from DJI range [-660, 660] => [0, 100]
+        return (((value + 660).toFloat() / 1320F) * 100).roundToInt()
+    }
+
+    private fun stickValue2rcValue(value: Int): Int {
+        // transform from DJI range [-660, 660] => [1000, 2000]
+        return ((value.toFloat() / 660) * 500).roundToInt() + 1500
+    }
+
+    fun toMAVLink(): RCData {
+        val currRC = this.copy(
+            // Percent: [0, 100]
+            throttleSetting = stickValue2percent(this.throttleSetting),
+            // Value: [1000, 2000] with 1500 as center...
+            leftStickVertical = stickValue2rcValue(this.leftStickVertical),
+            leftStickHorizontal = stickValue2rcValue(this.leftStickHorizontal),
+            rightStickVertical = stickValue2rcValue(this.rightStickVertical),
+            rightStickHorizontal = stickValue2rcValue(this.rightStickHorizontal),
+        )
+        return currRC
+    }
+
+    fun hasCenteredJoystick(): Boolean {
+        return this.leftStickVertical == 0 &&
+                this.leftStickHorizontal == 0 &&
+                this.rightStickVertical == 0 &&
+                this.rightStickHorizontal == 0
+    }
+}
 
 data class BatteryData(
     var percentCharge: Int = -1,
