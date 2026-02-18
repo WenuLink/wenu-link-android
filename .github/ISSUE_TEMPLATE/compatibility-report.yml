@@ -1,0 +1,162 @@
+name: Compatibility Report
+description: Report test results for a drone model to help build the compatibility matrix.
+title: "[Compatibility]: "
+labels: ["compatibility", "documentation"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing WenuLink with your hardware! Please fill in the details below.
+        For the test steps, refer to the [Test Procedures](https://github.com/WenuLink/wenu-link-android/wiki/Test-Procedures) wiki page.
+
+  - type: input
+    id: app-version
+    attributes:
+      label: WenuLink App Version
+      description: The version or commit hash of the WenuLink app you tested with.
+      placeholder: e.g. v0.1.0 or commit abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: drone-model
+    attributes:
+      label: Drone Model
+      description: The DJI drone model you tested with.
+      placeholder: e.g. DJI Mavic 2 Pro
+    validations:
+      required: true
+
+  - type: input
+    id: remote-controller
+    attributes:
+      label: Remote Controller
+      description: The remote controller model used.
+      placeholder: e.g. DJI RC231
+    validations:
+      required: false
+
+  - type: input
+    id: android-device
+    attributes:
+      label: Android Device
+      description: The Android phone or tablet used.
+      placeholder: e.g. Samsung Galaxy S21
+    validations:
+      required: true
+
+  - type: input
+    id: android-version
+    attributes:
+      label: Android Version
+      description: The Android OS version on the device.
+      placeholder: e.g. Android 13
+    validations:
+      required: true
+
+  - type: input
+    id: gcs-software
+    attributes:
+      label: GCS Software & Version
+      description: The ground control station software used (if applicable).
+      placeholder: e.g. QGroundControl 4.4.3
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: use-cases-tested
+    attributes:
+      label: Use Cases Tested
+      description: Which use cases did you test?
+      options:
+        - label: "Flight Plan"
+        - label: "Video Capture (WebRTC)"
+        - label: "Photogrammetry"
+
+  - type: dropdown
+    id: flight-plan-result
+    attributes:
+      label: "Flight Plan: Result"
+      description: If you tested the Flight Plan use case, what was the result?
+      options:
+        - Pass
+        - Partial
+        - Fail
+        - Not tested
+      default: 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: flight-plan-notes
+    attributes:
+      label: "Flight Plan: Notes"
+      description: Any details about the flight plan test (mission size, actions used, issues encountered).
+      placeholder: e.g. 3-waypoint mission with delay and yaw worked correctly. RTL triggered as expected.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: video-capture-result
+    attributes:
+      label: "Video Capture: Result"
+      description: If you tested the Video Capture use case, what was the result?
+      options:
+        - Pass
+        - Partial
+        - Fail
+        - Not tested
+      default: 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: video-capture-notes
+    attributes:
+      label: "Video Capture: Notes"
+      description: Any details about the video capture test (resolution, latency, browser used, issues encountered).
+      placeholder: e.g. 1080p stream in Chrome, ~1s latency, no frame drops.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: photogrammetry-result
+    attributes:
+      label: "Photogrammetry: Result"
+      description: If you tested the Photogrammetry use case, what was the result?
+      options:
+        - Pass
+        - Partial
+        - Fail
+        - Not tested
+      default: 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: photogrammetry-notes
+    attributes:
+      label: "Photogrammetry: Notes"
+      description: Any details about the photogrammetry test (number of waypoints, photos captured, GPS tags, processing software used).
+      placeholder: e.g. 12-waypoint survey, all 12 photos captured with GPS EXIF tags. Processed in OpenDroneMap.
+    validations:
+      required: false
+
+  - type: textarea
+    id: flight-logs
+    attributes:
+      label: Flight Logs
+      description: Optionally attach flight log files (.tlog, .bin, DJI logs) by dragging them here.
+      placeholder: Drag and drop log files here, or describe where they can be found.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: Additional Notes
+      description: Anything else worth mentioning (workarounds, environment details, suggestions).
+    validations:
+      required: false
+
