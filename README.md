@@ -44,6 +44,18 @@ For detailed setup instructions (DJI SDK API keys, WebRTC signaling servers, MAV
 
 ---
 
+## Example Use Cases
+
+To see what you can do with WenuLink — from autonomous flight plans and live video streaming to aerial photogrammetry — check out the **Example Use Cases** page:
+
+📄 [_Click here to view Example Use Cases_](https://github.com/WenuLink/wenu-link-android/wiki/Example-Use-Cases)
+
+For developers and contributors looking to verify compatibility with specific drone models, see the **Test Procedures**:
+
+📄 [_Click here to view Test Procedures_](https://github.com/WenuLink/wenu-link-android/wiki/Test-Procedures)
+
+---
+
 ## Target Audience
 
 WenuLink is designed for:
