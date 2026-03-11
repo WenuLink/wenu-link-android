@@ -12,7 +12,6 @@ import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import org.WenuLink.sdk.FCManager
 
-
 abstract class DJIParameter(
     name: String,
     type: Int,
@@ -54,7 +53,8 @@ class DJIBooleanParameter(
     override fun write(value: ParamValue, onResult: (String?) -> Unit) {
         val v = (value as ParamValue.BoolVal).v
         setter(v, CommonCallbacks.CompletionCallback { err ->
-            if (err == null) onResult(null) else onResult(err.description)
+            if (err == null) onResult(null)
+            else onResult(err.description)
         })
     }
 
@@ -128,7 +128,6 @@ class DJIFailSafeParameter(
     }
 }
 
-
 class DJIControlModeParameter(
     name: String,
     private val getter: (CommonCallbacks.CompletionCallbackWith<ControlMode>) -> Unit,
@@ -170,7 +169,6 @@ class DJIControlModeParameter(
     }
 }
 
-
 class DJIRollPitchControlModeParameter(
     name: String,
     private val getter: ((Int?) -> Unit) -> Unit,
@@ -199,7 +197,6 @@ class DJIRollPitchControlModeParameter(
 
 }
 
-
 class DJIVerticalControlModeParameter(
     name: String,
     private val getter: ((Int?) -> Unit) -> Unit,
@@ -227,7 +224,6 @@ class DJIVerticalControlModeParameter(
     }
 }
 
-
 class DJIYawModeControlModeParameter(
     name: String,
     private val getter: ((Int?) -> Unit) -> Unit,
@@ -254,7 +250,6 @@ class DJIYawModeControlModeParameter(
         setter(intToEnum(v)) { err -> completionResult(err, onResult) }
     }
 }
-
 
 /**
  * DJI available provider class

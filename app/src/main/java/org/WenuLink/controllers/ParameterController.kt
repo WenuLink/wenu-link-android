@@ -1,6 +1,5 @@
 package org.WenuLink.controllers
 
-import org.WenuLink.mavlink.MAVLinkClient
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_param_request_list
 import com.MAVLink.common.msg_param_request_read
@@ -8,12 +7,12 @@ import com.MAVLink.common.msg_param_set
 import com.MAVLink.common.msg_param_value
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParamValue
 import org.WenuLink.parameters.ParameterRegistry
 import org.WenuLink.parameters.ParameterSpec
-import kotlin.getValue
 import kotlin.math.round
 
 /**
@@ -24,7 +23,7 @@ class ParameterController (
     override val client: MAVLinkClient
 ) : IController {
 
-    private val logger by taggedLogger("ParameterController")
+    private val logger by taggedLogger(ParameterController::class.java.simpleName)
     private val registry = ParameterRegistry(listOf(
         ArduPilotParametersProvider,
         DJIParametersProvider
@@ -42,14 +41,13 @@ class ParameterController (
     fun isLoaded() = wasInitialized
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        var processed = true
         when (msg.msgid) {
             msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList()
             msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg)
             msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg)
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     fun requestList() {

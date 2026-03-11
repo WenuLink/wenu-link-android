@@ -31,7 +31,12 @@ fun MediaStreamTrack.stringify(): String {
 }
 
 fun IceCandidateErrorEvent.stringify(): String {
-    return "IceCandidateErrorEvent(errorCode=$errorCode, $errorText, address=$address, port=$port, url=$url)"
+    return "IceCandidateErrorEvent(" +
+                "errorCode=$errorCode, " +
+                "$errorText, " +
+                "address=$address, " +
+                "port=$port, " +
+                "url=$url)"
 }
 
 fun JavaAudioDeviceModule.AudioSamples.stringify(): String {

@@ -1,15 +1,14 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.BatteryData
-import org.WenuLink.adapters.RCData
 import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
 import io.getstream.log.taggedLogger
-import kotlin.getValue
+import org.WenuLink.adapters.BatteryData
+import org.WenuLink.adapters.RCData
 import kotlin.math.round
 
 object RCManager {
-    private val logger by taggedLogger("RCManager")
+    private val logger by taggedLogger(RCManager::class.java.simpleName)
     private var lastData: RCData? = null
     private val lastBatteryData: BatteryData = BatteryData()
     private var rcInstance: RemoteController? = null
@@ -76,9 +75,9 @@ object RCManager {
                     leftStickHorizontal = hardwareState.leftStick!!.horizontalPosition,
                     rightStickVertical = hardwareState.rightStick!!.verticalPosition,
                     rightStickHorizontal = hardwareState.rightStick!!.horizontalPosition,
-                    buttonC1 = hardwareState.c1Button?.isClicked ?: false,
-                    buttonC2 = hardwareState.c2Button?.isClicked ?: false,
-                    buttonC3 = hardwareState.c3Button?.isClicked ?: false,
+                    buttonC1 = hardwareState.c1Button?.isClicked == true,
+                    buttonC2 = hardwareState.c2Button?.isClicked == true,
+                    buttonC3 = hardwareState.c3Button?.isClicked == true,
                     mode = hardwareState.flightModeSwitch
                 )
             )

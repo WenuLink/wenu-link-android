@@ -1,9 +1,5 @@
 package org.WenuLink.adapters
 
-import org.WenuLink.sdk.AircraftManager
-import org.WenuLink.sdk.FCManager
-import org.WenuLink.sdk.RCManager
-import org.WenuLink.sdk.SimManager
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +8,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlin.getValue
+import org.WenuLink.sdk.AircraftManager
+import org.WenuLink.sdk.FCManager
+import org.WenuLink.sdk.RCManager
+import org.WenuLink.sdk.SimManager
 
 class TelemetryHandler {
     companion object {
@@ -27,7 +26,7 @@ class TelemetryHandler {
 
     }
 
-    private val logger by taggedLogger("TelemetryHandler")
+    private val logger by taggedLogger(TelemetryHandler::class.java.simpleName)
 
     private val _isListeningRC = MutableStateFlow(false)
     val isListeningRC: StateFlow<Boolean> = _isListeningRC.asStateFlow()
@@ -61,12 +60,12 @@ class TelemetryHandler {
     @Synchronized
     fun enableSimulation(enable: Boolean) {
         if (isActive()) {
-            logger.e { "Unable to set runSimulation=$enable, Telemetry is active." }
+            logger.e { "Unable to set runSimulation=$enable, Telemetry active." }
             return
         }
 
         if (!isSimulationAvailable) {
-            logger.e { "Unable to set runSimulation=$enable, Simulation is not available." }
+            logger.e { "Unable to set runSimulation=$enable, Simulation not available." }
             return
         }
 
@@ -116,11 +115,11 @@ class TelemetryHandler {
 
     fun listenSimulation(listen: Boolean) {
         if (listen) SimManager.run { error ->
-            if (error == null) logger.i { "Simulation is running." }
+            if (error == null) logger.i { "Simulation running." }
             else logger.e { "Unable to start simulation: $error" }
         }
         else SimManager.stop { error ->
-            if (error == null) logger.i { "Simulation is stop." }
+            if (error == null) logger.i { "Simulation stopped." }
             else logger.e { "Unable to stop simulation: $error" }
         }
     }
@@ -171,7 +170,7 @@ class TelemetryHandler {
 
         isBroadcasting.distinctUntilChangedBy { it }
             .onEach {
-                logger.d { "Requesting to ${if(it) "start" else "stop"} telemetry broadcast." }
+                logger.d { "Requesting to ${if (it) "start" else "stop"} telemetry broadcast." }
                 if (it) startBroadcast()
                 else stopBroadcast()
             }
@@ -196,7 +195,7 @@ class TelemetryHandler {
 
         // Second wait to receive the data ready for broadcast
         listenersOk = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::hasData)
-        logger.d { "Telemetry is broadcasting data: $listenersOk" }
+        logger.d { "Telemetry broadcasting data: $listenersOk" }
         return listenersOk
     }
 

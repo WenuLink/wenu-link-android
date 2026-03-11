@@ -43,7 +43,7 @@ data class RCData(
 ) {
     private fun stickValue2percent(value: Int): Int {
         // transform from DJI range [-660, 660] => [0, 100]
-        return (((value + 660).toFloat() / 1320F) * 100).roundToInt()
+        return (((value + 660).toFloat() / 1320f) * 100).roundToInt()
     }
 
     private fun stickValue2rcValue(value: Int): Int {
@@ -78,7 +78,7 @@ data class BatteryData(
     var current: Int = -1,
     var fullChargeCapacity: Int = -1,
     var chargeRemaining: Int = -1,
-    var temperature: Float = -1.0F,
+    var temperature: Float = -1.0f,
     var voltageCells: IntArray? = null
 ) {
 
@@ -88,13 +88,19 @@ data class BatteryData(
         if (other.current != -1) current = other.current
         if (other.fullChargeCapacity != -1) fullChargeCapacity = other.fullChargeCapacity
         if (other.chargeRemaining != -1) chargeRemaining = other.chargeRemaining
-        if (other.temperature != -1.0F) temperature = other.temperature
+        if (other.temperature != -1.0f) temperature = other.temperature
         if (other.voltageCells != null) voltageCells = other.voltageCells?.clone() // Clone to avoid reference issues
     }
 
     override fun toString(): String {
-        return "BatteryData(percentCharge=$percentCharge%, voltage=$voltage V, current=$current A, " +
-                "fullChargeCapacity=$fullChargeCapacity A, fullChargeCapacity=$chargeRemaining A, temperature=$temperature °C, voltageCells=${voltageCells?.joinToString()})"
+        return "BatteryData(" +
+                    "percentCharge=$percentCharge%, " +
+                    "voltage=$voltage V, " +
+                    "current=$current A, " +
+                    "fullChargeCapacity=$fullChargeCapacity A, " +
+                    "fullChargeCapacity=$chargeRemaining A, " +
+                    "temperature=$temperature °C, " +
+                    "voltageCells=${voltageCells?.joinToString()})"
     }
 }
 

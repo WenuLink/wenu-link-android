@@ -3,7 +3,6 @@
  */
 package org.WenuLink.sdk
 
-import android.util.Log
 import dji.common.error.DJIError
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
@@ -11,9 +10,11 @@ import dji.sdk.base.BaseProduct
 import dji.sdk.products.Aircraft
 import dji.sdk.realname.AppActivationManager
 import dji.sdk.sdkmanager.DJISDKManager
-
+import io.getstream.log.taggedLogger
 
 object SDKUtils {
+    private val logger by taggedLogger(SDKUtils::class.java.simpleName)
+
     fun getUsbAction(): String {
         return DJISDKManager.USB_ACCESSORY_ATTACHED
     }
@@ -49,11 +50,13 @@ object SDKUtils {
         return result
     }
 
-    fun createCompletionCallback(onResult: (String?) -> Unit): CommonCallbacks.CompletionCallback<DJIError> {
+    fun createCompletionCallback(
+        onResult: (String?) -> Unit
+    ): CommonCallbacks.CompletionCallback<DJIError> {
         return CommonCallbacks.CompletionCallback<DJIError> { error ->
             if (error == null) onResult(null)
             else {
-                Log.e("SDKUtils", "CompletionCallback onFailure $error")
+                logger.e { "CompletionCallback onFailure $error" }
                 onResult(error.description)
             }
         }

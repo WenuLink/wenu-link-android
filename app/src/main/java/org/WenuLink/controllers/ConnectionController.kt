@@ -25,20 +25,20 @@ import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.getValue
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink messages.
+ * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink
+ * messages.
  *
  * https://mavlink.io/en/services/heartbeat.html
  */
 class ConnectionController (
     override val client: MAVLinkClient
 ) : IController {
-    private val logger by taggedLogger("ConnectionController")
+    private val logger by taggedLogger(ConnectionController::class.java.simpleName)
     private var gcsLastTimestamp: Long = 0
     val isGCSPresent: Boolean
         get() {
@@ -67,14 +67,13 @@ class ConnectionController (
             MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        var processed = true
         when (msg.msgid) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> processHeartbeatGCS()
             msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg, aircraft)
             msg_timesync.MAVLINK_MSG_ID_TIMESYNC -> processTimeSync(msg)
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
@@ -232,8 +231,8 @@ class ConnectionController (
         val msg = msg_radio_status()
         // DJI represent the signal quality in percent with range [0, 100], where 100 is the best quality.
         // MAVLink uses [0, 254] as uint8_t
-        msg.rssi = ((airlinkSignal[0] / 100F) * 255F).roundToInt().toShort() // AirLink's DownLinkSignalQuality
-        msg.remrssi = ((airlinkSignal[1] / 100F) * 255F).roundToInt().toShort() // AirLink's UpLinkSignalQuality
+        msg.rssi = ((airlinkSignal[0] / 100f) * 255f).roundToInt().toShort() // AirLink's DownLinkSignalQuality
+        msg.remrssi = ((airlinkSignal[1] / 100f) * 255f).roundToInt().toShort() // AirLink's UpLinkSignalQuality
         return msg
 //        client.sendMessage(msg)
     }
@@ -249,7 +248,11 @@ class ConnectionController (
         msg.voltages = aircraftBattery.voltageCells
         msg.temperature = (aircraftBattery.temperature * 100.0).toInt().toShort()
         msg.current_battery = (aircraftBattery.current * 10).toShort()
-        msg.battery_remaining = (aircraftBattery.chargeRemaining.toFloat() / aircraftBattery.fullChargeCapacity.toFloat() * 100.0F).toInt().toByte()
+        msg.battery_remaining = (
+            aircraftBattery.chargeRemaining.toFloat() /
+            aircraftBattery.fullChargeCapacity.toFloat() *
+            100.0f
+        ).toInt().toByte()
 //        client.sendMessage(msg)
         return msg
     }

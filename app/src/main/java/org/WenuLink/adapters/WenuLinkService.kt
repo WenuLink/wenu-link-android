@@ -10,9 +10,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import io.getstream.log.taggedLogger
-import org.WenuLink.MainActivity
-import org.WenuLink.mavlink.MAVLinkService
-import org.WenuLink.webrtc.WebRTCService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,12 +18,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
-import kotlin.getValue
+import org.WenuLink.mavlink.MAVLinkService
+import org.WenuLink.webrtc.WebRTCService
 
 class WenuLinkService : Service() {
 
-    private val logger by taggedLogger("WenuLinkService")
+    private val logger by taggedLogger(WenuLinkService::class.java.simpleName)
     private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
@@ -92,7 +91,7 @@ class WenuLinkService : Service() {
         // TODO: update according to each present service
         startForeground(
             1, notification
-                .setContentTitle("WenuLink service is running")
+                .setContentTitle("WenuLink service running")
                 .setContentText(contentText)
                 .setSmallIcon(R.drawable.ic_menu_compass)
                 .setContentIntent(pendingIntent) // Open MainActivity when tapped
@@ -137,12 +136,12 @@ class WenuLinkService : Service() {
 
     private fun startWebRTC() {
         if (!WebRTCService.isEnabled) {
-            logger.i { "Unable to start WebRTC, the service is not enabled." }
+            logger.i { "Unable to start WebRTC, the service not enabled." }
             return
         }
 
         if (!webRTC.canStartClient()) {
-            logger.e { "WebRTC client not ready, check if is enabled and a camera is present." }
+            logger.e { "WebRTC client not ready, check if enabled and a camera is present." }
             return
         }
 
@@ -169,7 +168,7 @@ class WenuLinkService : Service() {
 
     fun startMAVLinkService(): Job? {
         if (!MAVLinkService.isEnabled) {
-            logger.i { "Unable to start MAVLink, the service is not enabled." }
+            logger.i { "Unable to start MAVLink, service not enabled." }
             return null
         }
 
@@ -183,6 +182,7 @@ class WenuLinkService : Service() {
                 return@launch
             }
             mavlink.createClient(serviceScope)
+
             mavlink.runProcess(true)
             mavlink.waitStart()
             watchRCInput(100L)

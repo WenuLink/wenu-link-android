@@ -1,7 +1,6 @@
 package org.WenuLink.sdk
 
 import android.content.Context
-import android.util.Log
 import dji.common.error.DJIError
 import dji.common.error.DJISDKError
 import dji.common.realname.AircraftBindingState
@@ -16,21 +15,19 @@ import dji.sdk.flightcontroller.FlightController
 import dji.sdk.remotecontroller.RemoteController
 import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
-
+import io.getstream.log.taggedLogger
 
 object RegistrationHandler {
-    private val TAG: String = RegistrationHandler::class.java.simpleName
-    private val TAGC: String = DJISDKManager.SDKManagerCallback::class.java.simpleName
+    private val logger by taggedLogger(RegistrationHandler::class.java.simpleName)
+    private val loggerC by taggedLogger(DJISDKManager.SDKManagerCallback::class.java.simpleName)
     private var registrationInProgress: Boolean = false
     private var registered: Boolean = false
     private var successCallback: ((Boolean, String?) -> Unit)? = null
     private var productCallback: ((Boolean) -> Unit)? = null
-    private var activationStatelistener: AppActivationStateListener? = null
+    private var activationStateListener: AppActivationStateListener? = null
     private var bindingStateListener: AircraftBindingStateListener? = null
 
-    fun isRegistered(): Boolean {
-        return registered
-    }
+    fun isRegistered(): Boolean = registered
 
     fun setSuccessCallback(callback: (Boolean, String?) -> Unit) {
         successCallback = callback
@@ -43,7 +40,7 @@ object RegistrationHandler {
     @Synchronized
     fun initialize(context: Context) {
         if (!registrationInProgress) {
-            Log.d(TAG, "Starting registration...")
+            logger.d { "Starting registration..." }
             registrationInProgress = true
 //            eventBus.register(context)
             DJISDKManager.getInstance().registerApp(context, sdkManagerCallback)
@@ -51,10 +48,10 @@ object RegistrationHandler {
     }
 
     fun setActivationCallback(callback: (Boolean, String?) -> Unit) {
-        activationStatelistener = AppActivationStateListener {
+        activationStateListener = AppActivationStateListener {
                 appActivationState: AppActivationState -> callback(true, "$appActivationState") }
         SDKUtils.getAppActivationManager()?.addAppActivationStateListener(
-            activationStatelistener as AppActivationStateListener)
+            activationStateListener as AppActivationStateListener)
     }
 
     fun setBindingCallback(callback: (Boolean, String?) -> Unit) {
@@ -65,20 +62,20 @@ object RegistrationHandler {
     }
 
     fun tearDownListener() {
-        if (activationStatelistener != null) {
+        if (activationStateListener != null) {
             // Example of removing listeners
             SDKUtils.getAppActivationManager()?.removeAppActivationStateListener(
-                activationStatelistener as AppActivationStateListener);
+                activationStateListener as AppActivationStateListener)
         }
         if (bindingStateListener != null) {
             SDKUtils.getAppActivationManager()?.removeAircraftBindingStateListener(
-                bindingStateListener as AircraftBindingStateListener);
+                bindingStateListener as AircraftBindingStateListener)
         }
     }
 
     @Synchronized
     fun destroy() {
-        Log.d(TAG, "Stopping..")
+        logger.d { "Stopping.." }
         tearDownListener()
         registered = false
         DJISDKManager.getInstance().destroy()
@@ -89,12 +86,12 @@ object RegistrationHandler {
         override fun onRegister(djiError: DJIError) {
             if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                 DJISDKManager.getInstance().startConnectionToProduct()
-                Log.i(TAGC, "Successfully registration")
+                loggerC.i { "Successfully registration" }
                 successCallback?.invoke(true, null)
                 registered = true
             } else {
                 val errorDescription = djiError.description
-                Log.i(TAGC, "Error in registration, $errorDescription")
+                loggerC.i { "Error in registration, $errorDescription" }
                 DJISDKManager.getInstance().destroy()
                 successCallback?.invoke(false, errorDescription)
             }
@@ -102,7 +99,7 @@ object RegistrationHandler {
         }
 
         override fun onProductDisconnect() {
-            Log.i(TAGC, "Drone disconnected")
+            loggerC.i { "Drone disconnected" }
             productCallback?.invoke(false)
         }
 
@@ -115,7 +112,7 @@ object RegistrationHandler {
         }
 
         override fun onProductChanged(p0: BaseProduct?) {
-            Log.i(TAGC, "onProductChanged()")
+            loggerC.i { "onProductChanged()" }
             productCallback?.invoke(true)
         }
 
@@ -124,15 +121,14 @@ object RegistrationHandler {
             oldComponent: BaseComponent?,
             newComponent: BaseComponent?
         ) {
-            newComponent?.setComponentListener(object : BaseComponent.ComponentListener {
-                override fun onConnectivityChange(isConnected: Boolean) {
-                    Log.d(TAGC, "onComponentConnectivityChanged: $isConnected")
-                }
-            })
-            Log.d(
-                TAGC,
-                "onComponentChange key: $componentKey, oldComponent: $oldComponent, newComponent: $newComponent"
-            )
+            newComponent?.setComponentListener { isConnected ->
+                loggerC.d { "onComponentConnectivityChanged: $isConnected" }
+            }
+            loggerC.d {
+                "onComponentChange key: $componentKey, " +
+                "oldComponent: $oldComponent, " +
+                "newComponent: $newComponent"
+            }
             if (componentKey == BaseProduct.ComponentKey.REMOTE_CONTROLLER)
                 RCManager.init(newComponent as RemoteController)
             if (componentKey == BaseProduct.ComponentKey.AIR_LINK)

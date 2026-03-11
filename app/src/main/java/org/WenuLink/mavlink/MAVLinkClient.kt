@@ -15,14 +15,13 @@ import java.net.InetAddress
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.getValue
 
 class MAVLinkClient(
     private val targetIp: String,
     private val targetPort: Int = 14550,
     private val localPort: Int = 14550,
 ) {
-    private val logger by taggedLogger("MAVLinkClient")
+    private val logger by taggedLogger(MAVLinkClient::class.java.simpleName)
     private var socket: DatagramSocket = DatagramSocket(localPort)
     private val mavlinkParser = Parser()
     private val clientScope = CoroutineScope(Dispatchers.IO)

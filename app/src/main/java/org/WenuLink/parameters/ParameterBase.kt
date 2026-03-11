@@ -47,14 +47,12 @@ sealed class ParameterSpec(
 
 }
 
-
 data class WenuLinkParameter(
     val spec: ParameterSpec,
     var value: ParamValue
 ) {
     override fun toString(): String = "Parameter(${spec.name}=$value)"
 }
-
 
 open class SimpleParameter(
     name: String,

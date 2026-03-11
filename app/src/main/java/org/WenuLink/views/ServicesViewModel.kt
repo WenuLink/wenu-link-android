@@ -14,14 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.WenuLinkService
-import org.WenuLink.adapters.TelemetryData
 import org.WenuLink.adapters.AsyncUtils
-import kotlin.getValue
-
+import org.WenuLink.adapters.TelemetryData
+import org.WenuLink.adapters.WenuLinkService
 
 class ServicesViewModel(application: Application) : AndroidViewModel(application) {
-    private val logger by taggedLogger("ServicesViewModel")
+    private val logger by taggedLogger(ServicesViewModel::class.java.simpleName)
 
     private var thisApp = (getApplication() as WenuLinkApp)
 
@@ -48,14 +46,18 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     fun isSimulationReady(): Boolean = aircraft.telemetry.isSimulationAvailable
 
-    fun isServiceRunning(): Boolean = thisApp.wenuLinkService?.isRunning() ?: false
+    fun isServiceRunning(): Boolean = thisApp.wenuLinkService?.isRunning() == true
 
-    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
+    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() == true
 
     init {
         viewModelScope.launch {
             // Wait for flag change
-            _isSimReady.value = AsyncUtils.waitTimeout(1000, 60000, ::isSimulationReady)
+            _isSimReady.value = AsyncUtils.waitTimeout(
+                1000,
+                60000,
+                ::isSimulationReady
+            )
         }
     }
 
@@ -70,7 +72,11 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         startFunction(Intent(thisApp, WenuLinkService::class.java))
 
         viewModelScope.launch {
-            _isServiceRunning.value = AsyncUtils.waitTimeout(1000, 60000, ::isServiceReady)
+            _isServiceRunning.value = AsyncUtils.waitTimeout(
+                1000,
+                60000,
+                ::isServiceReady
+            )
         }
     }
 

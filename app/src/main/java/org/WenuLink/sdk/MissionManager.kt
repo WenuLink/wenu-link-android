@@ -21,15 +21,13 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.mission.AssembledMission
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionNode
-import kotlin.getValue
-
 
 /**
  * Object class to comply with DJI ref
  * https://developer.dji.com/api-reference/android-api/Components/Missions/DJIWaypointMissionOperator.html
  */
 object MissionManager {
-    private val logger by taggedLogger("MissionManager")
+    private val logger by taggedLogger(MissionManager::class.java.simpleName)
     private val operator: WaypointMissionOperator
         get() = MissionControl.getInstance().waypointMissionOperator
     val currentState: WaypointMissionState
@@ -85,10 +83,12 @@ object MissionManager {
                     }
                     if (isMissionReady()) onResult(true, null)
                     else onResult(false, "Error uploading waypoint mission!")
-                } else onResult(
-                    false,
-                    "Error uploading mission! $error (${currentState})"
-                )
+                } else {
+                    onResult(
+                        false,
+                        "Error uploading mission! $error (${currentState})"
+                    )
+                }
             }
         )
     }

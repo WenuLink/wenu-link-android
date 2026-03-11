@@ -34,15 +34,16 @@ import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
 import kotlin.math.roundToInt
 
 /**
  * Management class for different MAVLink's microservices message processing.
- * All message processing follows the command protocol service, dealing with message, command, and request.
+ * All message processing follows the command protocol service, dealing with message, command, and
+ * request.
  *
  * https://mavlink.io/en/services/
  *
@@ -56,7 +57,7 @@ class MAVLinkController(
     private val serviceScope: CoroutineScope
 ) {
 
-    private val logger by taggedLogger("MAVLinkController")
+    private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private var aircraft = AircraftHandler.getInstance()
     private var controllers: MutableList<IController> = mutableListOf()
     private var readOnlyMessageRate = true
@@ -178,7 +179,8 @@ class MAVLinkController(
     }
 
     // TODO: fix routing
-    fun isTargetSystem(msgTargetSystem: Int) = msgTargetSystem == 0 || msgTargetSystem == client.systemID
+    fun isTargetSystem(msgTargetSystem: Int) =
+        msgTargetSystem == 0 || msgTargetSystem == client.systemID
 
     fun processCommandLong(msg: MAVLinkMessage) {
         if (msg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return
@@ -188,7 +190,10 @@ class MAVLinkController(
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
-        val processed = controllers.any { it.processCommandLong(commandMsg, aircraft, serviceScope) }
+        val processed = controllers.any {
+            it.processCommandLong(commandMsg, aircraft, serviceScope)
+        }
+
         if (processed) return
 
         when (commandMsg.command) {
@@ -270,7 +275,7 @@ class MAVLinkController(
     @Synchronized
     fun sendMessages() {
         if (!client.mustProcessMessages()) {
-            logger.w { "MAVLink client is not ready!" }
+            logger.w { "MAVLink client not ready!" }
             return
         }
 
@@ -308,7 +313,9 @@ class MAVLinkController(
         if (currentRate == null) {
             currentRate = MessageRate(messageID, microSecondsInterval)
             messageRates.add(currentRate)
-        } else currentRate.microSecondsInterval = microSecondsInterval
+        } else {
+            currentRate.microSecondsInterval = microSecondsInterval
+        }
         return currentRate
     }
 
@@ -371,7 +378,10 @@ class MAVLinkController(
     suspend fun launchSending(intervalTime: Long) {
         if (!isTelemetryRunning()) return
         // Start sending messages
-        client.startSending(intervalTime, this@MAVLinkController::sendMessages)
+        client.startSending(
+            intervalTime,
+            this@MAVLinkController::sendMessages
+        )
     }
 
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
@@ -398,7 +408,11 @@ class MAVLinkController(
         // https://docs.qgroundcontrol.com/master/en/qgc-dev-guide/communication_flow.html
         if (!isStationConnected()) return false
         logger.d { "Waiting for MAVLink microservices." }
-        val systemReady = AsyncUtils.waitTimeout(1000, timeout, ::isSystemReady)
+        val systemReady = AsyncUtils.waitTimeout(
+            1000,
+            timeout,
+            ::isSystemReady
+        )
         if (systemReady) logger.i { "MAVLink microservices initialized." }
         else logger.d { "Unable to check for Mission and Parameter request, possibly already set." }
 

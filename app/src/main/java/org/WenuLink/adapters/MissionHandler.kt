@@ -6,9 +6,8 @@ import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
-import org.WenuLink.sdk.MissionManager
 import org.WenuLink.sdk.MissionActionManager
-import kotlin.getValue
+import org.WenuLink.sdk.MissionManager
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,9 +24,9 @@ class MissionHandler {
 
     }
 
-    private val logger by taggedLogger("MissionHandler")
+    private val logger by taggedLogger(MissionHandler::class.java.simpleName)
     private val assembler = MissionAssembler()
-    var flightSpeed: Float = 5.0F
+    var flightSpeed: Float = 5.0f
         private set
     var currentSequence = 0
         private set
@@ -54,8 +53,8 @@ class MissionHandler {
     }
 
     fun setSpeed(speed: Float) {
-        if (speed < -15F || speed > 15F) logger.w { "Clipping new speed $speed in [-15, 15]" }
-        flightSpeed = min(max(speed, -15F), 15F)
+        if (speed < -15f || speed > 15f) logger.w { "Clipping new speed $speed in [-15, 15]" }
+        flightSpeed = min(max(speed, -15f), 15f)
     }
 
     fun getItemCoordinates(itemMsg: msg_mission_item_int): Coordinates3D {
@@ -76,7 +75,6 @@ class MissionHandler {
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
-        var commandAccepted = true
         logger.d { "Append mission item."}
 
         when (itemMsg.command) {
@@ -137,10 +135,10 @@ class MissionHandler {
             MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH ->
                 assembler.setRTLWhenFinish()
 
-            else -> commandAccepted = false
+            else -> return false
         }
 
-        return commandAccepted
+        return true
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) {
@@ -161,7 +159,8 @@ class MissionHandler {
         if (!isMissionRunning) return
         logger.i { "Pause WP mission" }
         MissionManager.pauseMission { error ->
-            if (error != null) logger.i { "Unable to pause the mission at $currentSequence: $error" }
+            if (error != null)
+                logger.i { "Unable to pause the mission at $currentSequence: $error" }
             updateState()
         }
     }

@@ -43,7 +43,6 @@ object AsyncUtils {
     }
 }
 
-
 object MessageUtils {
     fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
 
@@ -56,7 +55,11 @@ object MessageUtils {
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
 
-    fun msgCommandAck(messageID: Int, result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED, progress: Int = -1): MAVLinkMessage {
+    fun msgCommandAck(
+        messageID: Int,
+        result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
+        progress: Int = -1
+    ): MAVLinkMessage {
         val msg = msg_command_ack()
         msg.command = messageID
         if (progress > -1) {
@@ -68,7 +71,10 @@ object MessageUtils {
         return msg
     }
 
-    fun msgRequestAck(result: Int = MAV_RESULT.MAV_RESULT_DENIED, progress: Int = -1): MAVLinkMessage {
+    fun msgRequestAck(
+        result: Int = MAV_RESULT.MAV_RESULT_DENIED,
+        progress: Int = -1
+    ): MAVLinkMessage {
         return msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
     }
 

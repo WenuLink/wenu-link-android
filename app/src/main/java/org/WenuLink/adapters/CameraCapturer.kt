@@ -2,9 +2,9 @@ package org.WenuLink.adapters
 
 import android.content.Context
 import android.media.MediaFormat
+import io.getstream.log.taggedLogger
 import org.WenuLink.sdk.CameraManager
 import org.WenuLink.webrtc.utils.videoBuffer2VideoFrame
-import io.getstream.log.taggedLogger
 import org.webrtc.CapturerObserver
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
@@ -21,7 +21,7 @@ class CameraCapturer : VideoCapturer {
     )
 
     companion object {
-        private val logger by taggedLogger("CameraCapturer")
+        private val logger by taggedLogger(CameraCapturer::class.java.simpleName)
         fun hasCameraPresent(): Boolean = CameraManager.isConnected()
     }
 
@@ -59,15 +59,16 @@ class CameraCapturer : VideoCapturer {
             logger.e { "No camera connected" }
             return
         }
-        CameraManager.startCodecWithCallback(context as Context) { mediaFormat, videoBuffer, dataSize, width, height ->
-            if (videoBuffer != null)
-                this.processYuvData(
-                    mediaFormat,
-                    videoBuffer,
-                    dataSize,
-                    width,
-                    height
-                )
+        CameraManager.startCodecWithCallback(context as Context) {
+            mediaFormat, videoBuffer, dataSize, width, height ->
+                if (videoBuffer != null)
+                    this.processYuvData(
+                        mediaFormat,
+                        videoBuffer,
+                        dataSize,
+                        width,
+                        height
+                    )
         }
     }
 

@@ -1,6 +1,5 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.BatteryData
 import dji.common.battery.BatteryState
 import dji.common.error.DJIError
 import dji.common.util.CommonCallbacks.CompletionCallbackWith
@@ -8,11 +7,10 @@ import dji.sdk.airlink.AirLink
 import dji.sdk.battery.Battery
 import dji.sdk.products.Aircraft
 import io.getstream.log.taggedLogger
-import kotlin.getValue
-
+import org.WenuLink.adapters.BatteryData
 
 object AircraftManager {
-    private val logger by taggedLogger("AircraftManager")
+    private val logger by taggedLogger(AircraftManager::class.java.simpleName)
     private val lastBatteryData: BatteryData = BatteryData()
     private val lastAirLinkQuality: IntArray = intArrayOf(-1, -1)
     private var aircraftInstance: Aircraft? = null

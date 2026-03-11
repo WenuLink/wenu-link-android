@@ -85,9 +85,7 @@ fun VideoCapturer.videoBuffer2VideoFrame(
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar
             -> getBufferI420(mediaFormat, videoBuffer, width, height)
 
-        else -> {
-            return null
-        }
+        else -> return null
     }
     return VideoFrame(procBuffer, 0, timestampNS)
 }

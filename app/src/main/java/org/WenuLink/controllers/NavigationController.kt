@@ -28,12 +28,11 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
+import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.getValue
 import kotlin.math.roundToInt
 
 /**
@@ -48,7 +47,7 @@ import kotlin.math.roundToInt
 class NavigationController (
     override val client: MAVLinkClient,
 ) : IController {
-    private val logger by taggedLogger("NavigationController")
+    private val logger by taggedLogger(NavigationController::class.java.simpleName)
     private var maxRetryTimes = 5
     private var currentRetryTimes = 0
     private var numberOfExpectedItems = -1
@@ -56,17 +55,22 @@ class NavigationController (
         private set
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        var processed = true
         when (msg.msgid) {
-            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST -> sendMissionCount(aircraft.mission)
-            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT -> createNewMission(msg, aircraft.mission)
-            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT -> processMissionItem(msg, aircraft.mission)
-            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT -> sendMissionItem(msg, aircraft.mission)
-            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL -> sendMissionClear(aircraft.mission)
-            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
-            else -> processed = false
+            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST ->
+                sendMissionCount(aircraft.mission)
+            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT ->
+                createNewMission(msg, aircraft.mission)
+            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT ->
+                processMissionItem(msg, aircraft.mission)
+            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT ->
+                sendMissionItem(msg, aircraft.mission)
+            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL ->
+                sendMissionClear(aircraft.mission)
+            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK ->
+                processAck(msg)
+            else -> return false
         }
-        return processed
+        return true
     }
 
     override fun processCommandLong(
@@ -74,22 +78,27 @@ class NavigationController (
         aircraft: AircraftHandler,
         serviceScope: CoroutineScope
     ): Boolean {
-        var processed = true
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, aircraft)
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
         return when (messageID) {
-            msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT -> msgMissionCurrent(aircraft.mission)
-            msg_home_position.MAVLINK_MSG_ID_HOME_POSITION -> msgHomePosition(aircraft)
-            msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT -> msgRawGPSInt(aircraft.telemetry)
-            msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT -> msgGlobalPositionInt(aircraft.telemetry)
-            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed(aircraft)
-            msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN -> msgGpsGlobalOrigin(aircraft)
+            msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT ->
+                msgMissionCurrent(aircraft.mission)
+            msg_home_position.MAVLINK_MSG_ID_HOME_POSITION ->
+                msgHomePosition(aircraft)
+            msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT ->
+                msgRawGPSInt(aircraft.telemetry)
+            msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT ->
+                msgGlobalPositionInt(aircraft.telemetry)
+            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED ->
+                msgLocalPositionNed(aircraft)
+            msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN ->
+                msgGpsGlobalOrigin(aircraft)
             else -> null
         }
     }
@@ -99,12 +108,11 @@ class NavigationController (
         aircraft: AircraftHandler,
         serviceScope: CoroutineScope
     ): Boolean {
-        var processed = true
         when (commandIntMsg.command) {
             MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, aircraft) // 192
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     fun createMissionItemMsg(
@@ -170,7 +178,7 @@ class NavigationController (
         val itemMsg = msg as msg_mission_request_int
         val idx = itemMsg.seq
         logger.d { "sendMissionItem #$idx" }
-        if (mission.hasWaypointNodes()){
+        if (mission.hasWaypointNodes()) {
             val itemMsg = node2missionItemMsg(idx, mission)
             client.sendMessage(itemMsg)
         }
@@ -272,14 +280,14 @@ class NavigationController (
         )
     }
 
-    fun processDoReposition(commandIntMsg: msg_command_int, aircraft: AircraftHandler){
+    fun processDoReposition(commandIntMsg: msg_command_int, aircraft: AircraftHandler) {
         val latitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.x)
         val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
         aircraft.doReposition(
             target = coordinate,
-            speed = if (commandIntMsg.param1 != -1F) commandIntMsg.param1 else  null
+            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else  null
         )
 
         client.sendMessage(
@@ -305,7 +313,9 @@ class NavigationController (
 //                logger.d { "Mission started" }
 //                sendCurrentMission(currentItemSequence)
 //            }
-//            if (error != null) logger.d { "Mission start error: $error" }
+//            else {
+//                logger.d { "Mission start error: $error" }
+//            }
 //        }
 //    }
 
@@ -318,7 +328,6 @@ class NavigationController (
     }
 
     // TODO: start, pause, and resume procedures
-
 
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
         val coordinates = aircraft.homeCoordinates ?: return null
@@ -370,7 +379,11 @@ class NavigationController (
         else if (telemetryData.gpsLevel[2]) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
         }
-        else if (telemetryData.gpsLevel[3] || telemetryData.gpsLevel[4] || telemetryData.gpsLevel[5]) {
+        else if (
+            telemetryData.gpsLevel[3] ||
+            telemetryData.gpsLevel[4] ||
+            telemetryData.gpsLevel[5]
+        ) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX.toShort()
         }
         else {

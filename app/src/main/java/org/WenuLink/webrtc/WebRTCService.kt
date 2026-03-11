@@ -1,11 +1,6 @@
 package org.WenuLink.webrtc
 
 import android.content.Context
-import org.WenuLink.adapters.CameraCapturer
-import org.WenuLink.webrtc.peer.StreamPeerConnection
-import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
-import org.WenuLink.webrtc.peer.StreamPeerType
-import org.WenuLink.webrtc.utils.stringify
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -18,6 +13,11 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.CameraCapturer
+import org.WenuLink.webrtc.peer.StreamPeerConnection
+import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
+import org.WenuLink.webrtc.peer.StreamPeerType
+import org.WenuLink.webrtc.utils.stringify
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.SessionDescription
@@ -41,7 +41,7 @@ class WebRTCService {
     }
 
     // logger an coroutine scope
-    private val logger by taggedLogger("WebRTCService")
+    private val logger by taggedLogger(WebRTCService::class.java.simpleName)
     private lateinit var serviceScope: CoroutineScope  //(SupervisorJob() + Dispatchers.Main)
     private var runningJob: Job? = null
 
@@ -148,7 +148,6 @@ class WebRTCService {
         }
     }
 
-
     fun createVideoTrack(context: Context) {
         logger.d { "mediaOptions: $mediaOptions" }
         videoSource =
@@ -193,7 +192,6 @@ class WebRTCService {
             videoCapturer.stopCapture()
         }
     }
-
 
     fun disconnect() {
         if (!isServiceUp)

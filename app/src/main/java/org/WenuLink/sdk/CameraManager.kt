@@ -8,10 +8,9 @@ import dji.sdk.camera.VideoFeeder
 import dji.sdk.codec.DJICodecManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
-import kotlin.getValue
 
 object CameraManager {
-    private val logger by taggedLogger("CameraManager")
+    private val logger by taggedLogger(CameraManager::class.java.simpleName)
     private var mInstance: Camera? = null
     private var codecManager: DJICodecManager? = null
     var cameraName: String = "No Camera Connected"
@@ -22,7 +21,7 @@ object CameraManager {
         private set
     var frameHeight: Int = -1
         private set
-    var frameRate: Float = -1F
+    var frameRate: Float = -1f
         private set
 
     @Synchronized
@@ -57,13 +56,16 @@ object CameraManager {
     }
 
     override fun toString(): String {
-        return if (mInstance == null) {
+        return if (mInstance == null)
             "No Camera to manage"
-        } else
+        else
             "Managing: $cameraName $frameWidth x $frameHeight @ $frameRate"
     }
 
-    fun startCodecWithCallback(context: Context, processYuvData: (MediaFormat, ByteBuffer?, Int, Int, Int) -> Unit) {
+    fun startCodecWithCallback(
+        context: Context,
+        processYuvData: (MediaFormat, ByteBuffer?, Int, Int, Int) -> Unit
+    ) {
         if (isCodecStarted()) {
             logger.d { "codecManager not null" }
             return
