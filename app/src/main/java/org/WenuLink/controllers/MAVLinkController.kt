@@ -34,6 +34,7 @@ import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageRate
@@ -391,15 +392,22 @@ class MAVLinkController(
         )
     }
 
-    suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
+    suspend fun waitGroundStation(timeout: Long = 30000L): Boolean {
         if (!isTelemetryRunning()) return false
+
         // prevent to send data before initialization
         readOnlyMessageRate = true
-        // Send heartbeat and wait for any GCS
-        connectionController.sendHeartbeat(aircraft)
+
         logger.d { "Waiting for GCS." }
-        AsyncUtils.waitTimeout(10, timeout, ::isStationConnected)
+
+        // Send heartbeat and wait for any GCS
+        val deadline = System.currentTimeMillis() + timeout
+        while (!isStationConnected() && System.currentTimeMillis() < deadline) {
+            connectionController.sendHeartbeat(aircraft)
+            delay(1000L)
+        }
         logger.i { "GCS found?: ${isStationConnected()}." }
+
         return isStationConnected()
     }
 

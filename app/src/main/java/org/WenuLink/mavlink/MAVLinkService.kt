@@ -133,7 +133,8 @@ class MAVLinkService {
         if (hasParams) logger.d { "Parameters loaded" }
 
         isReady = controller.waitSystemReady(60000L)
-        if (isReady) controller.notifySystemReady()
+        if (isReady) logger.w { "System not ready, unlocking telemetry anyway." }
+        controller.notifySystemReady()
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
