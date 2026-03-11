@@ -33,7 +33,6 @@ This project and everyone participating in it is governed by the
 [Code of Conduct](/blob/develop/CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior.
 
-
 ## I Have a Question
 
 Before you ask a question, it is best to search for existing [Issues](https://github.com/WenuLink/wenu-link-android/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
@@ -46,16 +45,14 @@ If you then still feel the need to ask a question and need clarification, we rec
 
 We will then take care of the issue as soon as possible.
 
-
 ## I Want To Contribute
 
-> ### Legal Notice 
+> ### Legal Notice
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
 
 ### Need ideas to contribute?
 
 Unless you have a good idea to implement, you can browse the [beginner issues](https://github.com/WenuLink/wenu-link-android/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) and select a feature or bug fix that should be fairly easy to implement. Once you will become an experienced developer, you will be able to address more complex issues.
-
 
 ### Your First Code Contribution
 
@@ -74,13 +71,22 @@ In this regard, you can fork any branch that you are interested to contribute. F
 
 More information will be added.
 
+### Setup
+
+Before building the project, you need to provide a DJI developer API key.
+
+1. Copy `local.properties.example` to `local.properties` in the project toor (this file is gitignored and must never be commited).
+2. Register at https://developer.dji.com/ and create an app with the package name `org.WenuLink`.
+3. Fill in the `dji.api.key` value in your `local.properties`.
+
+Android Studio will automatically populate `sdk.dir` when you open the project. If building from command line, set in manually to your Andorid SDK path.
+
 ### Improving The Documentation
 
 Current documentation is focused for initial users to have an starting point on how the application works.
 Documentation writing for end-users and developers are welcome. The documentation roadmap is being discussed on [issue #5](https://github.com/WenuLink/wenu-link-android/issues/5) over a few defined use cases that guides the application development.
 
 Developers documentation should focus on a more technical aspect relating architecture design and the patterns used for the current code development. The ideia is to encourage good coding practices to keeps the project organized in terms of packages, classes, and methods names defition.
-
 
 ### Reporting Bugs
 
@@ -97,7 +103,6 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 - Version of AndroidStudio or IDE, compiler, SDK, runtime environment, package manager, depending on what seems relevant.
 - Possibly your logcat output
 - Can you reliably reproduce the issue? And can you also reproduce it with older versions?
-
 
 ### How Do I Submit a Good Bug Report?
 
@@ -117,18 +122,15 @@ Once it's filed:
 - A team member will try to reproduce the issue with your provided steps. If there are no reproduction steps or no obvious way to reproduce the issue, the team will ask you for those steps and mark the issue as `needs-info`. Bugs with the `needs-info` tag will not be addressed until they are reproduced.
 - If the team is able to reproduce the issue, it will be marked `needs-fix`, as well as possibly other tags (such as `critical`), and the issue will be left to be [implemented by someone](#your-first-code-contribution).
 
-
 ### Suggesting Enhancements
 
 This section guides you through submitting an enhancement suggestion **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
-
 
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
 - Perform a [search](https://github.com/WenuLink/wenu-link-android/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
 - Find out whether your idea fits with the scope and aims of the project. It's up to you to make a strong case to convince the project's developers of the merits of this feature. Keep in mind that we want features that will be useful to the majority of our users and not just a small subset. If you're just targeting a minority of users, consider writing an add-on/plugin library.
-
 
 #### How Do I Submit a Good Enhancement Suggestion?
 
@@ -137,9 +139,8 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/WenuLi
 - Use a **clear and descriptive title** for the issue to identify the suggestion.
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
-- You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux. 
+- You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
 - **Explain why this enhancement would be useful** to most CONTRIBUTING.md users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
-
 
 ## Styleguides
 
@@ -160,7 +161,6 @@ Regards class naming convention:
 - `Handler` suffix will be used with classes that deals with asynchronous operations.
 - `ViewModel` suffix will be used with classes that performs logic-level operations and updates UI-level elements.
 - `Manager` suffix will be used with classes that wraps SDK objects and methods for easy-to-use code implementation.
-
 
 ### Commit Messages
 
@@ -187,17 +187,15 @@ For the common case for a commit focused to an specific feature, hot fix, or bug
 ```
 Add user authentication
 
-Implemented user registration and login features. This refactor introduces 
+Implemented user registration and login features. This refactor introduces
 JWT tokens for session management, improving security and user experience.
 
 Fixes #42
 ```
 
-
 ## Join The Project Team
 
 As initial team, we are accepting new members that would compromise in improving the development of the presented project. Authorization and roles must be requested by open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Triagem,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
-
 
 ## Attribution
 This guide is based on the **contributing.md**. [Make your own](https://contributing.md/)!

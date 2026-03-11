@@ -1,0 +1,13 @@
+# Copy this file to local.properties and fill in your values.
+# local.properties is gitignored and must never be committed.
+
+# Path to your Android SDK installation.
+# Android Studio sets this automatically when you open the project.
+# Windows example: C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+# Linux/macOS example: /home/yourname/Android/Sdk
+sdk.dir=
+
+# DJI Developer API key.
+# Obtain one at https://developer.dji.com/ — create an app with
+# package name matching applicationId in app/build.gradle.kts (org.WenuLink).
+dji.api.key=
