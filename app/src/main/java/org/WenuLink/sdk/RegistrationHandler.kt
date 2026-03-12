@@ -48,28 +48,35 @@ object RegistrationHandler {
     }
 
     fun setActivationCallback(callback: (Boolean, String?) -> Unit) {
-        activationStateListener = AppActivationStateListener {
-                appActivationState: AppActivationState -> callback(true, "$appActivationState") }
+        activationStateListener =
+            AppActivationStateListener { appActivationState: AppActivationState ->
+                callback(true, "$appActivationState")
+            }
         SDKUtils.getAppActivationManager()?.addAppActivationStateListener(
-            activationStateListener as AppActivationStateListener)
+            activationStateListener as AppActivationStateListener
+        )
     }
 
     fun setBindingCallback(callback: (Boolean, String?) -> Unit) {
-        bindingStateListener = AircraftBindingStateListener {
-                bindingState: AircraftBindingState -> callback(true, "$bindingState") }
+        bindingStateListener = AircraftBindingStateListener { bindingState: AircraftBindingState ->
+            callback(true, "$bindingState")
+        }
         SDKUtils.getAppActivationManager()?.addAircraftBindingStateListener(
-            bindingStateListener as AircraftBindingStateListener)
+            bindingStateListener as AircraftBindingStateListener
+        )
     }
 
     fun tearDownListener() {
         if (activationStateListener != null) {
             // Example of removing listeners
             SDKUtils.getAppActivationManager()?.removeAppActivationStateListener(
-                activationStateListener as AppActivationStateListener)
+                activationStateListener as AppActivationStateListener
+            )
         }
         if (bindingStateListener != null) {
             SDKUtils.getAppActivationManager()?.removeAircraftBindingStateListener(
-                bindingStateListener as AircraftBindingStateListener)
+                bindingStateListener as AircraftBindingStateListener
+            )
         }
     }
 
@@ -105,8 +112,9 @@ object RegistrationHandler {
 
         override fun onProductConnect(product: BaseProduct?) {
             val possibleAircraft = SDKUtils.getAircraftInstance()
-            if (possibleAircraft != null)
+            if (possibleAircraft != null) {
                 AircraftManager.init(possibleAircraft)
+            }
             //            updateProductInstance(product)
             productCallback?.invoke(true)
         }
@@ -126,17 +134,21 @@ object RegistrationHandler {
             }
             loggerC.d {
                 "onComponentChange key: $componentKey, " +
-                "oldComponent: $oldComponent, " +
-                "newComponent: $newComponent"
+                    "oldComponent: $oldComponent, " +
+                    "newComponent: $newComponent"
             }
-            if (componentKey == BaseProduct.ComponentKey.REMOTE_CONTROLLER)
+            if (componentKey == BaseProduct.ComponentKey.REMOTE_CONTROLLER) {
                 RCManager.init(newComponent as RemoteController)
-            if (componentKey == BaseProduct.ComponentKey.AIR_LINK)
+            }
+            if (componentKey == BaseProduct.ComponentKey.AIR_LINK) {
                 AircraftManager.initAirLink(newComponent as AirLink)
-            if (componentKey == BaseProduct.ComponentKey.FLIGHT_CONTROLLER)
+            }
+            if (componentKey == BaseProduct.ComponentKey.FLIGHT_CONTROLLER) {
                 FCManager.init(newComponent as FlightController)
-            if (componentKey == BaseProduct.ComponentKey.CAMERA)
+            }
+            if (componentKey == BaseProduct.ComponentKey.CAMERA) {
                 CameraManager.init(newComponent as Camera)
+            }
         }
 
         override fun onInitProcess(p0: DJISDKInitEvent?, p1: Int) {

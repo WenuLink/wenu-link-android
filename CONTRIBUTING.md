@@ -18,10 +18,13 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 - [I Have a Question](#i-have-a-question)
 - [I Want To Contribute](#i-want-to-contribute)
   - [Your First Code Contribution](#your-first-code-contribution)
+  - [Setup](#setup)
   - [Improving The Documentation](#improving-the-documentation)
   - [Reporting Bugs](#reporting-bugs)
   - [Suggesting Enhancements](#suggesting-enhancements)
-- [Styleguides](#styleguides)
+- [Styleguide](#styleguide)
+  - [Code Style](#code-style)
+    - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
   - [Join The Project Team](#join-the-project-team)
 
@@ -142,7 +145,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/WenuLi
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
 - **Explain why this enhancement would be useful** to most CONTRIBUTING.md users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
 
-## Styleguides
+## Styleguide
 
 The overall coding style is based con actual Kotlin/Android development specifications. Specific definitions needs to be made for a more detailed style to address. Initially, the only requirement is to follow the package and visibility aspects so far.
 
@@ -161,6 +164,38 @@ Regards class naming convention:
 - `Handler` suffix will be used with classes that deals with asynchronous operations.
 - `ViewModel` suffix will be used with classes that performs logic-level operations and updates UI-level elements.
 - `Manager` suffix will be used with classes that wraps SDK objects and methods for easy-to-use code implementation.
+
+### Code Style
+
+This project follows the [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
+and the [Android Kotlin style guide](https://developer.android.com/kotlin/style-guide).
+
+Code style is enforced via **ktlint**. Before submitting a PR, run:
+
+    ./gradlew ktlintCheck
+
+To auto-fix most formatting issues:
+
+    ./gradlew ktlintFormat
+
+The project's `.editorconfig` configures indentation and line length
+automatically in both Android Studio and VS Code — no manual IDE
+configuration needed.
+
+#### Recommended: pre-commit hook
+
+To have ktlint check your code automatically on every `git commit`,
+run this once after cloning the repository:
+
+    ./gradlew addKtlintCheckGitPreCommitHook
+
+This installs a local git hook that aborts the commit if any style
+violations are found. Run `./gradlew ktlintFormat` to fix them, then
+commit again. The hook is not committed to the repository, so each
+contributor who wants it must run this command once themselves.
+
+Optionally, install the [ktlint Android Studio plugin](https://plugins.jetbrains.com/plugin/15057-ktlint)
+for real-time violation highlighting in the editor.
 
 ### Commit Messages
 

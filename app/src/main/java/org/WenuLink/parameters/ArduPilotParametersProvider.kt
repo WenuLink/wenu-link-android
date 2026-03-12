@@ -8,7 +8,6 @@ import com.MAVLink.enums.MAV_PARAM_TYPE
 object ArduPilotParametersProvider : ParameterProvider {
 
     override fun provide(): List<ParameterSpec> {
-
         /* ---------- internal storage ---------- */
         val values = mutableMapOf<String, ParamValue>()
 
@@ -17,46 +16,50 @@ object ArduPilotParametersProvider : ParameterProvider {
             type: Int,
             semantic: SemanticType,
             reader: ((ParamValue?) -> Unit) -> Unit
-        ) =
-            SimpleParameter(
-                name = name,
-                type = type,
-                semantic = semantic,
-                reader = reader,
-                writer = { v, cb ->
-                    values[name] = v
-                    cb(null)
-                }
-            )
+        ) = SimpleParameter(
+            name = name,
+            type = type,
+            semantic = semantic,
+            reader = reader,
+            writer = { v, cb ->
+                values[name] = v
+                cb(null)
+            }
+        )
 
-        fun intParam(name: String, initial: Int) =
-            numberParam(name, MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
-                SemanticType.INT,
-                reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) })
+        fun intParam(name: String, initial: Int) = numberParam(
+            name,
+            MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
+            SemanticType.INT,
+            reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
+        )
 
-        fun floatParam(name: String, initial: Float) =
-            numberParam(name, MAV_PARAM_TYPE.MAV_PARAM_TYPE_REAL32,
-                SemanticType.FLOAT,
-                reader = { cb -> cb(values[name] ?: ParamValue.FloatVal(initial)) })
+        fun floatParam(name: String, initial: Float) = numberParam(
+            name,
+            MAV_PARAM_TYPE.MAV_PARAM_TYPE_REAL32,
+            SemanticType.FLOAT,
+            reader = { cb -> cb(values[name] ?: ParamValue.FloatVal(initial)) }
+        )
 
-        fun int8Param(name: String, initial: Int) =
-            numberParam(name, MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT8,
-                SemanticType.INT,
-                    reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) })
+        fun int8Param(name: String, initial: Int) = numberParam(
+            name,
+            MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT8,
+            SemanticType.INT,
+            reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
+        )
 
-        fun boolParam(name: String, initial: Boolean) =
-            SimpleParameter(
-                name = name,
-                type = MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
-                semantic = SemanticType.BOOL,
-                reader = { cb ->
-                    cb(values[name] ?: ParamValue.BoolVal(initial))
-                },
-                writer = { v, cb ->
-                    values[name] = ParamValue.BoolVal((v as ParamValue.BoolVal).v)
-                    cb(null)
-                }
-            )
+        fun boolParam(name: String, initial: Boolean) = SimpleParameter(
+            name = name,
+            type = MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
+            semantic = SemanticType.BOOL,
+            reader = { cb ->
+                cb(values[name] ?: ParamValue.BoolVal(initial))
+            },
+            writer = { v, cb ->
+                values[name] = ParamValue.BoolVal((v as ParamValue.BoolVal).v)
+                cb(null)
+            }
+        )
 
         return listOf(
             /* ===============================
@@ -286,7 +289,7 @@ object ArduPilotParametersProvider : ParameterProvider {
             int8Param("EK3_MAG_CAL", 3),
             int8Param("EK3_SRC1_POSXY", 3),
             intParam("STAT_RUNTIME", 43),
-            intParam("FORMAT_VERSION", 120),
+            intParam("FORMAT_VERSION", 120)
         )
     }
 }

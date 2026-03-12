@@ -63,44 +63,38 @@ object FCManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean {
-        return fcInstance != null
-    }
+    fun isConnected(): Boolean = fcInstance != null
 
-    override fun toString(): String {
-        return if (!isConnected()) {
-            if (serialNumber != null && fwVersion != null) {
-                "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
-            } else {
-                "Reading FlightController"
-            }
+    override fun toString(): String = if (!isConnected()) {
+        if (serialNumber != null && fwVersion != null) {
+            "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
         } else {
-            "No FlightController"
+            "Reading FlightController"
         }
+    } else {
+        "No FlightController"
     }
 
-    fun state2telemetry(state: FlightControllerState): TelemetryData {
-        return TelemetryData(
-            roll = state.attitude.roll,
-            pitch = state.attitude.pitch,
-            yaw = state.attitude.yaw,
-            latitude = state.aircraftLocation.latitude,
-            longitude = state.aircraftLocation.longitude,
-            altitude = state.aircraftLocation.altitude,
-            positionX = 0f,
-            positionY = 0f,
-            positionZ = 0f,
-            velocityX = state.velocityX,
-            velocityY = state.velocityY,
-            velocityZ = state.velocityZ,
-            flightTime = state.flightTimeInSeconds,
-            takeOffAltitude = state.takeoffLocationAltitude,
-            isFlying = state.isFlying,
-            motorsOn = state.areMotorsOn(),
-            satelliteCount = state.satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
-        )
-    }
+    fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+        roll = state.attitude.roll,
+        pitch = state.attitude.pitch,
+        yaw = state.attitude.yaw,
+        latitude = state.aircraftLocation.latitude,
+        longitude = state.aircraftLocation.longitude,
+        altitude = state.aircraftLocation.altitude,
+        positionX = 0f,
+        positionY = 0f,
+        positionZ = 0f,
+        velocityX = state.velocityX,
+        velocityY = state.velocityY,
+        velocityZ = state.velocityZ,
+        flightTime = state.flightTimeInSeconds,
+        takeOffAltitude = state.takeoffLocationAltitude,
+        isFlying = state.isFlying,
+        motorsOn = state.areMotorsOn(),
+        satelliteCount = state.satelliteCount,
+        gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+    )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
         fcInstance?.setStateCallback(stateCallback)
@@ -141,9 +135,7 @@ object FCManager {
         }
     }
 
-    fun isFlying(): Boolean {
-        return fcInstance?.state?.isFlying == true
-    }
+    fun isFlying(): Boolean = fcInstance?.state?.isFlying == true
 
     fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
 
@@ -162,20 +154,19 @@ object FCManager {
         fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
     }
 
-    fun areMotorsArmed(): Boolean {
-        return fcInstance?.state?.areMotorsOn() == true
-    }
+    fun areMotorsArmed(): Boolean = fcInstance?.state?.areMotorsOn() == true
 
     fun armMotors() {
         logger.d { "Arming motors" }
 //        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
+        // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOnMotors { }
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
 //        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
+        // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOffMotors { }
     }
-
 }

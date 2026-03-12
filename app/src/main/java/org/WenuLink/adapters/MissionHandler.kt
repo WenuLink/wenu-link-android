@@ -4,12 +4,12 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
+import kotlin.math.max
+import kotlin.math.min
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
-import kotlin.math.max
-import kotlin.math.min
 
 class MissionHandler {
     companion object {
@@ -17,11 +17,11 @@ class MissionHandler {
 
         @Synchronized
         fun getInstance(): MissionHandler {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = MissionHandler()
+            }
             return mInstance!!
         }
-
     }
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
@@ -42,14 +42,15 @@ class MissionHandler {
     @Synchronized
     fun updateState() {
         logger.d { "updateMissionState: ${MissionManager.currentState}" }
-        if (MissionManager.isWaitingMission())
+        if (MissionManager.isWaitingMission()) {
             currentState = MISSION_STATE.MISSION_STATE_NO_MISSION
-        else if (MissionManager.isMissionReady())
+        } else if (MissionManager.isMissionReady()) {
             currentState = MISSION_STATE.MISSION_STATE_NOT_STARTED
-        else if (MissionManager.isMissionStarted())
+        } else if (MissionManager.isMissionStarted()) {
             currentState = MISSION_STATE.MISSION_STATE_ACTIVE
-        else if (MissionManager.isMissionPaused())
+        } else if (MissionManager.isMissionPaused()) {
             currentState = MISSION_STATE.MISSION_STATE_PAUSED
+        }
     }
 
     fun setSpeed(speed: Float) {
@@ -75,7 +76,7 @@ class MissionHandler {
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
-        logger.d { "Append mission item."}
+        logger.d { "Append mission item." }
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
@@ -101,10 +102,11 @@ class MissionHandler {
                 assembler.addWaypoint(coordinates)
 
                 // Delay (seconds)
-                if (delay > 0)
+                if (delay > 0) {
                     assembler.addActionToLast(
                         MissionAction.Delay(delay)
                     )
+                }
 
                 // Yaw (rad → deg)
                 if (yaw != 0f) {
@@ -159,8 +161,9 @@ class MissionHandler {
         if (!isMissionRunning) return
         logger.i { "Pause WP mission" }
         MissionManager.pauseMission { error ->
-            if (error != null)
+            if (error != null) {
                 logger.i { "Unable to pause the mission at $currentSequence: $error" }
+            }
             updateState()
         }
     }
@@ -222,7 +225,7 @@ class MissionHandler {
     fun cancelCommand() {
         logger.i { "Cancel command" }
         MissionActionManager.stop()
-        MissionActionManager.clear()  // <- not sure about this
+        MissionActionManager.clear() // <- not sure about this
         updateState()
     }
 
@@ -237,11 +240,7 @@ class MissionHandler {
         MissionActionManager.stop()
         updateState()
     }
-    fun doReposition(
-        target: Coordinates3D,
-        speed: Float?,
-        onResult: (String?) -> Unit
-    ) {
+    fun doReposition(target: Coordinates3D, speed: Float?, onResult: (String?) -> Unit) {
         logger.i { "doReposition" }
         MissionActionManager.clear()
         val error = MissionActionManager.scheduleGoTo(

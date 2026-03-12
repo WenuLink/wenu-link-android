@@ -19,7 +19,7 @@ object AircraftManager {
     private var useAirLink: Boolean = false
 
     @Synchronized
-    fun init(aircraft: Aircraft)  {
+    fun init(aircraft: Aircraft) {
         aircraftInstance = aircraft
         batteryInstance = aircraft.battery
         CameraManager.updateStreamID(getModel())
@@ -27,7 +27,7 @@ object AircraftManager {
     }
 
     @Synchronized
-    fun initAirLink(airLink: AirLink)  {
+    fun initAirLink(airLink: AirLink) {
         this.airLinkInstance = airLink
         useAirLink = true
         logger.i { "AirLink connected" }
@@ -37,16 +37,15 @@ object AircraftManager {
     fun isUpdated(): Boolean {
         var isUpdated = lastBatteryData.percentCharge > -1
         if (useAirLink) {
-            isUpdated = isUpdated && lastAirLinkQuality[0] > -1 &&
-                    lastAirLinkQuality[1] > -1
+            isUpdated = isUpdated &&
+                lastAirLinkQuality[0] > -1 &&
+                lastAirLinkQuality[1] > -1
         }
         return isUpdated
     }
 
     @Synchronized
-    fun isAircraftConnected(): Boolean {
-        return aircraftInstance != null
-    }
+    fun isAircraftConnected(): Boolean = aircraftInstance != null
 
     fun startListeners() {
         startBatteryListeners()
@@ -59,17 +58,11 @@ object AircraftManager {
     }
 
     @Synchronized
-    fun getBatteryData(): BatteryData {
-        return lastBatteryData
-    }
+    fun getBatteryData(): BatteryData = lastBatteryData
 
-    fun getModelName(): String {
-        return aircraftInstance?.model?.displayName ?: "No aircraft"
-    }
+    fun getModelName(): String = aircraftInstance?.model?.displayName ?: "No aircraft"
 
-    fun getModel(): String {
-        return aircraftInstance?.model?.toString() ?: "NONE"
-    }
+    fun getModel(): String = aircraftInstance?.model?.toString() ?: "NONE"
 
     @Synchronized
     private fun updateBattery(battery: BatteryData) {
@@ -82,9 +75,7 @@ object AircraftManager {
     }
 
     @Synchronized
-    fun getAirlinkData(): IntArray {
-        return lastAirLinkQuality
-    }
+    fun getAirlinkData(): IntArray = lastAirLinkQuality
 
     @Synchronized
     private fun updateAirlink(downLink: Int?, upLink: Int?) {
@@ -102,12 +93,12 @@ object AircraftManager {
                     batteryState.current,
                     batteryState.fullChargeCapacity,
                     batteryState.chargeRemaining,
-                    batteryState.temperature,
+                    batteryState.temperature
                 )
             )
         }
 
-        batteryInstance?.getCellVoltages(object: CompletionCallbackWith<Array<Int>> {
+        batteryInstance?.getCellVoltages(object : CompletionCallbackWith<Array<Int>> {
             override fun onSuccess(p0: Array<Int>) {
                 updateBatteryCellVoltages(p0.toIntArray())
                 logger.d { "getCellVoltages $p0" }
@@ -138,8 +129,8 @@ object AircraftManager {
 
     private fun stopAirLinkListeners() {
         logger.d { "Stopping AirLink updates" }
-        airLinkInstance?.setDownlinkSignalQualityCallback{ i -> }
-        airLinkInstance?.setUplinkSignalQualityCallback{ i -> }
+        airLinkInstance?.setDownlinkSignalQualityCallback { i -> }
+        airLinkInstance?.setUplinkSignalQualityCallback { i -> }
         updateAirlink(-1, -1)
     }
 }

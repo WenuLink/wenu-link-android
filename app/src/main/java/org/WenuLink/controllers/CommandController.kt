@@ -20,9 +20,7 @@ import org.WenuLink.mavlink.MAVLinkClient
  *
  * https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#incoming-commands
  */
-class CommandController (
-    override var client: MAVLinkClient
-): IController {
+class CommandController(override var client: MAVLinkClient) : IController {
     private val logger by taggedLogger(CommandController::class.java.simpleName)
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
@@ -41,12 +39,16 @@ class CommandController (
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_DO_SET_MODE ->
                 setMode(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM ->
                 processArmDisarm(commandLongMsg, aircraft, serviceScope)
+
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
                 processTakeoff(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_NAV_LAND ->
                 processLanding(commandLongMsg, aircraft)
+
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> return false
@@ -77,23 +79,17 @@ class CommandController (
         client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
     }
 
-    fun sendAutopilotAck() =
-        sendCommandAck(
-            MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
-            MAV_RESULT.MAV_RESULT_ACCEPTED
-        )
+    fun sendAutopilotAck() = sendCommandAck(
+        MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+        MAV_RESULT.MAV_RESULT_ACCEPTED
+    )
 
-    fun packVersion(
-        major: Int,
-        minor: Int,
-        patch: Int,
-        type: Int
-    ): Long {
-        return ((major shl 24) or
-                (minor shl 16) or
-                (patch shl 8) or
-                (type and 0xFF)).toLong()
-    }
+    fun packVersion(major: Int, minor: Int, patch: Int, type: Int): Long = (
+        (major shl 24) or
+            (minor shl 16) or
+            (patch shl 8) or
+            (type and 0xFF)
+        ).toLong()
 
     fun sendAutopilotVersion() {
         val msg = msg_autopilot_version()
@@ -104,7 +100,7 @@ class CommandController (
             MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED,
             MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT,
             MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
         ).fold(0L) { acc, value -> acc or value.toLong() }
 
         msg.flight_sw_version = packVersion(
@@ -114,24 +110,25 @@ class CommandController (
             FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
         ) // Match SDK version
         // TODO: Identify SDK and Aircraft too
-        msg.os_sw_version = 0  // Possibly Android version
-        msg.middleware_sw_version = 0  // Possibly WenuLink version
+        msg.os_sw_version = 0 // Possibly Android version
+        msg.middleware_sw_version = 0 // Possibly WenuLink version
         client.sendMessage(msg)
     }
 
     fun setMode(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         val requestedMode = commandMsg.param2.toLong()
         logger.d { "FlightMode requested: $requestedMode" }
-        if (aircraft.modeTransition(requestedMode))
+        if (aircraft.modeTransition(requestedMode)) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-        else
+        } else {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        }
     }
 
     fun processArmDisarm(
         commandMsg: msg_command_long,
         aircraft: AircraftHandler,
-        serviceScope: CoroutineScope,
+        serviceScope: CoroutineScope
     ) {
         val action = when (commandMsg.param1) {
             1f -> true
@@ -163,5 +160,4 @@ class CommandController (
         aircraft.land()
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
-
 }

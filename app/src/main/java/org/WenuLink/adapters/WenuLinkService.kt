@@ -48,11 +48,13 @@ class WenuLinkService : Service() {
         }
 
         // create WebRTC instance
-        if (WebRTCService.isEnabled && !isWebRTCReady())
-            webRTC = WebRTCService.getInstance()// create MAVLink instance if must
+        if (WebRTCService.isEnabled && !isWebRTCReady()) {
+            webRTC = WebRTCService.getInstance() // create MAVLink instance if must
+        }
 
-        if (MAVLinkService.isEnabled && !isMAVLinkReady())
+        if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
             mavlink = MAVLinkService()
+        }
 
         logger.i { "WenuLinkService created." }
     }
@@ -70,10 +72,11 @@ class WenuLinkService : Service() {
         }
 
         val notification: Notification.Builder =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 Notification.Builder(this, channelId)
-            else
+            } else {
                 Notification.Builder(this)
+            }
 
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -83,14 +86,17 @@ class WenuLinkService : Service() {
         )
 
         var contentText = "No service enabled yet"
-        if (::mavlink.isInitialized)
+        if (::mavlink.isInitialized) {
             contentText = "Sending periodic heartbeats to GCS\n"
-        if (::webRTC.isInitialized)
+        }
+        if (::webRTC.isInitialized) {
             contentText += "WebRTC streaming: ${webRTC.mediaOptions.VIDEO_CAMERA_NAME}"
+        }
         // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
         // TODO: update according to each present service
         startForeground(
-            1, notification
+            1,
+            notification
                 .setContentTitle("WenuLink service running")
                 .setContentText(contentText)
                 .setSmallIcon(R.drawable.ic_menu_compass)
@@ -210,7 +216,7 @@ class WenuLinkService : Service() {
     fun isPowerOff(): Boolean = aircraft.isPowerOff
 
     suspend fun watchRCInput(intervalTime: Long = 100L) {
-        while(!aircraft.isPowerOff) {
+        while (!aircraft.isPowerOff) {
             // Watch for joystick inputs
             aircraft.rcInput?.hasCenteredJoystick()?.let {
                 serviceScope.launch {
@@ -220,5 +226,4 @@ class WenuLinkService : Service() {
             delay(intervalTime)
         }
     }
-
 }

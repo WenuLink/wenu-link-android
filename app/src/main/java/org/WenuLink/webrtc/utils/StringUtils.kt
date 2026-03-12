@@ -26,23 +26,19 @@ import org.webrtc.audio.JavaAudioDeviceModule
 fun SessionDescription.stringify(): String =
     "SessionDescription(type=$type, description=$description)"
 
-fun MediaStreamTrack.stringify(): String {
-    return "MediaStreamTrack(id=${id()}, kind=${kind()}, enabled: ${enabled()}, state=${state()})"
-}
+fun MediaStreamTrack.stringify(): String =
+    "MediaStreamTrack(id=${id()}, kind=${kind()}, enabled: ${enabled()}, state=${state()})"
 
-fun IceCandidateErrorEvent.stringify(): String {
-    return "IceCandidateErrorEvent(" +
-                "errorCode=$errorCode, " +
-                "$errorText, " +
-                "address=$address, " +
-                "port=$port, " +
-                "url=$url)"
-}
+fun IceCandidateErrorEvent.stringify(): String = "IceCandidateErrorEvent(" +
+    "errorCode=$errorCode, " +
+    "$errorText, " +
+    "address=$address, " +
+    "port=$port, " +
+    "url=$url)"
 
-fun JavaAudioDeviceModule.AudioSamples.stringify(): String {
-    return "AudioSamples(audioFormat=$audioFormat, channelCount=$channelCount" +
-            ", sampleRate=$sampleRate, data.size=${data.size})"
-}
+fun JavaAudioDeviceModule.AudioSamples.stringify(): String =
+    "AudioSamples(audioFormat=$audioFormat, channelCount=$channelCount, " +
+        "sampleRate=$sampleRate, data.size=${data.size})"
 
 fun StreamPeerType.stringify() = when (this) {
     StreamPeerType.PUBLISHER -> "publisher"

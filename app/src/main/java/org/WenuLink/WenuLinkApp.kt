@@ -39,19 +39,17 @@ class WenuLinkApp : Application() {
         }
         // Register to listen for USB attach/detach
         val filter = IntentFilter().apply {
-            addAction(SDKManager.getIntentAction())  // your SDK’s action
+            addAction(SDKManager.getIntentAction()) // your SDK’s action
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(usbReceiver, filter, RECEIVER_EXPORTED)
-        }
-        else {
+        } else {
             registerReceiver(usbReceiver, filter)
         }
 
         AndroidStreamLogger.installOnDebuggableApp(this)
     }
-
 }

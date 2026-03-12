@@ -39,6 +39,5 @@ class MissionAssembler {
         rtlWhenFinish = true
     }
 
-    fun build(): AssembledMission =
-        AssembledMission(nodes.toList(), nWaypoints, rtlWhenFinish)
+    fun build(): AssembledMission = AssembledMission(nodes.toList(), nWaypoints, rtlWhenFinish)
 }

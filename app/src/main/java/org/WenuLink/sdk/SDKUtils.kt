@@ -1,4 +1,4 @@
-/**
+/*
  * based on https://github.com/dji-sdk/Mobile-SDK-Android/blob/master/Sample%20Code/app/src/main/java/com/dji/sdk/sample/internal/utils/ModuleVerificationUtil.java
  */
 package org.WenuLink.sdk
@@ -15,17 +15,12 @@ import io.getstream.log.taggedLogger
 object SDKUtils {
     private val logger by taggedLogger(SDKUtils::class.java.simpleName)
 
-    fun getUsbAction(): String {
-        return DJISDKManager.USB_ACCESSORY_ATTACHED
-    }
+    fun getUsbAction(): String = DJISDKManager.USB_ACCESSORY_ATTACHED
 
-    fun getProductInstance(): BaseProduct? {
-        return DJISDKManager.getInstance().product
-    }
+    fun getProductInstance(): BaseProduct? = DJISDKManager.getInstance().product
 
-    fun isAircraftConnected(): Boolean {
-        return getProductInstance() != null && getProductInstance() is Aircraft
-    }
+    fun isAircraftConnected(): Boolean =
+        getProductInstance() != null && getProductInstance() is Aircraft
 
     fun getAircraftInstance(): Aircraft? {
         if (!isAircraftConnected()) {
@@ -34,9 +29,8 @@ object SDKUtils {
         return getProductInstance() as Aircraft?
     }
 
-    fun getAppActivationManager(): AppActivationManager? {
-        return DJISDKManager.getInstance().appActivationManager
-    }
+    fun getAppActivationManager(): AppActivationManager? =
+        DJISDKManager.getInstance().appActivationManager
 
     fun getGPSSignalLevelArray(inputLevel: GPSSignalLevel): BooleanArray {
         // Create a boolean array with the same size as the number of enum constants
@@ -52,13 +46,13 @@ object SDKUtils {
 
     fun createCompletionCallback(
         onResult: (String?) -> Unit
-    ): CommonCallbacks.CompletionCallback<DJIError> {
-        return CommonCallbacks.CompletionCallback<DJIError> { error ->
-            if (error == null) onResult(null)
-            else {
+    ): CommonCallbacks.CompletionCallback<DJIError> =
+        CommonCallbacks.CompletionCallback<DJIError> { error ->
+            if (error == null) {
+                onResult(null)
+            } else {
                 logger.e { "CompletionCallback onFailure $error" }
                 onResult(error.description)
             }
         }
-    }
 }

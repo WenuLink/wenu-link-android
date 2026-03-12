@@ -19,11 +19,11 @@ class TelemetryHandler {
 
         @Synchronized
         fun getInstance(): TelemetryHandler {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = TelemetryHandler()
+            }
             return mInstance!!
         }
-
     }
 
     private val logger by taggedLogger(TelemetryHandler::class.java.simpleName)
@@ -43,14 +43,10 @@ class TelemetryHandler {
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
 
     @Synchronized
-    fun hasData(): Boolean {
-        return lastTelemetryData != null
-    }
+    fun hasData(): Boolean = lastTelemetryData != null
 
     @Synchronized
-    fun getData(): TelemetryData? {
-        return lastTelemetryData
-    }
+    fun getData(): TelemetryData? = lastTelemetryData
 
     @Synchronized
     private fun updateTelemetryData(telemetry: TelemetryData?) {
@@ -76,9 +72,11 @@ class TelemetryHandler {
     fun registerSimState(register: Boolean) {
         // Always clear first
         SimManager.unregisterStateCallback()
-        if (register) SimManager.registerStateCallback { state ->
-            // TODO: Some telemetry values such as velocities must be updated
-            updateTelemetryData(SimManager.state2telemetry(state))
+        if (register) {
+            SimManager.registerStateCallback { state ->
+                // TODO: Some telemetry values such as velocities must be updated
+                updateTelemetryData(SimManager.state2telemetry(state))
+            }
         }
     }
 
@@ -90,43 +88,66 @@ class TelemetryHandler {
 
         // Always clear first
         FCManager.unregisterStateCallback()
-        if (register) FCManager.registerStateCallback { state ->
-            // TODO: positionX,Y,Z values must be updated
-            updateTelemetryData(FCManager.state2telemetry(state))
+        if (register) {
+            FCManager.registerStateCallback { state ->
+                // TODO: positionX,Y,Z values must be updated
+                updateTelemetryData(FCManager.state2telemetry(state))
+            }
         }
     }
 
     @Synchronized
     fun registerStateListeners(register: Boolean) {
         logger.d { "registerStateListeners: $register (runSimulation: $mustRunSimulation)" }
-        if (mustRunSimulation) registerSimState(register)
-        else registerRealState(register)
+        if (mustRunSimulation) {
+            registerSimState(register)
+        } else {
+            registerRealState(register)
+        }
     }
 
     fun listenRemoteController(listen: Boolean) {
-        if (listen) RCManager.startListeners()
-        else RCManager.stopListeners()
+        if (listen) {
+            RCManager.startListeners()
+        } else {
+            RCManager.stopListeners()
+        }
     }
 
     fun listenAircraft(listen: Boolean) {
-        if (listen) AircraftManager.startListeners()
-        else AircraftManager.stopListeners()
+        if (listen) {
+            AircraftManager.startListeners()
+        } else {
+            AircraftManager.stopListeners()
+        }
     }
 
     fun listenSimulation(listen: Boolean) {
-        if (listen) SimManager.run { error ->
-            if (error == null) logger.i { "Simulation running." }
-            else logger.e { "Unable to start simulation: $error" }
-        }
-        else SimManager.stop { error ->
-            if (error == null) logger.i { "Simulation stopped." }
-            else logger.e { "Unable to stop simulation: $error" }
+        if (listen) {
+            SimManager.run { error ->
+                if (error == null) {
+                    logger.i { "Simulation running." }
+                } else {
+                    logger.e { "Unable to start simulation: $error" }
+                }
+            }
+        } else {
+            SimManager.stop { error ->
+                if (error == null) {
+                    logger.i { "Simulation stopped." }
+                } else {
+                    logger.e { "Unable to stop simulation: $error" }
+                }
+            }
         }
     }
 
     fun listenVehicleState(listen: Boolean) {
-        if (mustRunSimulation) listenSimulation(listen)
-        else listenAircraft(listen)
+        if (mustRunSimulation) {
+            listenSimulation(listen)
+        } else {
+            listenAircraft(listen)
+        }
     }
 
     fun startBroadcast() {
@@ -155,9 +176,9 @@ class TelemetryHandler {
     }
 
     fun isActive(): Boolean = _isListeningRC.value &&
-            _isListeningAircraft.value &&
-            _isBroadcasting.value &&
-            isReadingData()
+        _isListeningAircraft.value &&
+        _isBroadcasting.value &&
+        isReadingData()
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
         isListeningRC.distinctUntilChangedBy { it }
@@ -171,8 +192,11 @@ class TelemetryHandler {
         isBroadcasting.distinctUntilChangedBy { it }
             .onEach {
                 logger.d { "Requesting to ${if (it) "start" else "stop"} telemetry broadcast." }
-                if (it) startBroadcast()
-                else stopBroadcast()
+                if (it) {
+                    startBroadcast()
+                } else {
+                    stopBroadcast()
+                }
             }
             .launchIn(handlerScope)
     }
@@ -182,9 +206,12 @@ class TelemetryHandler {
         var isFlowing = RCManager.isUpdated()
         // If simulation activated, must wait for its startup
         isFlowing = isFlowing &&
-                if (mustRunSimulation) isSimulationActive
-        // Assumes that if not sim, Aircraft is present
-        else AircraftManager.isUpdated()
+            if (mustRunSimulation) {
+                isSimulationActive
+            } // Assumes that if not sim, Aircraft is present
+            else {
+                AircraftManager.isUpdated()
+            }
         return isFlowing
     }
 
@@ -218,13 +245,16 @@ class TelemetryHandler {
 
     fun getAircraftBattery(): BatteryData {
         // TODO: Maybe include some custom battery level
-        return if (mustRunSimulation) RCManager.getBatteryData()
-        else AircraftManager.getBatteryData()
+        return if (mustRunSimulation) {
+            RCManager.getBatteryData()
+        } else {
+            AircraftManager.getBatteryData()
+        }
     }
 
-    fun getAirlinkSignal(): IntArray {
-        return if (mustRunSimulation) intArrayOf(98, 95)
-        else AircraftManager.getAirlinkData()
+    fun getAirlinkSignal(): IntArray = if (mustRunSimulation) {
+        intArrayOf(98, 95)
+    } else {
+        AircraftManager.getAirlinkData()
     }
-
 }

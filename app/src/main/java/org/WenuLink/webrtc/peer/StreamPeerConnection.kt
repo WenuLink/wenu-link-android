@@ -61,7 +61,7 @@ class StreamPeerConnection(
     private val onStreamAdded: ((MediaStream) -> Unit)?,
     private val onNegotiationNeeded: ((StreamPeerConnection, StreamPeerType) -> Unit)?,
     private val onIceCandidate: ((IceCandidate, StreamPeerType) -> Unit)?,
-    private val onVideoTrack: ((RtpTransceiver?) -> Unit)?,
+    private val onVideoTrack: ((RtpTransceiver?) -> Unit)?
 ) : PeerConnection.Observer {
 
     private val typeTag = type.stringify()
@@ -149,7 +149,7 @@ class StreamPeerConnection(
                 pendingIceCandidates.forEach { iceCandidate ->
                     logger.i {
                         "[setRemoteDescription] #sfu; #subscriber; " +
-                        "pendingRtcIceCandidate: $iceCandidate"
+                            "pendingRtcIceCandidate: $iceCandidate"
                     }
                     connection.addRtcIceCandidate(iceCandidate)
                 }
@@ -204,10 +204,6 @@ class StreamPeerConnection(
     }
 
     /**
-     * Peer connection listeners.
-     */
-
-    /**
      * Triggered whenever there's a new [RtcIceCandidate] for the call. Used to update our tracks
      * and subscriptions.
      *
@@ -246,7 +242,7 @@ class StreamPeerConnection(
             mediaStream.audioTracks?.forEach { remoteAudioTrack ->
                 logger.v {
                     "[onAddTrack] #sfu; #$typeTag; " +
-                    "remoteAudioTrack: ${remoteAudioTrack.stringify()}"
+                        "remoteAudioTrack: ${remoteAudioTrack.stringify()}"
                 }
                 remoteAudioTrack.setEnabled(true)
             }
@@ -279,10 +275,11 @@ class StreamPeerConnection(
         when (newState) {
             PeerConnection.IceConnectionState.CLOSED,
             PeerConnection.IceConnectionState.FAILED,
-            PeerConnection.IceConnectionState.DISCONNECTED,
-                -> statsJob?.cancel()
+            PeerConnection.IceConnectionState.DISCONNECTED
+            -> statsJob?.cancel()
 
             PeerConnection.IceConnectionState.CONNECTED -> statsJob = observeStats()
+
             else -> Unit
         }
     }
@@ -290,9 +287,7 @@ class StreamPeerConnection(
     /**
      * @return The [RTCStatsReport] for the active connection.
      */
-    fun getStats(): StateFlow<RTCStatsReport?> {
-        return statsFlow
-    }
+    fun getStats(): StateFlow<RTCStatsReport?> = statsFlow
 
     /**
      * Observes the local connection stats and emits it to [statsFlow] that users can consume.
@@ -352,7 +347,6 @@ class StreamPeerConnection(
     override fun toString(): String =
         "StreamPeerConnection(type='$typeTag', constraints=$mediaConstraints)"
 
-    private fun String.mungeCodecs(): String {
-        return this.replace("vp9", "VP9").replace("vp8", "VP8").replace("h264", "H264")
-    }
+    private fun String.mungeCodecs(): String =
+        this.replace("vp9", "VP9").replace("vp8", "VP8").replace("h264", "H264")
 }

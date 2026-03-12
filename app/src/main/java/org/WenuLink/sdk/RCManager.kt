@@ -3,9 +3,9 @@ package org.WenuLink.sdk
 import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
 import io.getstream.log.taggedLogger
+import kotlin.math.round
 import org.WenuLink.adapters.BatteryData
 import org.WenuLink.adapters.RCData
-import kotlin.math.round
 
 object RCManager {
     private val logger by taggedLogger(RCManager::class.java.simpleName)
@@ -14,20 +14,16 @@ object RCManager {
     private var rcInstance: RemoteController? = null
 
     @Synchronized
-    fun init(remoteController: RemoteController)  {
+    fun init(remoteController: RemoteController) {
         rcInstance = remoteController
         logger.i { "Remote Controller connected" }
     }
 
     @Synchronized
-    fun isUpdated(): Boolean {
-        return lastData != null && lastBatteryData.percentCharge > -1
-    }
+    fun isUpdated(): Boolean = lastData != null && lastBatteryData.percentCharge > -1
 
     @Synchronized
-    fun isRCConnected(): Boolean {
-        return rcInstance != null
-    }
+    fun isRCConnected(): Boolean = rcInstance != null
 
     fun startListeners() {
         startHardwareListener()
@@ -40,14 +36,10 @@ object RCManager {
     }
 
     @Synchronized
-    fun getBatteryData(): BatteryData {
-        return lastBatteryData
-    }
+    fun getBatteryData(): BatteryData = lastBatteryData
 
     @Synchronized
-    fun getHardwareData(): RCData? {
-        return lastData
-    }
+    fun getHardwareData(): RCData? = lastData
 
     @Synchronized
     private fun updateData(data: RCData?) {

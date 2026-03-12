@@ -36,84 +36,82 @@ class AircraftStateMachine {
         val controlAuthority: ControlAuthority = ControlAuthority.NONE
     )
 
-    private var _state = UnifiedState()
+    private var state = UnifiedState()
 
-    val mavlink: Int get() = _state.mavlink
+    val mavlink: Int get() = state.mavlink
 
-    val landed: Int get() = _state.landed
+    val landed: Int get() = state.landed
 
-    val control: ControlAuthority get() = _state.controlAuthority
+    val control: ControlAuthority get() = state.controlAuthority
 
     fun dispatch(event: AircraftState): UnifiedState {
-        _state = reduce(_state, event)
-        return _state
+        state = reduce(state, event)
+        return state
     }
 
     fun setControlAuthority(controlAuthority: ControlAuthority): UnifiedState {
-        _state = _state.copy(controlAuthority = controlAuthority)
-        return _state
+        state = state.copy(controlAuthority = controlAuthority)
+        return state
     }
 
-    fun isMissionWaypoint() = _state.controlAuthority == ControlAuthority.WAYPOINT_MISSION
+    fun isMissionWaypoint() = state.controlAuthority == ControlAuthority.WAYPOINT_MISSION
 
-    fun isTimelineCommand() = _state.controlAuthority == ControlAuthority.TIMELINE_COMMAND
+    fun isTimelineCommand() = state.controlAuthority == ControlAuthority.TIMELINE_COMMAND
 
-    fun isRemoteController() = _state.controlAuthority == ControlAuthority.REMOTE_CONTROLLER
+    fun isRemoteController() = state.controlAuthority == ControlAuthority.REMOTE_CONTROLLER
 
-    fun isNewControlAuthority(authority: ControlAuthority) =
-        _state.controlAuthority != authority
+    fun isNewControlAuthority(authority: ControlAuthority) = state.controlAuthority != authority
 
     fun homeSet(isHomeSet: Boolean = true): UnifiedState {
-        _state = _state.copy(isHomeSet = isHomeSet)
-        return _state
+        state = state.copy(isHomeSet = isHomeSet)
+        return state
     }
 
-    fun isHomeSet() = _state.isHomeSet
+    fun isHomeSet() = state.isHomeSet
 
-    fun isStandBy() = _state.mavlink == MAV_STATE.MAV_STATE_STANDBY
+    fun isStandBy() = state.mavlink == MAV_STATE.MAV_STATE_STANDBY
 
-    fun isArmed() = _state.mavlink == MAV_STATE.MAV_STATE_ACTIVE
+    fun isArmed() = state.mavlink == MAV_STATE.MAV_STATE_ACTIVE
 
-    fun isFlying() = _state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+    fun isFlying() = state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
-    fun isOnTheGround() = _state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+    fun isOnTheGround() = state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
-    private fun reduce(s: UnifiedState, e: AircraftState): UnifiedState =
-        when (e) {
-            AircraftState.Boot ->
-                s.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
+    private fun reduce(s: UnifiedState, e: AircraftState): UnifiedState = when (e) {
+        AircraftState.Boot ->
+            s.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
 
-            AircraftState.Calibration ->
-                s.copy(mavlink = MAV_STATE.MAV_STATE_CALIBRATING)
+        AircraftState.Calibration ->
+            s.copy(mavlink = MAV_STATE.MAV_STATE_CALIBRATING)
 
-            AircraftState.Standby ->
-                s.copy(
-                    mavlink = MAV_STATE.MAV_STATE_STANDBY,
-                    landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-                )
+        AircraftState.Standby ->
+            s.copy(
+                mavlink = MAV_STATE.MAV_STATE_STANDBY,
+                landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            )
 
-            AircraftState.Arm ->
-                s.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
+        AircraftState.Arm ->
+            s.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
 
-            AircraftState.Takeoff ->
-                s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF)
+        AircraftState.Takeoff ->
+            s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF)
 
-            AircraftState.InAir ->
-                s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
+        AircraftState.InAir ->
+            s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
 
-            AircraftState.Land ->
-                s.copy(
-                    mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
-                    landed = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
-                )
+        AircraftState.Land ->
+            s.copy(
+                mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
+                landed = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
+            )
 
-            AircraftState.OnGround ->
-                s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND)
+        AircraftState.OnGround ->
+            s.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND)
 
-            AircraftState.FlightTermination ->
-                s.copy(mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION)
+        AircraftState.FlightTermination ->
+            s.copy(mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION)
 
-            AircraftState.PowerOff ->
-                s.copy(mavlink = MAV_STATE.MAV_STATE_POWEROFF)
-        }
+        AircraftState.PowerOff ->
+            s.copy(mavlink = MAV_STATE.MAV_STATE_POWEROFF)
+    }
 }

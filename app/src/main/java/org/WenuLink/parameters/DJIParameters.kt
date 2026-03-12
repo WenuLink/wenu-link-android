@@ -12,21 +12,17 @@ import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import org.WenuLink.sdk.FCManager
 
-abstract class DJIParameter(
-    name: String,
-    type: Int,
-    semantic: SemanticType
-) : ParameterSpec(name, type, semantic) {
+abstract class DJIParameter(name: String, type: Int, semantic: SemanticType) :
+    ParameterSpec(name, type, semantic) {
 
     /* ---------- Shared helpers ---------- */
-    protected fun completionResult(
-        error: DJIError?,
-        onResult: (String?) -> Unit
-    ) {
-        if (error == null) onResult(null)
-        else onResult(error.description)
+    protected fun completionResult(error: DJIError?, onResult: (String?) -> Unit) {
+        if (error == null) {
+            onResult(null)
+        } else {
+            onResult(error.description)
+        }
     }
-
 }
 
 class DJIBooleanParameter(
@@ -52,12 +48,17 @@ class DJIBooleanParameter(
 
     override fun write(value: ParamValue, onResult: (String?) -> Unit) {
         val v = (value as ParamValue.BoolVal).v
-        setter(v, CommonCallbacks.CompletionCallback { err ->
-            if (err == null) onResult(null)
-            else onResult(err.description)
-        })
+        setter(
+            v,
+            CommonCallbacks.CompletionCallback { err ->
+                if (err == null) {
+                    onResult(null)
+                } else {
+                    onResult(err.description)
+                }
+            }
+        )
     }
-
 }
 
 class DJIIntParameter(
@@ -89,26 +90,29 @@ class DJIIntParameter(
 
 class DJIFailSafeParameter(
     name: String,
-    private val getter: (CommonCallbacks.CompletionCallbackWith<ConnectionFailSafeBehavior>) -> Unit,
-    private val setter: (ConnectionFailSafeBehavior, CommonCallbacks.CompletionCallback<DJIError>) -> Unit
+    private val getter: (
+        CommonCallbacks.CompletionCallbackWith<ConnectionFailSafeBehavior>
+    ) -> Unit,
+    private val setter: (
+        ConnectionFailSafeBehavior,
+        CommonCallbacks.CompletionCallback<DJIError>
+    ) -> Unit
 ) : DJIParameter(
     name,
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
 
-    private fun enumToInt(v: ConnectionFailSafeBehavior): Int =
-        when (v) {
-            ConnectionFailSafeBehavior.HOVER   -> 0
-            ConnectionFailSafeBehavior.LANDING -> 1
-            ConnectionFailSafeBehavior.GO_HOME -> 2
-            ConnectionFailSafeBehavior.UNKNOWN -> 255
-        }
+    private fun enumToInt(v: ConnectionFailSafeBehavior): Int = when (v) {
+        ConnectionFailSafeBehavior.HOVER -> 0
+        ConnectionFailSafeBehavior.LANDING -> 1
+        ConnectionFailSafeBehavior.GO_HOME -> 2
+        ConnectionFailSafeBehavior.UNKNOWN -> 255
+    }
 
-    private fun intToEnum(v: Int): ConnectionFailSafeBehavior =
-        ConnectionFailSafeBehavior.entries
-            .find { it.ordinal == v }
-            ?: ConnectionFailSafeBehavior.UNKNOWN
+    private fun intToEnum(v: Int): ConnectionFailSafeBehavior = ConnectionFailSafeBehavior.entries
+        .find { it.ordinal == v }
+        ?: ConnectionFailSafeBehavior.UNKNOWN
 
     override fun read(onResult: (ParamValue?) -> Unit) {
         getter(object : CommonCallbacks.CompletionCallbackWith<ConnectionFailSafeBehavior> {
@@ -138,12 +142,11 @@ class DJIControlModeParameter(
     SemanticType.ENUM
 ) {
 
-    private fun enumToInt(v: ControlMode): Int =
-        when (v) {
-            ControlMode.MANUAL  -> 0
-            ControlMode.SMART   -> 2
-            ControlMode.UNKNOWN -> 255
-        }
+    private fun enumToInt(v: ControlMode): Int = when (v) {
+        ControlMode.MANUAL -> 0
+        ControlMode.SMART -> 2
+        ControlMode.UNKNOWN -> 255
+    }
 
     private fun intToEnum(v: Int): ControlMode =
         ControlMode.entries.find { it.ordinal == v } ?: ControlMode.UNKNOWN
@@ -155,10 +158,11 @@ class DJIControlModeParameter(
             }
 
             override fun onFailure(error: DJIError?) {
-                if (error == DJISDKError.COMMON_UNSUPPORTED)
+                if (error == DJISDKError.COMMON_UNSUPPORTED) {
                     onResult(ParamValue.EnumVal(2)) // SMART default
-                else
+                } else {
                     onResult(null)
+                }
             }
         })
     }
@@ -194,7 +198,6 @@ class DJIRollPitchControlModeParameter(
         val v = (value as ParamValue.EnumVal).v
         setter(intToEnum(v)) { err -> completionResult(err, onResult) }
     }
-
 }
 
 class DJIVerticalControlModeParameter(
@@ -295,32 +298,32 @@ object DJIParametersProvider : ParameterProvider {
         DJIIntParameter(
             name = "DJI_MAX_HEIGHT",
             getter = { cb -> fc.getMaxFlightHeight(cb) },
-            setter = { v, cb -> fc.setMaxFlightHeight(v,cb) }
+            setter = { v, cb -> fc.setMaxFlightHeight(v, cb) }
         ),
         DJIIntParameter(
             name = "DJI_MAX_RADIUS",
             getter = { cb -> fc.getMaxFlightRadius(cb) },
-            setter = { v, cb -> fc.setMaxFlightRadius(v,cb) }
+            setter = { v, cb -> fc.setMaxFlightRadius(v, cb) }
         ),
         DJIIntParameter(
             name = "DJI_BAT_LOW",
             getter = { cb -> fc.getLowBatteryWarningThreshold(cb) },
-            setter = { v, cb -> fc.setLowBatteryWarningThreshold(v,cb) }
+            setter = { v, cb -> fc.setLowBatteryWarningThreshold(v, cb) }
         ),
         DJIIntParameter(
             name = "DJI_BAT_CRITIC",
             getter = { cb -> fc.getSeriousLowBatteryWarningThreshold(cb) },
-            setter = { v, cb -> fc.setSeriousLowBatteryWarningThreshold(v,cb) }
+            setter = { v, cb -> fc.setSeriousLowBatteryWarningThreshold(v, cb) }
         ),
         DJIFailSafeParameter(
             name = "DJI_FAILSAFE",
             getter = { cb -> fc.getConnectionFailSafeBehavior(cb) },
-            setter = { v, cb -> fc.setConnectionFailSafeBehavior(v,cb) }
+            setter = { v, cb -> fc.setConnectionFailSafeBehavior(v, cb) }
         ),
         DJIControlModeParameter(
             name = "DJI_CTRL_MODE",
             getter = { cb -> fc.getControlMode(cb) },
-            setter = { v, cb -> fc.setControlMode(v,cb) }
+            setter = { v, cb -> fc.setControlMode(v, cb) }
         ),
         DJIRollPitchControlModeParameter(
             name = "DJI_ROLL_PITCH_MODE",
@@ -336,6 +339,6 @@ object DJIParametersProvider : ParameterProvider {
             name = "DJI_YAW_MODE",
             getter = { cb -> cb(fc.yawControlMode.ordinal) },
             setter = { v, cb -> fc.setYawControlMode(v) }
-        ),
+        )
     )
 }

@@ -25,6 +25,7 @@ import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
@@ -33,7 +34,6 @@ import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.math.roundToInt
 
 /**
  * MAVLinkController class to deal with the mission service and related MAVLink messages.
@@ -44,9 +44,7 @@ import kotlin.math.roundToInt
  * https://developer.dji.com/api-reference/android-api/Components/Missions/DJIMissionControl.html
  *
  */
-class NavigationController (
-    override val client: MAVLinkClient,
-) : IController {
+class NavigationController(override val client: MAVLinkClient) : IController {
     private val logger by taggedLogger(NavigationController::class.java.simpleName)
     private var maxRetryTimes = 5
     private var currentRetryTimes = 0
@@ -58,16 +56,22 @@ class NavigationController (
         when (msg.msgid) {
             msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST ->
                 sendMissionCount(aircraft.mission)
+
             msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT ->
                 createNewMission(msg, aircraft.mission)
+
             msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT ->
                 processMissionItem(msg, aircraft.mission)
+
             msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT ->
                 sendMissionItem(msg, aircraft.mission)
+
             msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL ->
                 sendMissionClear(aircraft.mission)
+
             msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK ->
                 processAck(msg)
+
             else -> return false
         }
         return true
@@ -85,23 +89,28 @@ class NavigationController (
         return true
     }
 
-    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
-        return when (messageID) {
+    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? =
+        when (messageID) {
             msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT ->
                 msgMissionCurrent(aircraft.mission)
+
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION ->
                 msgHomePosition(aircraft)
+
             msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT ->
                 msgRawGPSInt(aircraft.telemetry)
+
             msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT ->
                 msgGlobalPositionInt(aircraft.telemetry)
+
             msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED ->
                 msgLocalPositionNed(aircraft)
+
             msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN ->
                 msgGpsGlobalOrigin(aircraft)
+
             else -> null
         }
-    }
 
     override fun processCommandInt(
         commandIntMsg: msg_command_int,
@@ -109,7 +118,9 @@ class NavigationController (
         serviceScope: CoroutineScope
     ): Boolean {
         when (commandIntMsg.command) {
-            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, aircraft) // 192
+            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, aircraft)
+
+            // 192
             else -> return false
         }
         return true
@@ -230,11 +241,13 @@ class NavigationController (
         // Validate sequence
         val expectedSeq = mission.totalNodes
         if (itemMsg.seq != expectedSeq) {
-            logger.e { "Received item #${itemMsg.seq} instead #${expectedSeq}, re-requesting..." }
+            logger.e { "Received item #${itemMsg.seq} instead #$expectedSeq, re-requesting..." }
             if (currentRetryTimes < maxRetryTimes) {
                 requestMissionItem(expectedSeq)
                 currentRetryTimes += 1
-            } else logger.w { "Max re-requesting attempts reached" }
+            } else {
+                logger.w { "Max re-requesting attempts reached" }
+            }
 
             return
         }
@@ -247,7 +260,7 @@ class NavigationController (
             requestMissionItem(expectedSeq + 1)
         } else {
             // reached the end of the mission items
-            mission.uploadWaypoints{ error ->
+            mission.uploadWaypoints { error ->
                 if (error != null) sendStatusText(error, MAV_SEVERITY.MAV_SEVERITY_ERROR)
             }
             sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, mission)
@@ -287,7 +300,7 @@ class NavigationController (
 
         aircraft.doReposition(
             target = coordinate,
-            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else  null
+            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
         )
 
         client.sendMessage(
@@ -296,7 +309,6 @@ class NavigationController (
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
     }
 
 //    fun setCurrentMissionItem(msg: msg_mission_item_int, aircraft: AircraftHandler) {
@@ -375,18 +387,15 @@ class NavigationController (
         // Mavlink has separate codes for fix type.
         if (telemetryData.gpsLevel[0] || telemetryData.gpsLevel[1]) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
-        }
-        else if (telemetryData.gpsLevel[2]) {
+        } else if (telemetryData.gpsLevel[2]) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
-        }
-        else if (
+        } else if (
             telemetryData.gpsLevel[3] ||
             telemetryData.gpsLevel[4] ||
             telemetryData.gpsLevel[5]
         ) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX.toShort()
-        }
-        else {
+        } else {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
         }
         return msg
@@ -414,5 +423,4 @@ class NavigationController (
         msg.time_usec = MessageUtils.getMicroTime()
         return msg
     }
-
 }

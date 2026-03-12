@@ -3,13 +3,13 @@ package org.WenuLink.adapters
 import android.content.Context
 import android.media.MediaFormat
 import io.getstream.log.taggedLogger
+import java.nio.ByteBuffer
+import kotlin.math.round
 import org.WenuLink.sdk.CameraManager
 import org.WenuLink.webrtc.utils.videoBuffer2VideoFrame
 import org.webrtc.CapturerObserver
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
-import java.nio.ByteBuffer
-import kotlin.math.round
 
 class CameraCapturer : VideoCapturer {
     data class MediaMetadata(
@@ -60,15 +60,21 @@ class CameraCapturer : VideoCapturer {
             return
         }
         CameraManager.startCodecWithCallback(context as Context) {
-            mediaFormat, videoBuffer, dataSize, width, height ->
-                if (videoBuffer != null)
-                    this.processYuvData(
-                        mediaFormat,
-                        videoBuffer,
-                        dataSize,
-                        width,
-                        height
-                    )
+                mediaFormat,
+                videoBuffer,
+                dataSize,
+                width,
+                height
+            ->
+            if (videoBuffer != null) {
+                this.processYuvData(
+                    mediaFormat,
+                    videoBuffer,
+                    dataSize,
+                    width,
+                    height
+                )
+            }
         }
     }
 
@@ -84,10 +90,7 @@ class CameraCapturer : VideoCapturer {
     override fun dispose() {
         // Stop receiving frames on the callback from the decoder
         observer = null
-
     }
 
-    override fun isScreencast(): Boolean {
-        return false
-    }
+    override fun isScreencast(): Boolean = false
 }

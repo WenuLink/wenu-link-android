@@ -16,10 +16,7 @@ import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.controllers.MAVLinkController
 
-data class Endpoint(
-    val ip: String,
-    val port: Int
-)
+data class Endpoint(val ip: String, val port: Int)
 
 class MAVLinkService {
     companion object {
@@ -78,8 +75,11 @@ class MAVLinkService {
         isRunning.distinctUntilChangedBy { it }
             .onEach {
                 logger.d { "Requesting to ${if (it) "launch" else "stop"} MAVLinkService." }
-                if (it) launchService()
-                else stopService()
+                if (it) {
+                    launchService()
+                } else {
+                    stopService()
+                }
             }
             .launchIn(serviceScope)
     }
@@ -111,21 +111,22 @@ class MAVLinkService {
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-            "(GCS?=${hasStationConnected()}) " +
-            "(listening?=${listeningJob?.isActive}) " +
-            "(sending=${sendingJob?.isActive})"
+                "(GCS?=${hasStationConnected()}) " +
+                "(listening?=${listeningJob?.isActive}) " +
+                "(sending=${sendingJob?.isActive})"
         }
 
         // Try to connect to station
         val currentStationConnected = controller.waitGroundStation(30000L)
-        if (!currentStationConnected)
+        if (!currentStationConnected) {
             logger.w { "No GCS connection established, continuing anyway." }
+        }
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-            "(GCS?=${hasStationConnected()}) " +
-            "(listening?=${listeningJob?.isActive}) " +
-            "(sending=${sendingJob?.isActive})"
+                "(GCS?=${hasStationConnected()}) " +
+                "(listening?=${listeningJob?.isActive}) " +
+                "(sending=${sendingJob?.isActive})"
         }
 
         val hasParams = controller.waitParameters()
@@ -136,9 +137,9 @@ class MAVLinkService {
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-            "(GCS?=${hasStationConnected()}) " +
-            "(listening?=${listeningJob?.isActive}) " +
-            "(sending=${sendingJob?.isActive})"
+                "(GCS?=${hasStationConnected()}) " +
+                "(listening?=${listeningJob?.isActive}) " +
+                "(sending=${sendingJob?.isActive})"
         }
 
         val hasHome = controller.waitHomePosition()
@@ -160,9 +161,9 @@ class MAVLinkService {
         isReady = false
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-            "(GCS?=${hasStationConnected()}) " +
-            "(listening?=${listeningJob?.isActive}) " +
-            "(sending=${sendingJob?.isActive})"
+                "(GCS?=${hasStationConnected()}) " +
+                "(listening?=${listeningJob?.isActive}) " +
+                "(sending=${sendingJob?.isActive})"
         }
         sendingJob = null
         listeningJob = null

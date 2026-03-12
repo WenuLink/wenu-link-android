@@ -4,8 +4,8 @@ import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_ack
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_RESULT
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 object AsyncUtils {
     suspend fun waitReadiness(
@@ -33,10 +33,7 @@ object AsyncUtils {
         return isReady()
     }
 
-    suspend fun waitReady(
-        intervalTime: Long = 10,
-        isReady: () -> Boolean
-    ) {
+    suspend fun waitReady(intervalTime: Long = 10, isReady: () -> Boolean) {
         while (!isReady()) {
             delay(intervalTime) // Wait for the next check
         }
@@ -50,7 +47,7 @@ object MessageUtils {
     fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
 
     // deg E7 to float
-    fun coordinateMAVLink2DJI(value: Int): Double  = value.toDouble() / 10_000_000.0
+    fun coordinateMAVLink2DJI(value: Int): Double = value.toDouble() / 10_000_000.0
 
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
@@ -74,8 +71,5 @@ object MessageUtils {
     fun msgRequestAck(
         result: Int = MAV_RESULT.MAV_RESULT_DENIED,
         progress: Int = -1
-    ): MAVLinkMessage {
-        return msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
-    }
-
+    ): MAVLinkMessage = msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
 }

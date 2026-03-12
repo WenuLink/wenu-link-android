@@ -107,8 +107,11 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update GCS server address from user input
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
-            if (run) thisApp.wenuLinkService?.startMAVLinkService()
-            else thisApp.wenuLinkService?.stopMAVLinkService()
+            if (run) {
+                thisApp.wenuLinkService?.startMAVLinkService()
+            } else {
+                thisApp.wenuLinkService?.stopMAVLinkService()
+            }
         }
     }
 
@@ -116,15 +119,21 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update signaling server address from user input
         // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
         viewModelScope.launch {
-            if (run) thisApp.wenuLinkService?.startWebRTCService()
-            else thisApp.wenuLinkService?.stopWebRTCService()
+            if (run) {
+                thisApp.wenuLinkService?.startWebRTCService()
+            } else {
+                thisApp.wenuLinkService?.stopWebRTCService()
+            }
         }
     }
 
     fun runService(run: Boolean, simEnabled: Boolean = false) {
         logger.d { "runService($run)" }
         if (simEnabled) aircraft.telemetry.enableSimulation(true)
-        if (run) startService()
-        else stopService()
+        if (run) {
+            startService()
+        } else {
+            stopService()
+        }
     }
 }

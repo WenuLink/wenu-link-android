@@ -32,13 +32,13 @@ import com.MAVLink.enums.MAV_DATA_STREAM
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageRate
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.math.roundToInt
 
 /**
  * Management class for different MAVLink's microservices message processing.
@@ -84,7 +84,7 @@ class MAVLinkController(
             msg_gps_status.MAVLINK_MSG_ID_GPS_STATUS,
 //            msg_scaled_imu2.MAVLINK_MSG_ID_SCALED_IMU2,
 //            msg_scaled_imu3.MAVLINK_MSG_ID_SCALED_IMU3,
-            msg_scaled_pressure.MAVLINK_MSG_ID_SCALED_PRESSURE,
+            msg_scaled_pressure.MAVLINK_MSG_ID_SCALED_PRESSURE
 //            msg_scaled_pressure2.MAVLINK_MSG_ID_SCALED_PRESSURE2,
 //            msg_scaled_pressure3.MAVLINK_MSG_ID_SCALED_PRESSURE3
         ),
@@ -99,14 +99,14 @@ class MAVLinkController(
 //            msg_gps_rtk.MAVLINK_MSG_ID_GPS_RTK,
 //            msg_gps2_raw.MAVLINK_MSG_ID_GPS2_RAW,
 //            msg_gps2_rtk.MAVLINK_MSG_ID_GPS2_RTK,
-            msg_nav_controller_output.MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT,
+            msg_nav_controller_output.MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT
 //            msg_fence_status.MAVLINK_MSG_ID_FENCE_STATUS,
 //            msg_position_target_global_int.MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT
         ),
 
         MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS to listOf(
             msg_rc_channels_scaled.MAVLINK_MSG_ID_RC_CHANNELS_SCALED,
-            msg_rc_channels_raw.MAVLINK_MSG_ID_RC_CHANNELS_RAW,
+            msg_rc_channels_raw.MAVLINK_MSG_ID_RC_CHANNELS_RAW
 //            msg_servo_output_raw.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW
         ),
 
@@ -117,7 +117,7 @@ class MAVLinkController(
 
         MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA1 to listOf(
             msg_attitude.MAVLINK_MSG_ID_ATTITUDE,
-            msg_sim_state.MAVLINK_MSG_ID_SIM_STATE,
+            msg_sim_state.MAVLINK_MSG_ID_SIM_STATE
         ),
 
         MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA2 to listOf(
@@ -135,8 +135,8 @@ class MAVLinkController(
             msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT,
             msg_estimator_status.MAVLINK_MSG_ID_ESTIMATOR_STATUS,
             msg_vibration.MAVLINK_MSG_ID_VIBRATION,
-            msg_raw_rpm.MAVLINK_MSG_ID_RAW_RPM,
-        ),
+            msg_raw_rpm.MAVLINK_MSG_ID_RAW_RPM
+        )
 
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_ALL -> {}
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
@@ -154,9 +154,9 @@ class MAVLinkController(
     // https://mavlink.io/en/services/
     fun processMessage(msg: MAVLinkMessage) {
         // avoid eternal log with the station's heartbeat
-        if (!connectionController.isGCSPresent)
+        if (!connectionController.isGCSPresent) {
             logger.d { "Processing message: ${msg.name()}" }
-        else {
+        } else {
             if (msg.msgid != 0) logger.d { "Processing message: ${msg.name()}" }
         }
 
@@ -166,7 +166,9 @@ class MAVLinkController(
 
         when (msg.msgid) {
             msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG -> processCommandLong(msg)
+
             msg_command_int.MAVLINK_MSG_ID_COMMAND_INT -> processCommandInt(msg)
+
             msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM ->
                 processDataStreamRequest(msg)
 
@@ -198,7 +200,9 @@ class MAVLinkController(
 
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestLong(commandMsg)
+
             MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL -> processMessageInterval(commandMsg)
+
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
@@ -216,11 +220,14 @@ class MAVLinkController(
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
-        val processed = controllers.any { it.processCommandInt(commandMsg, aircraft, serviceScope) }
+        val processed = controllers.any {
+            it.processCommandInt(commandMsg, aircraft, serviceScope)
+        }
         if (processed) return
 
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestInt(commandMsg)
+
             else -> {
                 logger.w { "Unhandled COMMAND_INT ID: ${commandMsg.command}" }
                 client.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
@@ -335,9 +342,12 @@ class MAVLinkController(
             // requested interval in Hz
             timeInterval = request.req_message_rate
             // Standard 1Hz
-            timeInterval = if (timeInterval == 0) 1_000_000
-            // Hz to micro seconds if must start
-            else ((1.0 / timeInterval.toFloat()) * 1_000_000).roundToInt()
+            timeInterval = if (timeInterval == 0) {
+                1_000_000
+            } // Hz to micro seconds if must start
+            else {
+                ((1.0 / timeInterval.toFloat()) * 1_000_000).roundToInt()
+            }
         }
 
         dataList.forEach { setMessageRate(it, timeInterval.toLong()) }
@@ -349,7 +359,7 @@ class MAVLinkController(
 
         logger.d { "processMessageInterval" }
         val mavlinkMsgID = commandMsg.param1.toInt()
-        val interval = commandMsg.param2.toLong()  // already in micro seconds
+        val interval = commandMsg.param2.toLong() // already in micro seconds
         val newRate = setMessageRate(mavlinkMsgID, interval)
 //        logger.d { "\tnew currentRate:${newRate}" }
 
@@ -413,8 +423,11 @@ class MAVLinkController(
             timeout,
             ::isSystemReady
         )
-        if (systemReady) logger.i { "MAVLink microservices initialized." }
-        else logger.d { "Unable to check for Mission and Parameter request, possibly already set." }
+        if (systemReady) {
+            logger.i { "MAVLink microservices initialized." }
+        } else {
+            logger.d { "Unable to check for Mission and Parameter request, possibly already set." }
+        }
 
         return isSystemReady()
     }
@@ -448,5 +461,4 @@ class MAVLinkController(
         client.stopListening()
         // TODO: unload handlers if must
     }
-
 }

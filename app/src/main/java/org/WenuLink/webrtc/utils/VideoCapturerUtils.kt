@@ -3,12 +3,12 @@ package org.WenuLink.webrtc.utils
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.SystemClock
+import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 import org.webrtc.JavaI420Buffer
 import org.webrtc.NV12Buffer
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoFrame
-import java.nio.ByteBuffer
-import java.util.concurrent.TimeUnit
 
 fun getBufferNV12(
     mediaFormat: MediaFormat,
@@ -18,10 +18,12 @@ fun getBufferNV12(
 ): NV12Buffer {
     // NV12 Buffer
     return NV12Buffer(
-        width, height,
+        width,
+        height,
         mediaFormat.getInteger(MediaFormat.KEY_STRIDE),
         mediaFormat.getInteger(MediaFormat.KEY_SLICE_HEIGHT),
-        videoBuffer, null
+        videoBuffer,
+        null
     )
 }
 
@@ -77,13 +79,13 @@ fun VideoCapturer.videoBuffer2VideoFrame(
     val colorFormat = mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT)
     val procBuffer = when (colorFormat) {
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
-            -> getBufferNV12(mediaFormat,videoBuffer, width, height)
+        -> getBufferNV12(mediaFormat, videoBuffer, width, height)
 
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar,
         MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar
-            -> getBufferI420(mediaFormat, videoBuffer, width, height)
+        -> getBufferI420(mediaFormat, videoBuffer, width, height)
 
         else -> return null
     }

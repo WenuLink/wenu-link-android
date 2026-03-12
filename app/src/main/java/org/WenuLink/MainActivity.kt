@@ -45,13 +45,11 @@ import org.WenuLink.views.ServicesViewModel
 
 class MainActivity : ComponentActivity() {
     companion object {
-        fun getIntent(context: Context): Intent {
-            return Intent(context, MainActivity::class.java).apply {
-                action = SDKManager.getIntentAction()
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
+        fun getIntent(context: Context): Intent = Intent(context, MainActivity::class.java).apply {
+            action = SDKManager.getIntentAction()
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
     }
 
@@ -73,7 +71,7 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.CHANGE_WIFI_STATE,
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_PHONE_STATE
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -86,14 +84,16 @@ class MainActivity : ComponentActivity() {
 
         val missingPermissions = permissionsList.filter {
             ContextCompat.checkSelfPermission(applicationContext, it) !=
-            PackageManager.PERMISSION_GRANTED
+                PackageManager.PERMISSION_GRANTED
         }
 
         if (missingPermissions.isNotEmpty()) {
             homeViewModel.updateWorkflow("Waiting for pending permissions")
             val requestPermissionLauncher =
-                registerForActivityResult(ActivityResultContracts.
-                RequestMultiplePermissions()) { permissionsMap ->
+                registerForActivityResult(
+                    ActivityResultContracts
+                        .RequestMultiplePermissions()
+                ) { permissionsMap ->
                     if (permissionsMap.all { it.value }) {
                         onPermissionsGranted()
                     } else {
@@ -243,7 +243,8 @@ class MainActivity : ComponentActivity() {
 
             HorizontalDivider()
 
-            Button(onClick = {
+            Button(
+                onClick = {
                     logMessages = logMessages + "Manual Log at ${System.currentTimeMillis()}"
                 },
                 modifier = Modifier.padding(bottom = 8.dp)

@@ -25,7 +25,7 @@ object CameraManager {
         private set
 
     @Synchronized
-    fun init(camera: Camera)  {
+    fun init(camera: Camera) {
         mInstance = camera
         cameraName = camera.displayName
 
@@ -51,15 +51,12 @@ object CameraManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean {
-        return mInstance != null
-    }
+    fun isConnected(): Boolean = mInstance != null
 
-    override fun toString(): String {
-        return if (mInstance == null)
-            "No Camera to manage"
-        else
-            "Managing: $cameraName $frameWidth x $frameHeight @ $frameRate"
+    override fun toString(): String = if (mInstance == null) {
+        "No Camera to manage"
+    } else {
+        "Managing: $cameraName $frameWidth x $frameHeight @ $frameRate"
     }
 
     fun startCodecWithCallback(
@@ -86,7 +83,8 @@ object CameraManager {
             // The onReceive callback provides us the raw H264 (at least according to official documentation). To decode it we send it to our DJICodecManager
             // H264 or H265 encoding is done to compress and save bandwidth. (4K video might force a switch to H265 on DJI drones)
             val videoDataListener: VideoFeeder.VideoDataListener =
-                VideoFeeder.VideoDataListener { bytes, dataSize -> // Pass the encoded data along to obtain the YUV-color data
+                VideoFeeder.VideoDataListener { bytes, dataSize ->
+                    // Pass the encoded data along to obtain the YUV-color data
                     codecManager!!.sendDataToDecoder(bytes, dataSize)
                 }
             VideoFeeder.getInstance().getPrimaryVideoFeed().addVideoDataListener(videoDataListener)
@@ -104,7 +102,5 @@ object CameraManager {
         codecManager = null
     }
 
-    fun isCodecStarted(): Boolean {
-        return codecManager != null
-    }
+    fun isCodecStarted(): Boolean = codecManager != null
 }
