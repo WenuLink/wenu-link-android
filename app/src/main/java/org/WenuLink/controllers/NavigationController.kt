@@ -331,12 +331,12 @@ class NavigationController (
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude + telemetryData.takeOffAltitude)
+        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
         // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
         // but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)
         // DJI: relative altitude of the aircraft relative to take off location, measured by barometer, in meters.
-        msg.relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
+        msg.relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.relativeAltitude)
         msg.vx = (telemetryData.velocityX * 100).roundToInt().toShort()
         msg.vy = (telemetryData.velocityY * 100).roundToInt().toShort()
         msg.vz = (telemetryData.velocityZ * 100).roundToInt().toShort()

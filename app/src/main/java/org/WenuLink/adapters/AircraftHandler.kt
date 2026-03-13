@@ -49,6 +49,8 @@ class AircraftHandler {
     var isPowerOff = false
     val rcInput: RCData?
         get() = telemetry.getRCData()
+    val cameras = CameraHandler.getInstance()
+    var hasCameras: Boolean = false
 
     private val _isArmed = MutableStateFlow(false)
     val isArmed: StateFlow<Boolean> = _isArmed.asStateFlow()
@@ -56,16 +58,11 @@ class AircraftHandler {
     private val _isFlying = MutableStateFlow(false)
     val isFlying: StateFlow<Boolean> = _isFlying.asStateFlow()
 
-
-    fun baseModeFor(
-        flightMode: ArduCopterFlightMode,
-        armed: Boolean
-    ): Int =
-        toBaseMode(flightMode) or if (armed) MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED else 0
-
     fun updateModeIfArmed(newMode: ArduCopterFlightMode? = null) {
         if (newMode != null) copterFlightMode = newMode
-        baseMode = baseModeFor(copterFlightMode, state.isArmed())
+        baseMode = copterFlightMode.baseMode
+        if (state.isArmed())
+            baseMode = baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
     }
 
     fun modeTransition(copterMode: Long, onResult: (String?) -> Unit) {
@@ -79,6 +76,7 @@ class AircraftHandler {
 
     fun modeTransition(newMode: ArduCopterFlightMode, onResult: (String?) -> Unit) {
         if (newMode == copterFlightMode) { // Nothing to change
+            updateModeIfArmed()
             onResult(null)
             return
         }
@@ -143,7 +141,6 @@ class AircraftHandler {
     }
 
     suspend fun checkSensors(): Boolean {
-//        stateTransition(AircraftState.Calibration)
         logger.i {"Waiting sensors data"}
         sensorsOk = AsyncUtils.waitTimeout(100L, 10000L, isReady = telemetry::isReadingSensors)
         if (!sensorsOk) {
@@ -166,6 +163,8 @@ class AircraftHandler {
         val gyroOk = imuState?.gyroscope?.all { it == SensorState.OK } ?: false
         if (!gyroOk) logger.e { "Gyroscope error!" }
         sensorsOk = sensorsOk && gyroOk
+
+        hasCameras = cameras.initCameras()
 
         return sensorsOk
     }

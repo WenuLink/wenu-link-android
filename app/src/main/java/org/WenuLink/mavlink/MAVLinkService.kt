@@ -26,7 +26,7 @@ class MAVLinkService (
 
     private var mavlinkScope: CoroutineScope? = null
     private var controller: MAVLinkController = MAVLinkController(aircraft)
-    private var endpointAddress = "192.168.1.220:14550"
+    private var endpointAddress = "192.168.0.102:14550"
     private var client: MAVLinkClient? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null

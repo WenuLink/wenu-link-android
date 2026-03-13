@@ -5,7 +5,9 @@ import com.MAVLink.common.msg_command_ack
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_RESULT
 import kotlinx.coroutines.delay
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 object AsyncUtils {
     suspend fun waitReadiness(
@@ -85,4 +87,41 @@ object MessageUtils {
         return msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
     }
 
+    fun toShortArray(input: String, bytesSize: Int = 32): ShortArray {
+        return ShortArray(bytesSize).also { shortArray ->
+            input.take(bytesSize).forEachIndexed { index, char ->
+                shortArray[index] = char.code.toShort()
+            }
+        }
+    }
+
+
+}
+
+object OrientationUtils {
+
+    fun eulerDegToQuaternion(
+        rollDeg: Double,
+        pitchDeg: Double,
+        yawDeg: Double
+    ): Quaternion {
+
+        val roll = Math.toRadians(rollDeg)
+        val pitch = Math.toRadians(pitchDeg)
+        val yaw = Math.toRadians(yawDeg)
+
+        val cr = cos(roll * 0.5)
+        val sr = sin(roll * 0.5)
+        val cp = cos(pitch * 0.5)
+        val sp = sin(pitch * 0.5)
+        val cy = cos(yaw * 0.5)
+        val sy = sin(yaw * 0.5)
+
+        val w = cr * cp * cy + sr * sp * sy
+        val x = sr * cp * cy - cr * sp * sy
+        val y = cr * sp * cy + sr * cp * sy
+        val z = cr * cp * sy - sr * sp * cy
+
+        return Quaternion(w, x, y, z).normalized()
+    }
 }

@@ -147,6 +147,7 @@ class MAVLinkController(
         controllers += CommandController(client)
         controllers += ParameterController(client)
         controllers += NavigationController(client)
+        controllers += CameraController(client)
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
