@@ -20,7 +20,6 @@ import org.WenuLink.parameters.ParameterSpec
  * https://mavlink.io/en/services/parameter.html
  */
 class ParameterController(override val client: MAVLinkClient) : IController {
-
     private val logger by taggedLogger(ParameterController::class.java.simpleName)
     private val registry = ParameterRegistry(
         listOf(

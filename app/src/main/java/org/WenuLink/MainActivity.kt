@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
 
     private fun checkAndRequestPermissions() {
         homeViewModel.updateWorkflow("Checking permissions")
+
         var permissionsList = arrayOf(
             Manifest.permission.VIBRATE,
             Manifest.permission.INTERNET,

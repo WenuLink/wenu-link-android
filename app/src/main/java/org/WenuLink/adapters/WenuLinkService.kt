@@ -24,7 +24,6 @@ import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
 class WenuLinkService : Service() {
-
     private val logger by taggedLogger(WenuLinkService::class.java.simpleName)
     private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService

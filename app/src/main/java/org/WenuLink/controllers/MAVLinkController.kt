@@ -56,21 +56,18 @@ class MAVLinkController(
     private val client: MAVLinkClient,
     private val serviceScope: CoroutineScope
 ) {
-
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private var aircraft = AircraftHandler.getInstance()
     private var controllers: MutableList<IController> = mutableListOf()
     private var readOnlyMessageRate = true
     private var messageRates: MutableList<MessageRate> = mutableListOf(
-        MessageRate( // began with Heartbeat at 1Hz
+        MessageRate( // begin with Heartbeat at 1Hz
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT,
             1_000_000L
         )
     )
     private val connectionController: ConnectionController
-        get() {
-            return controllers.filterIsInstance<ConnectionController>().first()
-        }
+        get() = controllers.filterIsInstance<ConnectionController>().first()
 
     /**
      * Data definition based on

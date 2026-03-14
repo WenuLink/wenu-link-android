@@ -25,6 +25,7 @@ class AircraftHandler {
             if (serviceScope != null) {
                 mInstance!!.registerHandlerScope(serviceScope)
             }
+
             return mInstance!!
         }
     }

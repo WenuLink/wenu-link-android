@@ -36,7 +36,6 @@ import org.json.JSONObject
 import org.webrtc.IceCandidate
 
 class WebRTCClient(serverAddress: String) {
-
     enum class SessionState {
         Active, // Offer and Answer messages has been sent
         Creating, // Creating session, offer has been sent

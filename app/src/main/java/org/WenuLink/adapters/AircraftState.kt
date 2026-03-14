@@ -28,7 +28,6 @@ sealed interface AircraftState {
  * FSM / Reducer pattern.
  */
 class AircraftStateMachine {
-
     data class UnifiedState(
         val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
         val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,

@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("org.jlleitschuh.gradle.ktlint") version "14.1.0"
+    alias(libs.plugins.ktlint)
 }
 
 val localProps =
@@ -14,7 +14,7 @@ val localProps =
     }
 
 ktlint {
-    version.set("1.8.0")
+    version.set(libs.versions.ktlintEngine)
     android.set(true)
     outputToConsole.set(true)
     ignoreFailures.set(false)

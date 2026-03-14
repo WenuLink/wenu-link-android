@@ -73,7 +73,6 @@ interface ParameterProvider {
 }
 
 class ParameterRegistry(private val providers: List<ParameterProvider>) {
-
     private lateinit var params: List<WenuLinkParameter>
     private lateinit var byIndex: Map<Int, WenuLinkParameter>
     private lateinit var byName: Map<String, WenuLinkParameter>
