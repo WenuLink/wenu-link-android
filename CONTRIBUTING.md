@@ -24,6 +24,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
   - [Suggesting Enhancements](#suggesting-enhancements)
 - [Styleguide](#styleguide)
   - [Code Style](#code-style)
+    - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
   - [Join The Project Team](#join-the-project-team)
@@ -181,6 +182,17 @@ To auto-fix most formatting issues:
 The project's `.editorconfig` configures indentation and line length
 automatically in both Android Studio and VS Code — no manual IDE
 configuration needed.
+
+#### Running Gradle commands
+
+`./gradlew` commands must be run using the same JDK that Android Studio
+uses for building. The easiest way is to use Android Studio's built-in
+terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
+The path varies by OS:
+
+Windows: `C:\Program Files\Android\Android Studio\jbr`
+macOS: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
+Linux: `/opt/android-studio/jbr`
 
 #### Recommended: pre-commit hook
 
