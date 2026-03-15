@@ -10,17 +10,17 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.TelemetryData
 
 object SimManager {
-    private val logger by taggedLogger("SimulationManager")
+    private val logger by taggedLogger(SimManager::class.java.simpleName)
 
     private var hasCallback: Boolean = false
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
-    private var velocityX: Float = 0F
-    private var velocityY: Float = 0F
-    private var velocityZ: Float = 0F
+    private var velocityX: Float = 0f
+    private var velocityY: Float = 0f
+    private var velocityZ: Float = 0f
     private var flightTime: Int = 0
-    private var takeOffAltitude: Float = 0F
+    private var takeOffAltitude: Float = 0f
     private var initStamp: Long = 0L
     private var updateStamp: Long = 0L
     private var takeOffStamp: Long = 0L
@@ -34,7 +34,7 @@ object SimManager {
 
     fun isAvailable(): Boolean = simInstance != null
 
-    fun isActive(): Boolean = simInstance?.isSimulatorActive ?: false
+    fun isActive(): Boolean = simInstance?.isSimulatorActive == true
 
     fun registerStateCallback(stateCallback: (SimulatorState) -> Unit) {
         if (hasCallback) unregisterStateCallback()
@@ -48,7 +48,7 @@ object SimManager {
     }
 
     fun completeTelemetryData(telemetryT: TelemetryData, state: SimulatorState) {
-        val stamp = System.currentTimeMillis() / 1000  // to seconds
+        val stamp = System.currentTimeMillis() / 1000 // to seconds
         val dT = stamp - updateStamp
         velocityX = (state.positionX - telemetryT.positionX) / dT
         velocityY = (state.positionY - telemetryT.positionY) / dT
@@ -66,28 +66,26 @@ object SimManager {
     }
 
     @Synchronized
-    fun state2telemetry(state: SimulatorState): TelemetryData {
-        return TelemetryData(
-            roll = state.roll.toDouble(),
-            pitch = state.pitch.toDouble(),
-            yaw = state.yaw.toDouble(),
-            latitude = state.location.latitude,
-            longitude = state.location.longitude,
-            altitude = state.positionZ,
-            positionX = state.positionX,
-            positionY = state.positionY,
-            positionZ = state.positionZ,
-            velocityX = velocityX,
-            velocityY = velocityY,
-            velocityZ = velocityZ,
-            flightTime = flightTime,
-            takeOffAltitude = takeOffAltitude,
-            isFlying = state.isFlying,
-            motorsOn = state.areMotorsOn(),
-            satelliteCount = satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
-        )
-    }
+    fun state2telemetry(state: SimulatorState): TelemetryData = TelemetryData(
+        roll = state.roll.toDouble(),
+        pitch = state.pitch.toDouble(),
+        yaw = state.yaw.toDouble(),
+        latitude = state.location.latitude,
+        longitude = state.location.longitude,
+        altitude = state.positionZ,
+        positionX = state.positionX,
+        positionY = state.positionY,
+        positionZ = state.positionZ,
+        velocityX = velocityX,
+        velocityY = velocityY,
+        velocityZ = velocityZ,
+        flightTime = flightTime,
+        takeOffAltitude = takeOffAltitude,
+        isFlying = state.isFlying,
+        motorsOn = state.areMotorsOn(),
+        satelliteCount = satelliteCount,
+        gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
+    )
 
     fun run(
         lat: Double = -8.066478642777481,
@@ -100,15 +98,15 @@ object SimManager {
             onResult(null)
             return
         }
-        logger.d { "Simulation run." }
+        logger.d { "Simulation start." }
         this.satelliteCount = satelliteCount
-        initStamp = System.currentTimeMillis() / 1000  // to seconds
+        initStamp = System.currentTimeMillis() / 1000 // to seconds
         updateStamp = initStamp
-        velocityX = 0F
-        velocityY = 0F
-        velocityZ = 0F
+        velocityX = 0f
+        velocityY = 0f
+        velocityZ = 0f
         flightTime = 0
-        takeOffAltitude = 0F
+        takeOffAltitude = 0f
 
         simInstance?.start(
             InitializationData.createInstance(
@@ -128,5 +126,4 @@ object SimManager {
         logger.d { "Simulation stop." }
         simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
     }
-
 }

@@ -1,20 +1,16 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.TelemetryData
 import dji.common.error.DJIError
 import dji.common.flightcontroller.FlightControllerState
 import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.delay
 import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.AsyncUtils
-import kotlin.getValue
-import kotlin.math.abs
+import org.WenuLink.adapters.TelemetryData
 
 object FCManager {
-    private val logger by taggedLogger("FlightControllerManager")
+    private val logger by taggedLogger(FCManager::class.java.simpleName)
 
     var fcInstance: FlightController? = null
         private set
@@ -35,28 +31,31 @@ object FCManager {
     fun init(flightController: FlightController) {
         fcInstance = flightController
 
-        flightController.getSerialNumber(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(sn: String) {
-                updateSerialNumber(sn)
-                logger.i { "${this@FCManager}: $sn" }
-            }
+        flightController.getSerialNumber(
+            object : CommonCallbacks.CompletionCallbackWith<String> {
+                override fun onSuccess(sn: String) {
+                    updateSerialNumber(sn)
+                    logger.i { "${this@FCManager}: $sn" }
+                }
 
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Serial Number obtained: $error" }
+                override fun onFailure(error: DJIError) {
+                    logger.e { "No Serial Number obtained: $error" }
+                }
             }
+        )
 
-        })
-        flightController.getFirmwareVersion(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(firmware: String) {
-                updateFirmwareVersion(firmware)
-                logger.i { this@FCManager.toString() }
+        flightController.getFirmwareVersion(
+            object : CommonCallbacks.CompletionCallbackWith<String> {
+                override fun onSuccess(firmware: String) {
+                    updateFirmwareVersion(firmware)
+                    logger.i { this@FCManager.toString() }
+                }
+
+                override fun onFailure(error: DJIError) {
+                    logger.e { "No Firmware version obtained: $error" }
+                }
             }
-
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Firmware version obtained: $error" }
-            }
-
-        })
+        )
 
         logger.i { "FlightController init" }
 
@@ -64,43 +63,38 @@ object FCManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean {
-        return fcInstance != null
+    fun isConnected(): Boolean = fcInstance != null
+
+    override fun toString(): String = if (!isConnected()) {
+        if (serialNumber != null && fwVersion != null) {
+            "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
+        } else {
+            "Reading FlightController"
+        }
+    } else {
+        "No FlightController"
     }
 
-    override fun toString(): String {
-        return if (!isConnected()) {
-            val sn = "SN: " + if (serialNumber != null) serialNumber else "N/A"
-            val fw = "FW: " + if (fwVersion != null) fwVersion else "N/A"
-            if (serialNumber != null && fwVersion != null) {
-                "FlightController $sn - $fw"
-            } else
-                "Reading FlightController"
-        } else "No FlightController"
-    }
-
-    fun state2telemetry(state: FlightControllerState): TelemetryData {
-        return TelemetryData(
-            roll = state.attitude.roll,
-            pitch = state.attitude.pitch,
-            yaw = state.attitude.yaw,
-            latitude = state.aircraftLocation.latitude,
-            longitude = state.aircraftLocation.longitude,
-            altitude = state.aircraftLocation.altitude,
-            positionX = 0F,
-            positionY = 0F,
-            positionZ = 0F,
-            velocityX = state.velocityX,
-            velocityY = state.velocityY,
-            velocityZ = state.velocityZ,
-            flightTime = state.flightTimeInSeconds,
-            takeOffAltitude = state.takeoffLocationAltitude,
-            isFlying = state.isFlying,
-            motorsOn = state.areMotorsOn(),
-            satelliteCount = state.satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
-        )
-    }
+    fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+        roll = state.attitude.roll,
+        pitch = state.attitude.pitch,
+        yaw = state.attitude.yaw,
+        latitude = state.aircraftLocation.latitude,
+        longitude = state.aircraftLocation.longitude,
+        altitude = state.aircraftLocation.altitude,
+        positionX = 0f,
+        positionY = 0f,
+        positionZ = 0f,
+        velocityX = state.velocityX,
+        velocityY = state.velocityY,
+        velocityZ = state.velocityZ,
+        flightTime = state.flightTimeInSeconds,
+        takeOffAltitude = state.takeoffLocationAltitude,
+        isFlying = state.isFlying,
+        motorsOn = state.areMotorsOn(),
+        satelliteCount = state.satelliteCount,
+        gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+    )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
         fcInstance?.setStateCallback(stateCallback)
@@ -141,11 +135,9 @@ object FCManager {
         }
     }
 
-    fun isFlying(): Boolean {
-        return fcInstance?.state?.isFlying ?: false
-    }
+    fun isFlying(): Boolean = fcInstance?.state?.isFlying == true
 
-    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded ?: false
+    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
 
     fun startTakeoff() {
         //        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
@@ -162,20 +154,19 @@ object FCManager {
         fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
     }
 
-    fun areMotorsArmed(): Boolean {
-        return fcInstance?.state?.areMotorsOn() ?: false
-    }
+    fun areMotorsArmed(): Boolean = fcInstance?.state?.areMotorsOn() == true
 
     fun armMotors() {
         logger.d { "Arming motors" }
 //        fcInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOnMotors { } // apparently ignores the callback and must wait for change to happen
+        // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOnMotors { }
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
 //        fcInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
-        fcInstance?.turnOffMotors { } // apparently ignores the callback and must wait for change to happen
+        // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOffMotors { }
     }
-
 }

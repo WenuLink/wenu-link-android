@@ -3,7 +3,6 @@ package org.WenuLink.adapters.mission
 import org.WenuLink.adapters.Coordinates3D
 
 class MissionAssembler {
-
     private val nodes = mutableListOf<MissionNode>()
     private var rtlWhenFinish = false
     var nWaypoints: Int = 0
@@ -39,6 +38,5 @@ class MissionAssembler {
         rtlWhenFinish = true
     }
 
-    fun build(): AssembledMission =
-        AssembledMission(nodes.toList(), nWaypoints, rtlWhenFinish)
+    fun build(): AssembledMission = AssembledMission(nodes.toList(), nWaypoints, rtlWhenFinish)
 }

@@ -21,24 +21,22 @@ import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.getValue
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
- * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink messages.
+ * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink
+ * messages.
  *
  * https://mavlink.io/en/services/heartbeat.html
  */
-class ConnectionController (
-    override val client: MAVLinkClient
-) : IController {
-    private val logger by taggedLogger("ConnectionController")
+class ConnectionController(override val client: MAVLinkClient) : IController {
+    private val logger by taggedLogger(ConnectionController::class.java.simpleName)
     private var gcsLastTimestamp: Long = 0
     val isGCSPresent: Boolean
         get() {
@@ -49,50 +47,59 @@ class ConnectionController (
 
     // TODO: move where it belongs, AircraftHandler
     val sensorsPresent = MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_GYRO or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_ACCEL or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_MAG or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_YAW_POSITION or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_RC_RECEIVER or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_AHRS or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_TERRAIN or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_BATTERY or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_ACCEL or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_MAG or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_YAW_POSITION or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_RC_RECEIVER or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_AHRS or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_TERRAIN or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_BATTERY or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK or
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        var processed = true
         when (msg.msgid) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> processHeartbeatGCS()
             msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg, aircraft)
             msg_timesync.MAVLINK_MSG_ID_TIMESYNC -> processTimeSync(msg)
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
-    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
-        return when (messageID) {
+    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? =
+        when (messageID) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(aircraft)
+
             msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(aircraft.telemetry)
+
             msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(aircraft.telemetry)
+
             msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(aircraft.telemetry)
+
             msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
+
             msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(aircraft.telemetry)
+
             msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(aircraft.telemetry)
+
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
-            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(aircraft.telemetry)
+
+            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS ->
+                msgBatteryStatus(aircraft.telemetry)
+
             msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
-//            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
+
+            //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null
         }
-    }
 
     fun processHeartbeatGCS() {
         gcsLastTimestamp = System.currentTimeMillis()
@@ -147,16 +154,16 @@ class ConnectionController (
 
         // TODO: Update accordingly?
         val sensorsEnabled = sensorsPresent and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv() and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE.inv() and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING.inv()
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv() and
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE.inv() and
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING.inv()
 
         val sensorsHealth = sensorsPresent or
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_GPS or
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROXIMITY and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
-                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_GPS or
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROXIMITY and
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
 
 //        if (!aircraft.preArmCheckOk) sensorsHealth = sensorsHealth and
 //                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK.inv()
@@ -208,8 +215,8 @@ class ConnectionController (
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
         msg.airspeed = sqrt(
-            telemetryData.velocityX.toDouble().pow(2.0)
-                    + telemetryData.velocityY.toDouble().pow(2.0)
+            telemetryData.velocityX.toDouble().pow(2.0) +
+                telemetryData.velocityY.toDouble().pow(2.0)
         ).toFloat()
         // Mavlink: Current ground speed in m/s. For now, just echoing airspeed.
         msg.groundspeed = msg.airspeed
@@ -227,20 +234,21 @@ class ConnectionController (
         return msg
     }
 
-    fun msgRadioStatus(telemetry: TelemetryHandler):  MAVLinkMessage {
+    fun msgRadioStatus(telemetry: TelemetryHandler): MAVLinkMessage {
         val airlinkSignal = telemetry.getAirlinkSignal()
         val msg = msg_radio_status()
-        // DJI represent the signal quality in percent with range [0, 100], where 100 is the best quality.
-        // MAVLink uses [0, 254] as uint8_t
-        msg.rssi = ((airlinkSignal[0] / 100F) * 255F).roundToInt().toShort() // AirLink's DownLinkSignalQuality
-        msg.remrssi = ((airlinkSignal[1] / 100F) * 255F).roundToInt().toShort() // AirLink's UpLinkSignalQuality
+        // DJI represent the signal quality in percent with range [0, 100], where 100 is the best
+        // quality. MAVLink uses [0, 254] as uint8_t
+
+        // AirLink's DownLinkSignalQuality
+        msg.rssi = ((airlinkSignal[0] / 100f) * 255f).roundToInt().toShort()
+        // AirLink's UpLinkSignalQuality
+        msg.remrssi = ((airlinkSignal[1] / 100f) * 255f).roundToInt().toShort()
         return msg
 //        client.sendMessage(msg)
     }
 
-    fun msgPowerStatus(): MAVLinkMessage {
-        return msg_power_status()
-    }
+    fun msgPowerStatus(): MAVLinkMessage = msg_power_status()
 
     fun msgBatteryStatus(telemetry: TelemetryHandler): MAVLinkMessage {
         val aircraftBattery = telemetry.getAircraftBattery()
@@ -249,7 +257,11 @@ class ConnectionController (
         msg.voltages = aircraftBattery.voltageCells
         msg.temperature = (aircraftBattery.temperature * 100.0).toInt().toShort()
         msg.current_battery = (aircraftBattery.current * 10).toShort()
-        msg.battery_remaining = (aircraftBattery.chargeRemaining.toFloat() / aircraftBattery.fullChargeCapacity.toFloat() * 100.0F).toInt().toByte()
+        msg.battery_remaining = (
+            aircraftBattery.chargeRemaining.toFloat() /
+                aircraftBattery.fullChargeCapacity.toFloat() *
+                100.0f
+            ).toInt().toByte()
 //        client.sendMessage(msg)
         return msg
     }

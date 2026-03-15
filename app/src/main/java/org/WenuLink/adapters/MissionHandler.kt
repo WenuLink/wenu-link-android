@@ -4,13 +4,12 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.mission.MissionAction
-import org.WenuLink.adapters.mission.MissionAssembler
-import org.WenuLink.sdk.MissionManager
-import org.WenuLink.sdk.MissionActionManager
-import kotlin.getValue
 import kotlin.math.max
 import kotlin.math.min
+import org.WenuLink.adapters.mission.MissionAction
+import org.WenuLink.adapters.mission.MissionAssembler
+import org.WenuLink.sdk.MissionActionManager
+import org.WenuLink.sdk.MissionManager
 
 class MissionHandler {
     companion object {
@@ -18,16 +17,16 @@ class MissionHandler {
 
         @Synchronized
         fun getInstance(): MissionHandler {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = MissionHandler()
+            }
             return mInstance!!
         }
-
     }
 
-    private val logger by taggedLogger("MissionHandler")
+    private val logger by taggedLogger(MissionHandler::class.java.simpleName)
     private val assembler = MissionAssembler()
-    var flightSpeed: Float = 5.0F
+    var flightSpeed: Float = 5.0f
         private set
     var currentSequence = 0
         private set
@@ -43,19 +42,20 @@ class MissionHandler {
     @Synchronized
     fun updateState() {
         logger.d { "updateMissionState: ${MissionManager.currentState}" }
-        if (MissionManager.isWaitingMission())
+        if (MissionManager.isWaitingMission()) {
             currentState = MISSION_STATE.MISSION_STATE_NO_MISSION
-        else if (MissionManager.isMissionReady())
+        } else if (MissionManager.isMissionReady()) {
             currentState = MISSION_STATE.MISSION_STATE_NOT_STARTED
-        else if (MissionManager.isMissionStarted())
+        } else if (MissionManager.isMissionStarted()) {
             currentState = MISSION_STATE.MISSION_STATE_ACTIVE
-        else if (MissionManager.isMissionPaused())
+        } else if (MissionManager.isMissionPaused()) {
             currentState = MISSION_STATE.MISSION_STATE_PAUSED
+        }
     }
 
     fun setSpeed(speed: Float) {
-        if (speed < -15F || speed > 15F) logger.w { "Clipping new speed $speed in [-15, 15]" }
-        flightSpeed = min(max(speed, -15F), 15F)
+        if (speed < -15f || speed > 15f) logger.w { "Clipping new speed $speed in [-15, 15]" }
+        flightSpeed = min(max(speed, -15f), 15f)
     }
 
     fun getItemCoordinates(itemMsg: msg_mission_item_int): Coordinates3D {
@@ -76,8 +76,7 @@ class MissionHandler {
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
-        var commandAccepted = true
-        logger.d { "Append mission item."}
+        logger.d { "Append mission item." }
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
@@ -103,10 +102,11 @@ class MissionHandler {
                 assembler.addWaypoint(coordinates)
 
                 // Delay (seconds)
-                if (delay > 0)
+                if (delay > 0) {
                     assembler.addActionToLast(
                         MissionAction.Delay(delay)
                     )
+                }
 
                 // Yaw (rad → deg)
                 if (yaw != 0f) {
@@ -137,10 +137,10 @@ class MissionHandler {
             MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH ->
                 assembler.setRTLWhenFinish()
 
-            else -> commandAccepted = false
+            else -> return false
         }
 
-        return commandAccepted
+        return true
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) {
@@ -161,7 +161,9 @@ class MissionHandler {
         if (!isMissionRunning) return
         logger.i { "Pause WP mission" }
         MissionManager.pauseMission { error ->
-            if (error != null) logger.i { "Unable to pause the mission at $currentSequence: $error" }
+            if (error != null) {
+                logger.i { "Unable to pause the mission at $currentSequence: $error" }
+            }
             updateState()
         }
     }
@@ -223,7 +225,7 @@ class MissionHandler {
     fun cancelCommand() {
         logger.i { "Cancel command" }
         MissionActionManager.stop()
-        MissionActionManager.clear()  // <- not sure about this
+        MissionActionManager.clear() // <- not sure about this
         updateState()
     }
 
@@ -238,11 +240,7 @@ class MissionHandler {
         MissionActionManager.stop()
         updateState()
     }
-    fun doReposition(
-        target: Coordinates3D,
-        speed: Float?,
-        onResult: (String?) -> Unit
-    ) {
+    fun doReposition(target: Coordinates3D, speed: Float?, onResult: (String?) -> Unit) {
         logger.i { "doReposition" }
         MissionActionManager.clear()
         val error = MissionActionManager.scheduleGoTo(

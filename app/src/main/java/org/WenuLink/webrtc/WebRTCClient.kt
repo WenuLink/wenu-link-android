@@ -35,23 +35,20 @@ import org.json.JSONException
 import org.json.JSONObject
 import org.webrtc.IceCandidate
 
-class WebRTCClient(
-    serverAddress: String,
-) {
-
+class WebRTCClient(serverAddress: String) {
     enum class SessionState {
-        Active,     // Offer and Answer messages has been sent
-        Creating,   // Creating session, offer has been sent
-        Ready,      // Both clients available and ready to initiate session
+        Active, // Offer and Answer messages has been sent
+        Creating, // Creating session, offer has been sent
+        Ready, // Both clients available and ready to initiate session
         Impossible, // We have less than two clients connected to the server
-        Offline     // unable to connect signaling server
+        Offline // unable to connect signaling server
     }
 
     enum class CommandType {
-        STATE,  // Command for WebRTCSessionState
-        OFFER,  // to send or receive offer
+        STATE, // Command for WebRTCSessionState
+        OFFER, // to send or receive offer
         ANSWER, // to send or receive answer
-        ICE     // to send and receive ice candidates
+        ICE // to send and receive ice candidates
     }
 
     private val logger by taggedLogger("SignalingClient")
@@ -82,7 +79,8 @@ class WebRTCClient(
                     "data",
                     JSONObject(message).apply {
                         put("socketID", peerSocketID)
-                    })
+                    }
+                )
             }
 
             logger.d { "[sendCommand] $jsonMessage" }
@@ -125,7 +123,6 @@ class WebRTCClient(
             val jsonData = JSONObject(textMessage)
             event = jsonData.getString("event")
             dataString = jsonData.getString("data")
-
         } catch (e: JSONException) {
             logger.e { "JSONException: ${e.message}" }
         }
@@ -161,6 +158,7 @@ class WebRTCClient(
                 }
 
                 "answer" -> handleSignalingCommand(CommandType.ANSWER, rawData)
+
                 "candidate" -> handleSignalingCommand(CommandType.ICE, rawData)
             }
         }

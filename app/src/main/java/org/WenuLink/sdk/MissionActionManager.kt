@@ -15,8 +15,8 @@ import dji.sdk.mission.timeline.actions.RecordVideoAction
 import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import dji.sdk.mission.timeline.actions.TakeOffAction
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.Coordinates3D
 import kotlin.reflect.KClass
+import org.WenuLink.adapters.Coordinates3D
 
 /**
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html
@@ -57,14 +57,9 @@ object MissionActionManager {
 
     // ---- Actions ----
 
-    fun scheduleTakeOff(): DJIError? {
-        return missionControl.scheduleElement(TakeOffAction())
-    }
+    fun scheduleTakeOff(): DJIError? = missionControl.scheduleElement(TakeOffAction())
 
-    fun scheduleGoTo(
-        coordinates: Coordinates3D,
-        speed: Float? = null,
-    ): DJIError? {
+    fun scheduleGoTo(coordinates: Coordinates3D, speed: Float? = null): DJIError? {
         val action = GoToAction(
             LocationCoordinate2D(coordinates.lat, coordinates.long),
             coordinates.alt
@@ -96,23 +91,18 @@ object MissionActionManager {
     fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
         registerCallback(action, TimelineEvent.FINISHED, callback)
 
-    fun registerTakeOffFinished(callback: () -> Unit) =
-        onFinish(TakeOffAction::class, callback)
+    fun registerTakeOffFinished(callback: () -> Unit) = onFinish(TakeOffAction::class, callback)
 
-    fun registerGoToFinished(callback: () -> Unit) =
-        onFinish(GoToAction::class, callback)
+    fun registerGoToFinished(callback: () -> Unit) = onFinish(GoToAction::class, callback)
 
-    fun registerLandFinished(callback: () -> Unit) =
-        onFinish(LandAction::class, callback)
+    fun registerLandFinished(callback: () -> Unit) = onFinish(LandAction::class, callback)
 
     fun registerAircraftYawFinished(callback: () -> Unit) =
         onFinish(AircraftYawAction::class, callback)
 
-    fun registerGoHomeFinished(callback: () -> Unit) =
-        onFinish(GoHomeAction::class, callback)
+    fun registerGoHomeFinished(callback: () -> Unit) = onFinish(GoHomeAction::class, callback)
 
-    fun registerHotpointFinished(callback: () -> Unit) =
-        onFinish(HotpointAction::class, callback)
+    fun registerHotpointFinished(callback: () -> Unit) = onFinish(HotpointAction::class, callback)
 
     fun registerGimbalAttitudeFinished(callback: () -> Unit) =
         onFinish(GimbalAttitudeAction::class, callback)
