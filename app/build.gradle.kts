@@ -145,4 +145,7 @@ dependencies {
     implementation(libs.okhttp)
     // Log
     implementation(libs.stream.log)
+    // UI Rework
+    implementation("androidx.navigation:navigation-compose:2.9.7")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 }
