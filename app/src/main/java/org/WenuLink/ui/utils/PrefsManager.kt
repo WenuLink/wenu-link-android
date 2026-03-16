@@ -1,0 +1,49 @@
+package org.WenuLink.ui.utils
+
+import android.content.Context
+import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+// TODO: Reallocate preferences manager
+object PrefsManager {
+    private const val PREFS_NAME = "wenulink_config"
+    private const val KEY_MAVLINK_IP = "mavlink_ip"
+    private const val KEY_WEBRTC_IP = "webrtc_ip"
+    private const val KEY_THEME = "app_theme_mode"
+
+    private val _themeFlow = MutableStateFlow<Int?>(null)
+    val themeFlow = _themeFlow.asStateFlow()
+
+    private fun getPrefs(context: Context): SharedPreferences {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    fun getMavlinkIp(context: Context): String {
+        return getPrefs(context).getString(KEY_MAVLINK_IP, "192.168.1.220") ?: "192.168.1.220"
+    }
+
+    fun saveMavlinkIp(context: Context, ip: String) {
+        getPrefs(context).edit().putString(KEY_MAVLINK_IP, ip).apply()
+    }
+
+    fun getWebRtcIp(context: Context): String {
+        return getPrefs(context).getString(KEY_WEBRTC_IP, "192.168.1.100") ?: "192.168.1.100"
+    }
+
+    fun saveWebRtcIp(context: Context, ip: String) {
+        getPrefs(context).edit().putString(KEY_WEBRTC_IP, ip).apply()
+    }
+
+    fun getThemeMode(context: Context): Int {
+        val mode = getPrefs(context).getInt(KEY_THEME, 0)
+        if (_themeFlow.value == null) {
+            _themeFlow.value = mode
+        }
+        return mode
+    }
+
+    fun saveThemeMode(context: Context, mode: Int) {
+        getPrefs(context).edit().putInt(KEY_THEME, mode).apply()
+        _themeFlow.value = mode
+    }
+}

@@ -1,0 +1,89 @@
+package org.WenuLink.ui.screens.config
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import org.WenuLink.ui.navigation.Screen
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MenuScreen(navController: NavController) {
+    val settingsItems = listOf(
+        Triple("IP Addressing", "MAVLink and WebRTC IP Settings", Screen.ConfigIp),
+        Triple("DJI API KEY", "DJI Registration Details", Screen.ConfigDji),
+        Triple("Interface", "Theme & Display", Screen.ConfigTheme)
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                windowInsets = WindowInsets.safeDrawing
+            )
+        },
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            items(settingsItems) { (title, subtitle, screenRoute) ->
+                ListItem(
+                    headlineContent = { Text(title, fontWeight = FontWeight.Medium) },
+                    supportingContent = { Text(subtitle) },
+                    leadingContent = {
+                        Icon(
+                            imageVector = when(title) {
+                                "IP Addressing" -> Icons.Default.Wifi
+                                "DJI API KEY" -> Icons.Default.VpnKey
+                                "Interface" -> Icons.Default.Palette
+                                "Flight Logs" -> Icons.Default.Description
+                                else -> Icons.Default.Settings
+                            },
+                            contentDescription = null
+                        )
+                    },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, null, modifier = Modifier.size(16.dp))
+                    },
+                    modifier = Modifier
+                        .clickable { navController.navigate(screenRoute.route) },
+
+                    colors = ListItemDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        headlineColor = MaterialTheme.colorScheme.onBackground,
+                        leadingIconColor = MaterialTheme.colorScheme.primary,
+                        supportingColor = MaterialTheme.colorScheme.secondary
+                    )
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+            }
+        }
+    }
+}
