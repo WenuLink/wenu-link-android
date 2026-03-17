@@ -10,11 +10,11 @@ import dji.sdk.camera.Camera
 import dji.sdk.camera.VideoFeeder
 import dji.sdk.codec.DJICodecManager
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.suspendCancellableCoroutine
-import org.WenuLink.adapters.AsyncUtils
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.getValue
+import kotlinx.coroutines.suspendCancellableCoroutine
+import org.WenuLink.adapters.AsyncUtils
 
 /**
  * https://developer.dji.com/api-reference/android-api/Components/Camera/DJICamera.html
@@ -60,36 +60,42 @@ object CameraManager {
         logger.i { toString() }
     }
 
-    fun createCompletionCallback(onResult: (String, Boolean) -> Unit): CommonCallbacks.CompletionCallbackWith<String> {
-        return object : CommonCallbacks.CompletionCallbackWith<String> {
+    fun createCompletionCallback(
+        onResult: (String, Boolean) -> Unit
+    ): CommonCallbacks.CompletionCallbackWith<String> =
+        object : CommonCallbacks.CompletionCallbackWith<String> {
             override fun onSuccess(value: String) {
                 onResult(value, true)
             }
 
             override fun onFailure(p0: DJIError?) {
-                if (p0 != null)
+                if (p0 != null) {
                     onResult(p0.description, false)
+                }
             }
         }
+
+    suspend fun retrieveFirmwareVersion(): String? = suspendCancellableCoroutine { cont ->
+        if (fwVersion != null) {
+            cont.resume(fwVersion)
+        }
+        mInstance?.getFirmwareVersion(
+            createCompletionCallback { firmwareVersion, _ ->
+                cont.resume(firmwareVersion)
+            }
+        ) ?: cont.resume(null)
     }
 
-    suspend fun retrieveFirmwareVersion(): String? =
-        suspendCancellableCoroutine { cont ->
-            if (fwVersion != null)
-                cont.resume(fwVersion)
-            mInstance?.getFirmwareVersion(createCompletionCallback { firmwareVersion, _ ->
-                cont.resume(firmwareVersion)
-            }) ?: cont.resume(null)
+    suspend fun retrieveSerialNumber(): String? = suspendCancellableCoroutine { cont ->
+        if (serialNumber != null) {
+            cont.resume(serialNumber)
         }
-
-    suspend fun retrieveSerialNumber(): String? =
-        suspendCancellableCoroutine { cont ->
-            if (serialNumber != null)
+        mInstance?.getSerialNumber(
+            createCompletionCallback { serialNumber, _ ->
                 cont.resume(serialNumber)
-            mInstance?.getSerialNumber(createCompletionCallback { serialNumber, _ ->
-                cont.resume(serialNumber)
-            }) ?: cont.resume(null)
-        }
+            }
+        ) ?: cont.resume(null)
+    }
 
     suspend fun retrieveCameraMode(): SettingsDefinitions.CameraMode? =
         suspendCancellableCoroutine { cont ->
@@ -118,7 +124,11 @@ object CameraManager {
                     }
 
                     override fun onFailure(error: DJIError?) {
-                        if (error != null) logger.d { "Error in reading CameraMode: ${error.description}" }
+                        if (error !=
+                            null
+                        ) {
+                            logger.d { "Error in reading CameraMode: ${error.description}" }
+                        }
                         cont.resume(null)
                     }
                 }
@@ -126,19 +136,22 @@ object CameraManager {
         }
 
     suspend fun retrieveMetadata() {
-        if (mInstance == null)
+        if (mInstance == null) {
             return
+        }
 
         fwVersion = retrieveFirmwareVersion()
         serialNumber = retrieveSerialNumber()
 
         val cameraMode = retrieveCameraMode()
-        if (cameraMode != null)
+        if (cameraMode != null) {
             this.cameraMode = cameraMode
+        }
 
         val captureMode = retrieveCaptureMode()
-        if (captureMode != null)
+        if (captureMode != null) {
             this.captureMode = captureMode
+        }
     }
 
     fun updateStreamID(id: String) {
@@ -202,60 +215,61 @@ object CameraManager {
 
     private suspend fun setCameraMode(mode: SettingsDefinitions.CameraMode): String? =
         suspendCancellableCoroutine { cont ->
-            if (cameraMode == mode)
+            if (cameraMode == mode) {
                 cont.resume(null)
+            }
 
             mInstance?.setMode(
                 mode,
                 SDKUtils.createCompletionCallback { error ->
 
-                    if (error == null)
+                    if (error == null) {
                         this@CameraManager.cameraMode = mode
+                    }
 
-                    if (cont.isActive)
+                    if (cont.isActive) {
                         cont.resume(error)
+                    }
                 }
             ) ?: cont.resume("Camera instance is null")
         }
 
-    suspend fun setPhotoMode(): String? =
-        setCameraMode(SettingsDefinitions.CameraMode.SHOOT_PHOTO)
+    suspend fun setPhotoMode(): String? = setCameraMode(SettingsDefinitions.CameraMode.SHOOT_PHOTO)
 
-    suspend fun setVideoMode(): String? =
-        setCameraMode(SettingsDefinitions.CameraMode.RECORD_VIDEO)
+    suspend fun setVideoMode(): String? = setCameraMode(SettingsDefinitions.CameraMode.RECORD_VIDEO)
 
     suspend fun setBroadcastMode(): String? =
         setCameraMode(SettingsDefinitions.CameraMode.BROADCAST)
 
-    suspend fun setCaptureMode(
-        mode: SettingsDefinitions.ShootPhotoMode
-    ): String? = suspendCancellableCoroutine { cont ->
+    suspend fun setCaptureMode(mode: SettingsDefinitions.ShootPhotoMode): String? =
+        suspendCancellableCoroutine { cont ->
 
-        if (captureMode == mode) {
-            cont.resume(null)
-            return@suspendCancellableCoroutine
-        }
-
-        mInstance?.setShootPhotoMode(
-            mode,
-            SDKUtils.createCompletionCallback { error ->
-
-                if (error == null)
-                    this@CameraManager.captureMode = mode
-
-                if (cont.isActive)
-                    cont.resume(error)
+            if (captureMode == mode) {
+                cont.resume(null)
+                return@suspendCancellableCoroutine
             }
-        )
 
-        cont.invokeOnCancellation {
-            // Optional: add SDK cancel logic if available
+            mInstance?.setShootPhotoMode(
+                mode,
+                SDKUtils.createCompletionCallback { error ->
+
+                    if (error == null) {
+                        this@CameraManager.captureMode = mode
+                    }
+
+                    if (cont.isActive) {
+                        cont.resume(error)
+                    }
+                }
+            )
+
+            cont.invokeOnCancellation {
+                // Optional: add SDK cancel logic if available
+            }
         }
-    }
 
-    suspend fun setSingleShoot(): String? {
-        return setCaptureMode(SettingsDefinitions.ShootPhotoMode.SINGLE)
-    }
+    suspend fun setSingleShoot(): String? =
+        setCaptureMode(SettingsDefinitions.ShootPhotoMode.SINGLE)
 
     fun isPhotoMode() = cameraMode == SettingsDefinitions.CameraMode.SHOOT_PHOTO
 
@@ -267,26 +281,32 @@ object CameraManager {
         val camera = mInstance ?: return "Camera instance is null"
 
         // Ensure for CameraMode.SHOOT_PHOTO
-        if (!isPhotoMode())
+        if (!isPhotoMode()) {
             return "Camera mode is not SHOOT_PHOTO"
+        }
 
         // Ensure for ShootPhotoMode.SINGLE
         if (!isSingleShoot()) {
             val error = setSingleShoot()
-            if (error != null)
+            if (error != null) {
                 return error
+            }
 
             val success = AsyncUtils.waitTimeout(isReady = ::isSingleShoot)
-            if (!success)
+            if (!success) {
                 return "Failed to switch to SINGLE mode"
+            }
         }
 
         // Launch capture
         return suspendCancellableCoroutine { cont ->
 
             camera.startShootPhoto { error ->
-                if (error != null) cont.resume(error.description)
-                else cont.resume(null)
+                if (error != null) {
+                    cont.resume(error.description)
+                } else {
+                    cont.resume(null)
+                }
             }
 
             cont.invokeOnCancellation {

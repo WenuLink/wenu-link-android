@@ -39,11 +39,11 @@ data class MAVLinkTelemetryData(
     val roll: Float,
     val pitch: Float,
     val yaw: Float,
-    val latitude: Int,     // scaled 1E7
-    val longitude: Int,    // scaled 1E7
-    val relativeAltitude: Int,     // millimeters
-    val takeOffAltitude: Int,     // millimeters
-    val altitude: Int = relativeAltitude + takeOffAltitude,     // millimeters
+    val latitude: Int, // scaled 1E7
+    val longitude: Int, // scaled 1E7
+    val relativeAltitude: Int, // millimeters
+    val takeOffAltitude: Int, // millimeters
+    val altitude: Int = relativeAltitude + takeOffAltitude, // millimeters
     val velocityX: Short,
     val velocityY: Short,
     val velocityZ: Short,
@@ -53,23 +53,21 @@ data class MAVLinkTelemetryData(
 
 object TelemetryMapper {
 
-    fun toMavlink(source: TelemetryData): MAVLinkTelemetryData {
-        return MAVLinkTelemetryData(
-            timestamp = source.timestamp,
-            roll = source.roll.toFloat(),
-            pitch = source.pitch.toFloat(),
-            yaw = source.yaw.toFloat(),
-            latitude = MessageUtils.coordinateDJI2MAVLink(source.latitude),
-            longitude = MessageUtils.coordinateDJI2MAVLink(source.longitude),
-            relativeAltitude = MessageUtils.altitudeDJI2MAVLink(source.relativeAltitude),
-            takeOffAltitude = MessageUtils.altitudeDJI2MAVLink(source.takeOffAltitude),
-            velocityX = (source.velocityX * 100).roundToInt().toShort(),
-            velocityY = (source.velocityY * 100).roundToInt().toShort(),
-            velocityZ = (source.velocityZ * 100).roundToInt().toShort(),
-            satelliteCount = source.satelliteCount,
-            gpsFixType = source.gpsFixType
-        )
-    }
+    fun toMavlink(source: TelemetryData): MAVLinkTelemetryData = MAVLinkTelemetryData(
+        timestamp = source.timestamp,
+        roll = source.roll.toFloat(),
+        pitch = source.pitch.toFloat(),
+        yaw = source.yaw.toFloat(),
+        latitude = MessageUtils.coordinateDJI2MAVLink(source.latitude),
+        longitude = MessageUtils.coordinateDJI2MAVLink(source.longitude),
+        relativeAltitude = MessageUtils.altitudeDJI2MAVLink(source.relativeAltitude),
+        takeOffAltitude = MessageUtils.altitudeDJI2MAVLink(source.takeOffAltitude),
+        velocityX = (source.velocityX * 100).roundToInt().toShort(),
+        velocityY = (source.velocityY * 100).roundToInt().toShort(),
+        velocityZ = (source.velocityZ * 100).roundToInt().toShort(),
+        satelliteCount = source.satelliteCount,
+        gpsFixType = source.gpsFixType
+    )
 }
 
 data class RCData(
@@ -201,26 +199,19 @@ data class ImageMetadata(
     val index: Int,
     val captureOk: Boolean,
     val cameraID: Int,
-    val telemetry: TelemetryData,
+    val telemetry: TelemetryData
 )
 
-data class Quaternion(
-    val w: Double,
-    val x: Double,
-    val y: Double,
-    val z: Double
-) {
+data class Quaternion(val w: Double, val x: Double, val y: Double, val z: Double) {
     fun normalized(): Quaternion {
-        val norm = kotlin.math.sqrt(w*w + x*x + y*y + z*z)
+        val norm = kotlin.math.sqrt(w * w + x * x + y * y + z * z)
         return Quaternion(w / norm, x / norm, y / norm, z / norm)
     }
 
-    fun toFloatArray(): FloatArray {
-        return floatArrayOf(
-            w.toFloat(),
-            x.toFloat(),
-            y.toFloat(),
-            z.toFloat()
-        )
-    }
+    fun toFloatArray(): FloatArray = floatArrayOf(
+        w.toFloat(),
+        x.toFloat(),
+        y.toFloat(),
+        z.toFloat()
+    )
 }

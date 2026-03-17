@@ -2,6 +2,8 @@ package org.WenuLink.adapters
 
 import com.MAVLink.enums.CAMERA_MODE
 import io.getstream.log.taggedLogger
+import kotlin.getValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -9,8 +11,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.WenuLink.adapters.actions.CameraAction
 import org.WenuLink.sdk.CameraManager
-import kotlin.getValue
-import kotlin.math.roundToInt
 
 class CameraHandler {
     companion object {
@@ -18,11 +18,11 @@ class CameraHandler {
 
         @Synchronized
         fun getInstance(): CameraHandler {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = CameraHandler()
+            }
             return mInstance!!
         }
-
     }
     private val logger by taggedLogger("CameraHandler")
     private val _cameraActions = MutableSharedFlow<CameraAction>(
@@ -36,14 +36,19 @@ class CameraHandler {
         get() = availableCameras.toList()
 
     suspend fun initCameras(): Boolean {
-        if (!CameraManager.isConnected())
+        if (!CameraManager.isConnected()) {
             return false
+        }
         logger.d { "initCamera" }
         CameraManager.retrieveMetadata()
         fun hasFirmware() = CameraManager.fwVersion != null
-        val hasFW =  AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 60000L, ::hasFirmware)
+        val hasFW = AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 60000L, ::hasFirmware)
         fun hasSerialNumber() = CameraManager.serialNumber != null
-        val hasSN =  AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 60000L, ::hasSerialNumber)
+        val hasSN = AsyncUtils.waitTimeout(
+            intervalTime = 1000L,
+            timeout = 60000L,
+            ::hasSerialNumber
+        )
 
         // for now assumes a single camera, however this class should manage multi camera if must
         availableCameras.add(
@@ -86,7 +91,7 @@ class CameraHandler {
         if (CameraManager.isPhotoMode()) return true
 
         val error = CameraManager.setPhotoMode()
-        logger.d { "Camera setPhotoMode error: $error"}
+        logger.d { "Camera setPhotoMode error: $error" }
 
         return error == null
     }
@@ -95,7 +100,7 @@ class CameraHandler {
         if (CameraManager.isVideoMode()) return true
 
         val error = CameraManager.setVideoMode()
-        logger.d { "Camera setVideoMode error: $error"}
+        logger.d { "Camera setVideoMode error: $error" }
 
         return error == null
     }
@@ -124,17 +129,13 @@ class CameraHandler {
             )
     }
 
-    fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0): Boolean {
-        return availableCameras[cameraIdx].state.captureStatus == status
-    }
+    fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0): Boolean =
+        availableCameras[cameraIdx].state.captureStatus == status
 
-    fun captureInProgress(cameraIdx: Int = 0): Boolean {
-        return checkCaptureStatus(CameraCaptureStatus.IN_PROGRESS)
-    }
+    fun captureInProgress(cameraIdx: Int = 0): Boolean =
+        checkCaptureStatus(CameraCaptureStatus.IN_PROGRESS)
 
-    fun captureIdle(cameraIdx: Int = 0): Boolean {
-        return checkCaptureStatus(CameraCaptureStatus.IDLE)
-    }
+    fun captureIdle(cameraIdx: Int = 0): Boolean = checkCaptureStatus(CameraCaptureStatus.IDLE)
 
     fun requestAction(action: CameraAction) {
         _cameraActions.tryEmit(action)
@@ -149,14 +150,13 @@ class CameraHandler {
     }
 
     private suspend fun handleAction(action: CameraAction) {
-
         when (action) {
-
             is CameraAction.SetMode -> {
                 val error = CameraManager.setPhotoMode()
                 action.onResult(error)
-                if (error == null)
+                if (error == null) {
                     updateMode(action.mode, action.cameraIdx)
+                }
             }
 
             is CameraAction.TakePhoto -> {
@@ -182,8 +182,9 @@ class CameraHandler {
     }
 
     suspend fun shootPhoto(cameraIdx: Int = 0): String? {
-        if (!captureIdle(cameraIdx))
+        if (!captureIdle(cameraIdx)) {
             return "Camera is busy!"
+        }
 
         val isPhotoMode = setPhotoMode(cameraIdx)
 
@@ -195,7 +196,8 @@ class CameraHandler {
             // mark IDLE back
             updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
             return error
+        } else {
+            return "No in PhotoMode!"
         }
-        else return "No in PhotoMode!"
     }
 }

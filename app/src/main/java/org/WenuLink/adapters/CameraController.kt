@@ -15,6 +15,9 @@ import com.MAVLink.enums.STORAGE_STATUS
 import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
+import kotlin.coroutines.resume
+import kotlin.getValue
+import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AircraftHandler
@@ -26,9 +29,6 @@ import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.TelemetryMapper
 import org.WenuLink.adapters.actions.CameraAction
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.coroutines.resume
-import kotlin.getValue
-import kotlin.math.roundToLong
 
 /**
  * MAVLinkController class to deal with the camera protocol v2's messages.
@@ -36,14 +36,15 @@ import kotlin.math.roundToLong
  * https://mavlink.io/en/services/camera.html
  *
  */
-class CameraController (
-    override val client: MAVLinkClient,
-) : IController {
+class CameraController(override val client: MAVLinkClient) : IController {
 
     private val logger by taggedLogger("CameraController")
     private var imageIndex: Int = 0
 
-    override fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+    override fun processCommandLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ): Boolean {
         var processed = true
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg, aircraft)
@@ -62,9 +63,17 @@ class CameraController (
         val requestID = commandLongMsg.param1.toInt()
         when (requestID) {
             msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION -> reportCameras(aircraft)
+
             msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS -> reportSettings(aircraft)
-            msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION -> sendStorageStatus(aircraft)
-            msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS -> sendCaptureStatus(aircraft)
+
+            msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION -> sendStorageStatus(
+                aircraft
+            )
+
+            msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS -> sendCaptureStatus(
+                aircraft
+            )
+
             else -> processed = false
         }
         return processed
@@ -108,17 +117,15 @@ class CameraController (
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
         aircraft.cameras.list.forEach {
             // Append boot time before send
-            client.sendMessage(msgSettings(it).apply {
-                time_boot_ms = aircraft.systemBootTime
-            })
+            client.sendMessage(
+                msgSettings(it).apply {
+                    time_boot_ms = aircraft.systemBootTime
+                }
+            )
         }
     }
 
-    private fun handleSetCameraMode(
-        commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
-    ) {
-
+    private fun handleSetCameraMode(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
         sendCommandAck(
             commandLongMsg.command,
             MAV_RESULT.MAV_RESULT_IN_PROGRESS,
@@ -134,10 +141,11 @@ class CameraController (
                 onResult = { error ->
                     sendCommandAck(
                         commandLongMsg.command,
-                        if (error == null)
+                        if (error == null) {
                             MAV_RESULT.MAV_RESULT_ACCEPTED
-                        else
-                            MAV_RESULT.MAV_RESULT_FAILED,
+                        } else {
+                            MAV_RESULT.MAV_RESULT_FAILED
+                        },
                         progress = 100
                     )
                 }
@@ -146,16 +154,20 @@ class CameraController (
     }
 
     private fun sendStorageStatus(aircraft: AircraftHandler) {
-        client.sendMessage(msgStorageInformation().apply {
-            time_boot_ms = aircraft.systemBootTime
-        })
+        client.sendMessage(
+            msgStorageInformation().apply {
+                time_boot_ms = aircraft.systemBootTime
+            }
+        )
     }
 
     private fun sendCaptureStatus(aircraft: AircraftHandler) {
         val cameraInfo: CameraMetadata = aircraft.cameras.list.first()
-        client.sendMessage(msgCaptureStatus(cameraInfo).apply {
-            time_boot_ms = aircraft.systemBootTime
-        })
+        client.sendMessage(
+            msgCaptureStatus(cameraInfo).apply {
+                time_boot_ms = aircraft.systemBootTime
+            }
+        )
     }
 
     private fun requestStartCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
@@ -210,20 +222,24 @@ class CameraController (
             }
         }
 
-
-    private suspend fun startPhotoCapture(intervalSeconds: Float, totalPhotos: Int, aircraft: AircraftHandler) {
+    private suspend fun startPhotoCapture(
+        intervalSeconds: Float,
+        totalPhotos: Int,
+        aircraft: AircraftHandler
+    ) {
         var takenPhotos = 0
         while (takenPhotos <= totalPhotos) {
             if (takenPhotos > 0) delay((intervalSeconds * 1000).roundToLong())
 
             val photoData = shootPhoto(aircraft)
-            if (photoData?.captureOk == true)
+            if (photoData?.captureOk == true) {
                 takenPhotos += 1
+            }
         }
     }
 
-    fun msgCameraInformation(cameraInfo: CameraMetadata): msg_camera_information {
-        return msg_camera_information().apply {
+    fun msgCameraInformation(cameraInfo: CameraMetadata): msg_camera_information =
+        msg_camera_information().apply {
             vendor_name = MessageUtils.toShortArray("DJI", 32)
             model_name = MessageUtils.toShortArray(cameraInfo.name, 32)
             firmware_version = MessageUtils.packVersion(
@@ -240,22 +256,19 @@ class CameraController (
             resolution_v = cameraInfo.height
             lens_id = 0
             flags = CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_IMAGE.toLong() or
-                    CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_VIDEO.toLong() or
-                    CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
+                CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_VIDEO.toLong() or
+                CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
             cam_definition_version = cameraInfo.fwVersion.toInt()
             // TODO: Camera definition file, visit https://mavlink.io/en/services/camera_def.html
             cam_definition_uri = "".toByteArray()
             camera_device_id = cameraInfo.id.toShort()
         }
-    }
 
-    fun msgSettings(cameraInfo: CameraMetadata): msg_camera_settings {
-        return msg_camera_settings().apply {
-            mode_id = cameraInfo.state.mavlinkMode.toShort()
-            zoomLevel = Float.NaN
-            focusLevel = Float.NaN
-            camera_device_id = cameraInfo.id.toShort()
-        }
+    fun msgSettings(cameraInfo: CameraMetadata): msg_camera_settings = msg_camera_settings().apply {
+        mode_id = cameraInfo.state.mavlinkMode.toShort()
+        zoomLevel = Float.NaN
+        focusLevel = Float.NaN
+        camera_device_id = cameraInfo.id.toShort()
     }
 
     fun msgStorageInformation(): msg_storage_information {
@@ -283,8 +296,7 @@ class CameraController (
         if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE) {
             imageStatus = cameraInfo.state.captureStatus
             imageInterval = cameraInfo.state.captureTime.toFloat()
-        }
-        else if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_VIDEO) {
+        } else if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_VIDEO) {
             videoStatus = cameraInfo.state.captureStatus
             videoTime = cameraInfo.state.captureTime
         }

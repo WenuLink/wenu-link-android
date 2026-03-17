@@ -62,8 +62,9 @@ class AircraftHandler {
     fun updateModeIfArmed(newMode: ArduCopterFlightMode? = null) {
         if (newMode != null) copterFlightMode = newMode
         baseMode = copterFlightMode.baseMode
-        if (state.isArmed())
+        if (state.isArmed()) {
             baseMode = baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
+        }
     }
 
     fun modeTransition(copterMode: Long, onResult: (String?) -> Unit) {
