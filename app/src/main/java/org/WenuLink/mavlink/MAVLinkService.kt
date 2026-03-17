@@ -16,9 +16,7 @@ import org.WenuLink.controllers.MAVLinkController
 
 data class Endpoint(val ip: String, val port: Int)
 
-class MAVLinkService (
-    aircraft: AircraftHandler
-) {
+class MAVLinkService(aircraft: AircraftHandler) {
     companion object {
         var isEnabled: Boolean = true
             private set
@@ -54,7 +52,7 @@ class MAVLinkService (
     fun isServiceStop(): Boolean = listeningJob == null && sendingJob == null
 
     fun createClient() {
-        if (clientExists()){
+        if (clientExists()) {
             logger.d { "MAVLinkClient already created for udp://$endpoint." }
             return
         }
@@ -103,7 +101,7 @@ class MAVLinkService (
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-                "(GCS?=${hasStationConnected}) " +
+                "(GCS?=$hasStationConnected) " +
                 "(listening?=${listeningJob?.isActive}) " +
                 "(sending=${sendingJob?.isActive})"
         }
@@ -118,7 +116,7 @@ class MAVLinkService (
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
-                "(GCS?=${hasStationConnected}) " +
+                "(GCS?=$hasStationConnected) " +
                 "(listening?=${listeningJob?.isActive}) " +
                 "(sending=${sendingJob?.isActive})"
         }
@@ -133,7 +131,7 @@ class MAVLinkService (
 
             logger.d {
                 "MAVLinkService (ready?=$isReady) " +
-                    "(GCS?=${hasStationConnected}) " +
+                    "(GCS?=$hasStationConnected) " +
                     "(listening?=${listeningJob?.isActive}) " +
                     "(sending=${sendingJob?.isActive})"
             }
@@ -173,5 +171,4 @@ class MAVLinkService (
         _isRunning.value = false
         isReady = false
     }
-
 }

@@ -110,12 +110,12 @@ data class MessageRate(
 )
 
 enum class SensorState {
-    BOOT,                // Boot states
+    BOOT, // Boot states
     CALIBRATION_NEEDED, // Calibration needed states
-    OK                   // Ok states
+    OK // Ok states
 }
 
 data class IMUState(
     val gyroscope: MutableList<SensorState> = mutableListOf(),
-    val accelerometer: MutableList<SensorState> = mutableListOf(),
+    val accelerometer: MutableList<SensorState> = mutableListOf()
 )

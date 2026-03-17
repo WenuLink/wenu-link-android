@@ -353,7 +353,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude + telemetryData.takeOffAltitude)
+        msg.alt =
+            MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude + telemetryData.takeOffAltitude)
         // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
         // but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)

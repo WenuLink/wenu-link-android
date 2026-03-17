@@ -153,11 +153,14 @@ class TelemetryHandler {
     }
 
     fun registerSensorState(listen: Boolean) {
-        FCManager.unregisterIMUState()  // always clear first
-        if (listen) FCManager.registerIMUState { imuState ->
-            updateIMUState(imuState)
+        FCManager.unregisterIMUState() // always clear first
+        if (listen) {
+            FCManager.registerIMUState { imuState ->
+                updateIMUState(imuState)
+            }
+        } else {
+            updateIMUState(null)
         }
-        else updateIMUState(null)
     }
 
     @Synchronized

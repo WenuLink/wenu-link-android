@@ -214,7 +214,7 @@ class WenuLinkService : Service() {
     fun isPowerOff(): Boolean = aircraft.isPowerOff
 
     fun runServices(
-        onMAVLinkResult: (String?) -> Unit,
+        onMAVLinkResult: (String?) -> Unit
 //        onWebRTCResult: (String?) -> Unit
     ) {
         // Start services
@@ -234,7 +234,7 @@ class WenuLinkService : Service() {
     }
 
     suspend fun watchRCInput(intervalTime: Long = 100L) {
-        while(!isPowerOff()) {
+        while (!isPowerOff()) {
             // Watch for joystick inputs
             aircraft.rcInput?.hasCenteredJoystick()?.let {
                 serviceScope.launch {

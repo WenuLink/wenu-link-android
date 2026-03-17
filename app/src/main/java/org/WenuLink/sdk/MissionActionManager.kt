@@ -84,7 +84,6 @@ object MissionActionManager {
     fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? {
         val goHome = GoHomeAction().apply {
             autoConfirmLandingEnabled = autoConfirm
-
         }
         return missionControl.scheduleElement(goHome)
     }

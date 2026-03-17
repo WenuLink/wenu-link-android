@@ -29,9 +29,10 @@ object AsyncUtils {
 
         if (timeout == -1L) {
             waitReady(intervalTime, isReady)
-        }
-        else while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
-            delay(intervalTime) // Wait for the next check
+        } else {
+            while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
+                delay(intervalTime) // Wait for the next check
+            }
         }
         return isReady()
     }
@@ -55,17 +56,12 @@ object MessageUtils {
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
 
-    fun packVersion(
-        major: Int,
-        minor: Int,
-        patch: Int,
-        type: Int
-    ): Long {
-        return ((major shl 24) or
-                (minor shl 16) or
-                (patch shl 8) or
-                (type and 0xFF)).toLong()
-    }
+    fun packVersion(major: Int, minor: Int, patch: Int, type: Int): Long = (
+        (major shl 24) or
+            (minor shl 16) or
+            (patch shl 8) or
+            (type and 0xFF)
+        ).toLong()
 
     fun msgCommandAck(
         messageID: Int,

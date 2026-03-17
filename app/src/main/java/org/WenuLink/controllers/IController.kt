@@ -21,9 +21,11 @@ interface IController {
         return false
     }
 
-    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean = false
+    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean = false
+    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
+        false
 
     fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
         false

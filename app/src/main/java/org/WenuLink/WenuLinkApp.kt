@@ -69,5 +69,4 @@ class WenuLinkApp : Application() {
             Intent(this, WenuLinkService::class.java)
         )
     }
-
 }

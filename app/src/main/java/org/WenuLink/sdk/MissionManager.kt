@@ -234,7 +234,6 @@ object MissionManager {
                 logger.d { "onExecutionFinish: $p0" }
                 onFinish(p0?.description)
             }
-
         }
 
         operator.addListener(listener!!)

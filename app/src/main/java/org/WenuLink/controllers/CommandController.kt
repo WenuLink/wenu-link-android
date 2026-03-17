@@ -31,7 +31,10 @@ class CommandController(override var client: MAVLinkClient) : IController {
         return true
     }
 
-    override fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+    override fun processCommandLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ): Boolean {
         if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
 
         when (commandLongMsg.command) {
@@ -118,10 +121,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
         }
     }
 
-    fun processArmDisarm(
-        commandMsg: msg_command_long,
-        aircraft: AircraftHandler
-    ) {
+    fun processArmDisarm(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         val action = when (commandMsg.param1) {
             1f -> true
             0f -> false

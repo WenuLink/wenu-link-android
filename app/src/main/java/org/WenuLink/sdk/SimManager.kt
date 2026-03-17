@@ -97,7 +97,7 @@ object SimManager {
         }
         logger.d { "Simulation start." }
         this.satelliteCount = satelliteCount
-        initStamp = System.currentTimeMillis() / 1000  // to seconds
+        initStamp = System.currentTimeMillis() / 1000 // to seconds
         takeOffAltitude = alt
 
         simInstance?.start(

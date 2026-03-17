@@ -2,6 +2,7 @@ package org.WenuLink.adapters
 
 import com.MAVLink.enums.MAV_MODE_FLAG
 import io.getstream.log.taggedLogger
+import kotlin.getValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +14,6 @@ import kotlinx.coroutines.launch
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
-import kotlin.getValue
 
 class AircraftHandler {
     companion object {
@@ -29,7 +29,6 @@ class AircraftHandler {
 
             return mInstance!!
         }
-
     }
 
     private val logger by taggedLogger(AircraftHandler::class.java.simpleName)
@@ -58,7 +57,6 @@ class AircraftHandler {
     private val _isFlying = MutableStateFlow(false)
     val isFlying: StateFlow<Boolean> = _isFlying.asStateFlow()
 
-
     fun baseModeFor(flightMode: ArduCopterFlightMode, armed: Boolean): Int {
         val base = toBaseMode(flightMode)
         val armedFlag = if (armed) MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED else 0
@@ -86,7 +84,7 @@ class AircraftHandler {
             return
         }
 
-        logger.d { "Mode transition: ${copterFlightMode}->${newMode}" }
+        logger.d { "Mode transition: $copterFlightMode->$newMode" }
         // TODO: check if transition conditions are met
 
         updateModeIfArmed(newMode)
@@ -115,7 +113,9 @@ class AircraftHandler {
             mission.resumeCommand()
         }
 
-        if (newMode == ArduCopterFlightMode.BRAKE && state.isTimelineCommand()) mission.pauseCommand()
+        if (newMode == ArduCopterFlightMode.BRAKE && state.isTimelineCommand()) {
+            mission.pauseCommand()
+        }
         // TODO: validate for successful transition, set previous mode if fail
     }
 
@@ -135,13 +135,14 @@ class AircraftHandler {
             stateTransition(AircraftState.Arm) // Ensure logic state transition
         }
         // Already flying?
-        if (FCManager.isFlying()){
+        if (FCManager.isFlying()) {
             takeOff() // StateFlow update
-            stateTransition(AircraftState.InAir)  // State transition
+            stateTransition(AircraftState.InAir) // State transition
+        } else {
+            stateTransition(AircraftState.OnGround)
         }
-        else stateTransition(AircraftState.OnGround)
 
-        manualControl()  // Initialize with Stabilize mode
+        manualControl() // Initialize with Stabilize mode
 
         return true
     }
@@ -153,7 +154,7 @@ class AircraftHandler {
 
     suspend fun checkSensors(): Boolean {
 //        stateTransition(AircraftState.Calibration)
-        logger.i {"Waiting sensors data"}
+        logger.i { "Waiting sensors data" }
         sensorsOk = AsyncUtils.waitTimeout(100L, 10000L, isReady = telemetry::isReadingSensors)
         if (!sensorsOk) {
             logger.e { "No sensor readings!" }
@@ -166,7 +167,11 @@ class AircraftHandler {
         sensorsOk = sensorsOk && compassOk
 
         // https://developer.dji.com/api-reference/android-api/Components/IMUState/DJIIMUState.html
-        val imuState: IMUState? = if (telemetry.isReadingSensors()) telemetry.getIMUState() else null
+        val imuState: IMUState? = if (telemetry.isReadingSensors()) {
+            telemetry.getIMUState()
+        } else {
+            null
+        }
 
         val accOk = imuState?.accelerometer?.all { it == SensorState.OK } ?: false
         if (!accOk) logger.e { "Accelerometer error!" }
@@ -277,8 +282,11 @@ class AircraftHandler {
 
         isFlying.distinctUntilChangedBy { it }
             .onEach {
-                if (it) fcTakeOff()
-                else landing()
+                if (it) {
+                    fcTakeOff()
+                } else {
+                    landing()
+                }
             }
             .launchIn(handlerScope)
     }
@@ -546,5 +554,4 @@ class AircraftHandler {
             controlTransition(ControlAuthority.NONE)
         }
     }
-
 }

@@ -52,9 +52,7 @@ import org.WenuLink.mavlink.MAVLinkClient
  * - ParameterController: Parameter Protocol
  * - NavigationController: Mission Protocol
  */
-class MAVLinkController(
-    private val aircraft: AircraftHandler,
-) {
+class MAVLinkController(private val aircraft: AircraftHandler) {
 
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private val controllers: MutableList<IController> = mutableListOf()
@@ -432,5 +430,4 @@ class MAVLinkController(
         )
         return true
     }
-
 }
