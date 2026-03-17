@@ -1,17 +1,18 @@
 package org.WenuLink.views
 
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.WenuLink.sdk.SDKManager
 
 class HomeViewModel : ViewModel() {
+    private val logger by taggedLogger(HomeViewModel::class.java.simpleName)
 
     private val _isPermissionsGranted = MutableLiveData<Boolean>()
     val isPermissionsGranted: LiveData<Boolean> = _isPermissionsGranted
@@ -22,7 +23,7 @@ class HomeViewModel : ViewModel() {
     private val _sdkStatus = MutableLiveData<String>()
     val sdkStatus: LiveData<String> = _sdkStatus
 
-    private val _isRegistered = MutableLiveData<Boolean>(SDKManager.isRegistered())
+    private val _isRegistered = MutableLiveData(SDKManager.isRegistered())
     val isRegistered: LiveData<Boolean> = _isRegistered
 
     private val _bindingState = MutableLiveData<String>()
@@ -43,14 +44,14 @@ class HomeViewModel : ViewModel() {
         // Register callbacks
         SDKManager.setActivationCallback { success, msg ->
             CoroutineScope(Dispatchers.IO).launch {
-                Log.d("ControlViewModel", "activationChanged $success, $msg")
+                logger.d { "activationChanged $success, $msg" }
                 _activationState.postValue(SDKManager.appActivationState)
             }
         }
 
         SDKManager.setBindingCallback { success, msg ->
             viewModelScope.launch {
-                Log.d("ControlViewModel", "bindingChanged $success, $msg")
+                logger.d { "bindingChanged $success, $msg" }
                 _bindingState.postValue(SDKManager.aircraftBindingState)
             }
         }

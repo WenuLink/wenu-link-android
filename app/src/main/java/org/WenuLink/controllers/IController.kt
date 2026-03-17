@@ -17,26 +17,21 @@ interface IController {
     val client: MAVLinkClient
 
     fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+        // TODO: centralize client sending answer messages
         return false
     }
 
-    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
-        return false
-    }
+    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean {
-        return false
-    }
+    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean {
-        return false
-    }
+    fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun processRequestLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
-        return false
-    }
+    fun processRequestLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? {
-        return null
-    }
+    fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? = null
 }

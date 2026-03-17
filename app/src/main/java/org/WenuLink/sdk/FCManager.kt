@@ -1,6 +1,5 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.TelemetryData
 import dji.common.error.DJIError
 import dji.common.flightcontroller.CompassCalibrationState
 import dji.common.flightcontroller.FlightControllerState
@@ -9,13 +8,14 @@ import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.SensorState as AppSensorState
-import org.WenuLink.adapters.IMUState as AppIMUState
 import kotlin.getValue
+import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.IMUState as AppIMUState
+import org.WenuLink.adapters.SensorState as AppSensorState
+import org.WenuLink.adapters.TelemetryData
 
 object FCManager {
-    private val logger by taggedLogger("FlightControllerManager")
+    private val logger by taggedLogger(FCManager::class.java.simpleName)
 
     var fcInstance: FlightController? = null
         private set
@@ -36,28 +36,31 @@ object FCManager {
     fun init(flightController: FlightController) {
         fcInstance = flightController
 
-        flightController.getSerialNumber(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(sn: String) {
-                updateSerialNumber(sn)
-                logger.i { "${this@FCManager}: $sn" }
-            }
+        flightController.getSerialNumber(
+            object : CommonCallbacks.CompletionCallbackWith<String> {
+                override fun onSuccess(sn: String) {
+                    updateSerialNumber(sn)
+                    logger.i { "${this@FCManager}: $sn" }
+                }
 
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Serial Number obtained: $error" }
+                override fun onFailure(error: DJIError) {
+                    logger.e { "No Serial Number obtained: $error" }
+                }
             }
+        )
 
-        })
-        flightController.getFirmwareVersion(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(firmware: String) {
-                updateFirmwareVersion(firmware)
-                logger.i { this@FCManager.toString() }
+        flightController.getFirmwareVersion(
+            object : CommonCallbacks.CompletionCallbackWith<String> {
+                override fun onSuccess(firmware: String) {
+                    updateFirmwareVersion(firmware)
+                    logger.i { this@FCManager.toString() }
+                }
+
+                override fun onFailure(error: DJIError) {
+                    logger.e { "No Firmware version obtained: $error" }
+                }
             }
-
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Firmware version obtained: $error" }
-            }
-
-        })
+        )
 
         logger.i { "FlightController init" }
 
@@ -65,43 +68,38 @@ object FCManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean {
-        return fcInstance != null
+    fun isConnected(): Boolean = fcInstance != null
+
+    override fun toString(): String = if (!isConnected()) {
+        if (serialNumber != null && fwVersion != null) {
+            "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
+        } else {
+            "Reading FlightController"
+        }
+    } else {
+        "No FlightController"
     }
 
-    override fun toString(): String {
-        return if (!isConnected()) {
-            val sn = "SN: " + if (serialNumber != null) serialNumber else "N/A"
-            val fw = "FW: " + if (fwVersion != null) fwVersion else "N/A"
-            if (serialNumber != null && fwVersion != null) {
-                "FlightController $sn - $fw"
-            } else
-                "Reading FlightController"
-        } else "No FlightController"
-    }
-
-    fun state2telemetry(state: FlightControllerState): TelemetryData {
-        return TelemetryData(
-            roll = state.attitude.roll,
-            pitch = state.attitude.pitch,
-            yaw = state.attitude.yaw,
-            latitude = state.aircraftLocation.latitude,
-            longitude = state.aircraftLocation.longitude,
-            positionX = 0F,
-            positionY = 0F,
-            positionZ = 0F,
-            velocityX = state.velocityX,
-            velocityY = state.velocityY,
-            velocityZ = state.velocityZ,
-            flightTime = state.flightTimeInSeconds,
-            takeOffAltitude = state.takeoffLocationAltitude,
-            relativeAltitude = state.aircraftLocation.altitude,
-            isFlying = state.isFlying,
-            motorsOn = state.areMotorsOn(),
-            satelliteCount = state.satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
-        )
-    }
+    fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+        roll = state.attitude.roll,
+        pitch = state.attitude.pitch,
+        yaw = state.attitude.yaw,
+        latitude = state.aircraftLocation.latitude,
+        longitude = state.aircraftLocation.longitude,
+        positionX = 0f,
+        positionY = 0f,
+        positionZ = 0f,
+        velocityX = state.velocityX,
+        velocityY = state.velocityY,
+        velocityZ = state.velocityZ,
+        flightTime = state.flightTimeInSeconds,
+        takeOffAltitude = state.takeoffLocationAltitude,
+        relativeAltitude = state.aircraftLocation.altitude,
+        isFlying = state.isFlying,
+        motorsOn = state.areMotorsOn(),
+        satelliteCount = state.satelliteCount,
+        gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+    )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
         fcInstance?.setStateCallback(stateCallback)
@@ -142,11 +140,9 @@ object FCManager {
         }
     }
 
-    fun isFlying(): Boolean {
-        return fcInstance?.state?.isFlying ?: false
-    }
+    fun isFlying(): Boolean = fcInstance?.state?.isFlying == true
 
-    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded ?: false
+    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
 
     fun startTakeoff() {
         fcInstance?.startTakeoff { }
@@ -157,9 +153,7 @@ object FCManager {
         fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
     }
 
-    fun areMotorsArmed(): Boolean {
-        return fcInstance?.state?.areMotorsOn() ?: false
-    }
+    fun areMotorsArmed(): Boolean = fcInstance?.state?.areMotorsOn() == true
 
     fun armMotors() {
         logger.d { "Arming motors" }
@@ -168,66 +162,70 @@ object FCManager {
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
-        fcInstance?.turnOffMotors { } // same than armMotors, async wait required
+        // apparently ignores the callback and must wait for change to happen
+        fcInstance?.turnOffMotors { }
     }
 
-    fun sensorState(sensorState: SensorState?): AppSensorState {
-        return when (sensorState) {
-            SensorState.DISCONNECTED,
-            SensorState.CALIBRATING,
-            SensorState.CALIBRATION_FAILED,
-            SensorState.WARMING_UP
-                -> AppSensorState.BOOT
+    fun sensorState(sensorState: SensorState?): AppSensorState = when (sensorState) {
+        SensorState.DISCONNECTED,
+        SensorState.CALIBRATING,
+        SensorState.CALIBRATION_FAILED,
+        SensorState.WARMING_UP
+        -> AppSensorState.BOOT
 
-            SensorState.DATA_EXCEPTION,
-            SensorState.IN_MOTION,
-            SensorState.LARGE_BIAS
-                -> AppSensorState.CALIBRATION_NEEDED
+        SensorState.DATA_EXCEPTION,
+        SensorState.IN_MOTION,
+        SensorState.LARGE_BIAS
+        -> AppSensorState.CALIBRATION_NEEDED
 
-            SensorState.NORMAL_BIAS,
-            SensorState.MEDIUM_BIAS,
-            SensorState.UNKNOWN
-                -> AppSensorState.OK
+        SensorState.NORMAL_BIAS,
+        SensorState.MEDIUM_BIAS,
+        SensorState.UNKNOWN
+        -> AppSensorState.OK
 
-            null -> AppSensorState.BOOT
-        }
+        null -> AppSensorState.BOOT
     }
-
 
     fun registerIMUState(onSensor: (AppIMUState) -> Unit) {
         val nSensors = fcInstance?.imuCount ?: 0
         logger.d { "Listening sensor: $nSensors IMU(s)" }
         val state = AppIMUState()
-        if (nSensors > 0) fcInstance?.setIMUStateCallback { p0 ->
-            // The callback is executed one time per sensor, with -1 indicating the list's end
-            if (p0.index != -1) {
-                // assumes same number gyros and accel
-                if (state.gyroscope.getOrNull(p0.index) == null)
-                    state.gyroscope.add(sensorState(p0.gyroscopeState))
-                else
-                    state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
+        if (nSensors > 0) {
+            fcInstance?.setIMUStateCallback { p0 ->
+                // The callback is executed one time per sensor, with -1 indicating the list's end
+                if (p0.index != -1) {
+                    // assumes same number gyros and accel
+                    if (state.gyroscope.getOrNull(p0.index) == null) {
+                        state.gyroscope.add(sensorState(p0.gyroscopeState))
+                    } else {
+                        state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
+                    }
 
-                if (state.accelerometer.getOrNull(p0.index) == null)
-                    state.accelerometer.add(sensorState(p0.accelerometerState))
-                else
-                    state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
-            } else {
-                // Publish a copy after receiving the entire list
-                onSensor(
-                    AppIMUState().copy(
-                        gyroscope = state.gyroscope,
-                        accelerometer = state.accelerometer
+                    if (state.accelerometer.getOrNull(p0.index) == null) {
+                        state.accelerometer.add(sensorState(p0.accelerometerState))
+                    } else {
+                        state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
+                    }
+                } else {
+                    // Publish a copy after receiving the entire list
+                    onSensor(
+                        AppIMUState().copy(
+                            gyroscope = state.gyroscope,
+                            accelerometer = state.accelerometer
+                        )
                     )
-                )
+                }
             }
+        } else {
+            logger.i { "No IMU sensor found!" }
         }
-        else logger.i { "No IMU sensor found!" }
     }
 
     fun unregisterIMUState() {
         logger.d { "Stop listening sensor: ${fcInstance?.imuCount} IMU(s)" }
-        if ((fcInstance?.imuCount ?: 0) > 0)
+        if ((fcInstance?.imuCount ?: 0) > 0) {
             fcInstance?.setIMUStateCallback(null)
+        }
     }
 
     fun compassOk(): Boolean {
@@ -238,9 +236,10 @@ object FCManager {
             val hasError = fcInstance?.compass?.hasError() ?: true
             val calState = fcInstance?.compass?.calibrationState
             compassOk = !hasError && calState == CompassCalibrationState.NOT_CALIBRATING
-        } else logger.i { "No Compass sensor found!" }
+        } else {
+            logger.i { "No Compass sensor found!" }
+        }
 
         return compassOk
     }
-
 }

@@ -3,7 +3,10 @@ package org.WenuLink.parameters
 import kotlinx.coroutines.delay
 
 enum class SemanticType {
-    BOOL, INT, FLOAT, ENUM
+    BOOL,
+    INT,
+    FLOAT,
+    ENUM
 }
 
 sealed interface ParamValue {
@@ -17,7 +20,7 @@ sealed class ParameterSpec(
     val name: String,
     val type: Int,
     val semantic: SemanticType,
-    var index: Int = -1,
+    var index: Int = -1
 ) {
 
     init {
@@ -27,34 +30,26 @@ sealed class ParameterSpec(
     abstract fun read(onResult: (ParamValue?) -> Unit)
     abstract fun write(value: ParamValue, onResult: (String?) -> Unit)
 
-    fun toMavlink(value: ParamValue): Int =
-        when (value) {
-            is ParamValue.BoolVal  -> if (value.v) 1 else 0
-            is ParamValue.IntVal   -> value.v
-            is ParamValue.EnumVal  -> value.v
-            is ParamValue.FloatVal -> value.v.toInt()
-        }
+    fun toMavlink(value: ParamValue): Int = when (value) {
+        is ParamValue.BoolVal -> if (value.v) 1 else 0
+        is ParamValue.IntVal -> value.v
+        is ParamValue.EnumVal -> value.v
+        is ParamValue.FloatVal -> value.v.toInt()
+    }
 
-    fun fromMavlink(value: Int): ParamValue =
-        when (semantic) {
-            SemanticType.BOOL  -> ParamValue.BoolVal(value != 0)
-            SemanticType.INT   -> ParamValue.IntVal(value)
-            SemanticType.FLOAT -> ParamValue.FloatVal(value.toFloat())
-            SemanticType.ENUM  -> ParamValue.EnumVal(value)
-        }
+    fun fromMavlink(value: Int): ParamValue = when (semantic) {
+        SemanticType.BOOL -> ParamValue.BoolVal(value != 0)
+        SemanticType.INT -> ParamValue.IntVal(value)
+        SemanticType.FLOAT -> ParamValue.FloatVal(value.toFloat())
+        SemanticType.ENUM -> ParamValue.EnumVal(value)
+    }
 
     override fun toString(): String = name
-
 }
 
-
-data class WenuLinkParameter(
-    val spec: ParameterSpec,
-    var value: ParamValue
-) {
+data class WenuLinkParameter(val spec: ParameterSpec, var value: ParamValue) {
     override fun toString(): String = "Parameter(${spec.name}=$value)"
 }
-
 
 open class SimpleParameter(
     name: String,
@@ -71,17 +66,13 @@ open class SimpleParameter(
     override fun write(value: ParamValue, onResult: (String?) -> Unit) {
         writer(value, onResult)
     }
-
 }
 
 interface ParameterProvider {
     fun provide(): List<ParameterSpec>
 }
 
-class ParameterRegistry(
-    private val providers: List<ParameterProvider>
-) {
-
+class ParameterRegistry(private val providers: List<ParameterProvider>) {
     private lateinit var params: List<WenuLinkParameter>
     private lateinit var byIndex: Map<Int, WenuLinkParameter>
     private lateinit var byName: Map<String, WenuLinkParameter>
@@ -117,7 +108,7 @@ class ParameterRegistry(
         require(params.isNotEmpty()) { "ParameterRegistry cannot be empty" }
 
         byIndex = params.associateBy { it.spec.index }
-        byName  = params.associateBy { it.spec.name.uppercase() }
+        byName = params.associateBy { it.spec.name.uppercase() }
 
         require(byIndex.size == params.size) {
             "Duplicate parameter index detected"
@@ -127,16 +118,11 @@ class ParameterRegistry(
         }
     }
 
-    fun getByIndex(index: Int): WenuLinkParameter? =
-        byIndex[index]
+    fun getByIndex(index: Int): WenuLinkParameter? = byIndex[index]
 
-    fun getByName(name: String): WenuLinkParameter? =
-        byName[name.uppercase()]
+    fun getByName(name: String): WenuLinkParameter? = byName[name.uppercase()]
 
-    fun all(): Collection<WenuLinkParameter> =
-        params
+    fun all(): Collection<WenuLinkParameter> = params
 
-    fun size(): Int {
-        return params.size
-    }
+    fun size(): Int = params.size
 }

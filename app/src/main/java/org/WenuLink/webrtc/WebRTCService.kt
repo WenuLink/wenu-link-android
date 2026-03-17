@@ -1,12 +1,8 @@
 package org.WenuLink.webrtc
 
 import android.content.Context
-import org.WenuLink.adapters.CameraCapturer
-import org.WenuLink.webrtc.peer.StreamPeerConnection
-import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
-import org.WenuLink.webrtc.peer.StreamPeerType
-import org.WenuLink.webrtc.utils.stringify
 import io.getstream.log.taggedLogger
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +14,11 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.CameraCapturer
+import org.WenuLink.webrtc.peer.StreamPeerConnection
+import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
+import org.WenuLink.webrtc.peer.StreamPeerType
+import org.WenuLink.webrtc.utils.stringify
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.SessionDescription
@@ -25,7 +26,6 @@ import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
-import java.util.UUID
 
 class WebRTCService {
     companion object {
@@ -34,15 +34,16 @@ class WebRTCService {
             private set
 
         fun getInstance(): WebRTCService {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = WebRTCService()
+            }
             return mInstance!!
         }
     }
 
     // logger an coroutine scope
-    private val logger by taggedLogger("WebRTCService")
-    private lateinit var serviceScope: CoroutineScope  //(SupervisorJob() + Dispatchers.Main)
+    private val logger by taggedLogger(WebRTCService::class.java.simpleName)
+    private lateinit var serviceScope: CoroutineScope // (SupervisorJob() + Dispatchers.Main)
     private var runningJob: Job? = null
 
     // element required for WebRTC logics
@@ -51,6 +52,7 @@ class WebRTCService {
     private lateinit var webRTCClient: WebRTCClient
     private lateinit var peerConnectionFactory: StreamPeerConnectionFactory
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
+
     // Signaling configuration
     private var signalingServer = "ws://192.168.1.220:8090"
     var isServiceUp: Boolean = false
@@ -121,16 +123,20 @@ class WebRTCService {
 
         isRunning.distinctUntilChangedBy { it }
             .onEach {
-                if (it) run(context)
-                else disconnect()
+                if (it) {
+                    run(context)
+                } else {
+                    disconnect()
+                }
                 logger.d { "isRunning: $it" }
             }
             .launchIn(this.serviceScope)
     }
 
     fun run(context: Context) {
-        if (isServiceUp)
+        if (isServiceUp) {
             return
+        }
         runningJob = serviceScope.launch {
             webRTCClient.signalingCommandFlow.collect { commandToValue ->
                 logger.d { "signalingCommandFlow ${commandToValue.first}" }
@@ -141,13 +147,14 @@ class WebRTCService {
                     }
 
                     WebRTCClient.CommandType.ANSWER -> handleAnswer(commandToValue.second)
+
                     WebRTCClient.CommandType.ICE -> handleIce(commandToValue.second)
+
                     else -> Unit
                 }
             }
         }
     }
-
 
     fun createVideoTrack(context: Context) {
         logger.d { "mediaOptions: $mediaOptions" }
@@ -175,8 +182,9 @@ class WebRTCService {
             // sending local video track to show local video from start
             _localVideoTrackFlow.emit(localVideoTrack)
 
-            if (offer != null)
+            if (offer != null) {
                 sendAnswer()
+            }
         }
     }
 
@@ -194,10 +202,10 @@ class WebRTCService {
         }
     }
 
-
     fun disconnect() {
-        if (!isServiceUp)
+        if (!isServiceUp) {
             return
+        }
 
         try {
             runningJob?.cancel()

@@ -12,13 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.TelemetryData
 import org.WenuLink.adapters.AsyncUtils
-import kotlin.getValue
-
+import org.WenuLink.adapters.TelemetryData
 
 class ServicesViewModel(application: Application) : AndroidViewModel(application) {
-    private val logger by taggedLogger("ServicesViewModel")
+    private val logger by taggedLogger(ServicesViewModel::class.java.simpleName)
 
     private var thisApp = (getApplication() as WenuLinkApp)
 
@@ -46,8 +44,11 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     init {
         viewModelScope.launch {
             // Wait for flag change
-            // TODO: move to a reactive value set
-            _isSimReady.value = AsyncUtils.waitTimeout(1000, 60000, ::isSimulationReady)
+            _isSimReady.value = AsyncUtils.waitTimeout(
+                1000,
+                60000,
+                ::isSimulationReady
+            )
         }
     }
 
@@ -59,7 +60,11 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         thisApp.launchWenulinkService()
         // Async wait and update for state change
         viewModelScope.launch {
-            _isServiceRunning.value = AsyncUtils.waitTimeout(1000, 60000L, ::isServiceReady)
+            _isServiceRunning.value = AsyncUtils.waitTimeout(
+                1000,
+                60000,
+                ::isServiceReady
+            )
             thisApp.wenuLinkService?.runServices { error ->
                 logger.d { "runServices error: $error" }
             }
@@ -89,10 +94,13 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update GCS server address from user input
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
-            if (run) thisApp.wenuLinkService?.startMAVLinkService { error ->
-                logger.d { "startMAVLinkService error: $error" }
+            if (run) {
+                thisApp.wenuLinkService?.startMAVLinkService { error ->
+                    logger.d { "startMAVLinkService error: $error" }
+                }
+            } else {
+                thisApp.wenuLinkService?.stopMAVLinkService()?.join()
             }
-            else thisApp.wenuLinkService?.stopMAVLinkService()?.join()
         }
     }
 
@@ -100,15 +108,21 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // TODO: Update signaling server address from user input
         // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
         viewModelScope.launch {
-            if (run) thisApp.wenuLinkService?.startWebRTCService()
-            else thisApp.wenuLinkService?.stopWebRTCService()
+            if (run) {
+                thisApp.wenuLinkService?.startWebRTCService()
+            } else {
+                thisApp.wenuLinkService?.stopWebRTCService()
+            }
         }
     }
 
     fun runService(run: Boolean, simEnabled: Boolean = false) {
         logger.d { "runService($run)" }
         if (simEnabled) aircraft.telemetry.enableSimulation(true)
-        if (run) startService()
-        else stopService()
+        if (run) {
+            startService()
+        } else {
+            stopService()
+        }
     }
 }

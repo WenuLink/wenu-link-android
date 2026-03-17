@@ -10,7 +10,7 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.TelemetryData
 
 object SimManager {
-    private val logger by taggedLogger("SimulationManager")
+    private val logger by taggedLogger(SimManager::class.java.simpleName)
 
     private var hasCallback: Boolean = false
     var simInstance: Simulator? = null
@@ -29,7 +29,7 @@ object SimManager {
 
     fun isAvailable(): Boolean = simInstance != null
 
-    fun isActive(): Boolean = simInstance?.isSimulatorActive ?: false
+    fun isActive(): Boolean = simInstance?.isSimulatorActive == true
 
     fun registerStateCallback(stateCallback: (SimulatorState) -> Unit) {
         if (hasCallback) unregisterStateCallback()
@@ -95,9 +95,9 @@ object SimManager {
             onResult(null)
             return
         }
-        logger.d { "Simulation run." }
+        logger.d { "Simulation start." }
         this.satelliteCount = satelliteCount
-        initStamp = System.currentTimeMillis() / 1000  // to seconds
+        initStamp = System.currentTimeMillis() / 1000 // to seconds
         takeOffAltitude = alt
 
         simInstance?.start(
@@ -118,5 +118,4 @@ object SimManager {
         logger.d { "Simulation stop." }
         simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
     }
-
 }

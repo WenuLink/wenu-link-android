@@ -4,9 +4,9 @@ import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_ack
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_RESULT
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlin.math.cos
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 object AsyncUtils {
@@ -29,23 +29,22 @@ object AsyncUtils {
     ): Boolean {
         val startTime = System.currentTimeMillis()
 
-        if (timeout == -1L) waitReady(intervalTime, isReady)
-        else while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
-            delay(intervalTime) // Wait for the next check
+        if (timeout == -1L) {
+            waitReady(intervalTime, isReady)
+        } else {
+            while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
+                delay(intervalTime) // Wait for the next check
+            }
         }
         return isReady()
     }
 
-    suspend fun waitReady(
-        intervalTime: Long = 10,
-        isReady: () -> Boolean
-    ) {
+    suspend fun waitReady(intervalTime: Long = 10, isReady: () -> Boolean) {
         while (!isReady()) {
             delay(intervalTime) // Wait for the next check
         }
     }
 }
-
 
 object MessageUtils {
     fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
@@ -54,24 +53,23 @@ object MessageUtils {
     fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
 
     // deg E7 to float
-    fun coordinateMAVLink2DJI(value: Int): Double  = value.toDouble() / 10_000_000.0
+    fun coordinateMAVLink2DJI(value: Int): Double = value.toDouble() / 10_000_000.0
 
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
 
-    fun packVersion(
-        major: Int,
-        minor: Int,
-        patch: Int,
-        type: Int
-    ): Long {
-        return ((major shl 24) or
-                (minor shl 16) or
-                (patch shl 8) or
-                (type and 0xFF)).toLong()
-    }
+    fun packVersion(major: Int, minor: Int, patch: Int, type: Int): Long = (
+        (major shl 24) or
+            (minor shl 16) or
+            (patch shl 8) or
+            (type and 0xFF)
+        ).toLong()
 
-    fun msgCommandAck(messageID: Int, result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED, progress: Int = -1): MAVLinkMessage {
+    fun msgCommandAck(
+        messageID: Int,
+        result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
+        progress: Int = -1
+    ): MAVLinkMessage {
         val msg = msg_command_ack()
         msg.command = messageID
         if (progress > -1) {
@@ -83,9 +81,10 @@ object MessageUtils {
         return msg
     }
 
-    fun msgRequestAck(result: Int = MAV_RESULT.MAV_RESULT_DENIED, progress: Int = -1): MAVLinkMessage {
-        return msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
-    }
+    fun msgRequestAck(
+        result: Int = MAV_RESULT.MAV_RESULT_DENIED,
+        progress: Int = -1
+    ): MAVLinkMessage = msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
 
     fun toShortArray(input: String, bytesSize: Int = 32): ShortArray {
         return ShortArray(bytesSize).also { shortArray ->
@@ -94,7 +93,6 @@ object MessageUtils {
             }
         }
     }
-
 
 }
 

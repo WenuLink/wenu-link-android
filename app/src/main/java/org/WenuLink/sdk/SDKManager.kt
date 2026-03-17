@@ -19,13 +19,9 @@ object SDKManager {
         isContextAttached = true
     }
 
-    fun getIntentAction(): String? {
-        return SDKUtils.getUsbAction()
-    }
+    fun getIntentAction(): String = SDKUtils.getUsbAction()
 
-    fun isRegistered(): Boolean {
-        return RegistrationHandler.isRegistered()
-    }
+    fun isRegistered(): Boolean = RegistrationHandler.isRegistered()
 
     fun setActivationCallback(callback: (Boolean, String?) -> Unit) {
         RegistrationHandler.setActivationCallback(callback)
@@ -35,7 +31,7 @@ object SDKManager {
         RegistrationHandler.setBindingCallback(callback)
     }
 
-    fun setProductChangeCallback(callback: (Boolean) -> Unit){
+    fun setProductChangeCallback(callback: (Boolean) -> Unit) {
         RegistrationHandler.setProductChangeCallback(callback)
     }
 
@@ -44,13 +40,11 @@ object SDKManager {
         RegistrationHandler.initialize(context)
     }
 
-    fun destroy(context: Context){
+    fun destroy(context: Context) {
         // TODO: unload everything
         RegistrationHandler.destroy()
     }
 
-    fun getAircraftModel(): String {
-        return SDKUtils.getAircraftInstance()?.model?.displayName ?: "No Aircraft Detected"
-    }
-
+    fun getAircraftModel(): String =
+        SDKUtils.getAircraftInstance()?.model?.displayName ?: "No Aircraft Detected"
 }

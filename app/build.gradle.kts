@@ -1,7 +1,31 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
+}
+
+val localProps =
+    Properties().apply {
+        val f = rootProject.file("local.properties")
+        if (f.exists()) load(f.inputStream())
+    }
+
+ktlint {
+    version.set(libs.versions.ktlintEngine)
+    android.set(true)
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
+
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+    }
+
+    filter {
+        exclude("**/com/MAVLink/**")
+    }
 }
 
 android {
@@ -15,6 +39,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        manifestPlaceholders["djiApiKey"] = localProps.getProperty("dji.api.key", "")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = true
@@ -65,13 +91,18 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
+
     buildFeatures {
         compose = true
     }
@@ -100,17 +131,15 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.multidex)
     implementation(libs.dji.sdk) {
-        /**
-         * Uncomment the "library-anti-distortion" if your app does not need Anti Distortion for Mavic 2 Pro and Mavic 2 Zoom.
-         * Uncomment the "fly-safe-database" if you need database for release, or we will download it when DJISDKManager.getInstance().registerApp
-         * is called.
-         * Both will greatly reduce the size of the APK.
-         */
+        // Uncomment the "library-anti-distortion" if your app does not need Anti Distortion for Mavic 2 Pro and Mavic 2 Zoom.
+        // Uncomment the "fly-safe-database" if you need database for release, or we will download it when DJISDKManager.getInstance().registerApp
+        // is called.
+        // Both will greatly reduce the size of the APK.
         exclude(module = "library-anti-distortion")
         exclude(module = "fly-safe-database")
     }
     compileOnly(libs.dji.sdk.provided)
-    //implementation("com.dji:dji-uxsdk:4.18")
+    // implementation("com.dji:dji-uxsdk:4.18")
     // WebRTC and WebSocket
     implementation(libs.stream.webrtc.android)
     implementation(libs.okhttp)

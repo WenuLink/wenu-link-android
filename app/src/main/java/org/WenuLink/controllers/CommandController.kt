@@ -8,10 +8,10 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
+import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.mavlink.MAVLinkClient
-import kotlin.getValue
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
@@ -20,47 +20,56 @@ import kotlin.getValue
  *
  * https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#incoming-commands
  */
-class CommandController (
-    override var client: MAVLinkClient
-): IController {
-    private val logger by taggedLogger("CommandController")
+class CommandController(override var client: MAVLinkClient) : IController {
+    private val logger by taggedLogger(CommandController::class.java.simpleName)
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
-        var processed = true
         when (msg.msgid) {
             msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotAck()
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
-    override fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+    override fun processCommandLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ): Boolean {
         if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
 
-        var processed = true
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_DO_SET_MODE -> setMode(commandLongMsg, aircraft)
-            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM -> processArmDisarm(commandLongMsg, aircraft)
-            MAV_CMD.MAV_CMD_NAV_TAKEOFF -> processTakeoff(commandLongMsg, aircraft)
-            MAV_CMD.MAV_CMD_NAV_LAND -> processLanding(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_DO_SET_MODE ->
+                setMode(commandLongMsg, aircraft)
+
+            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM ->
+                processArmDisarm(commandLongMsg, aircraft)
+
+            MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
+                processTakeoff(commandLongMsg, aircraft)
+
+            MAV_CMD.MAV_CMD_NAV_LAND ->
+                processLanding(commandLongMsg, aircraft)
+
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#requestable-messages
-    override fun processRequestLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean {
+    override fun processRequestLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ): Boolean {
         if (commandLongMsg.command != MAV_CMD.MAV_CMD_REQUEST_MESSAGE) return false
 
         val requestID = commandLongMsg.param1.toInt()
-        var processed = true
         when (requestID) {
             msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotVersion()
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     fun sendCommandAck(
@@ -71,23 +80,23 @@ class CommandController (
         client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
     }
 
-    fun sendAutopilotAck() {
-        sendCommandAck(
-            MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
-            MAV_RESULT.MAV_RESULT_ACCEPTED
-        )
-    }
+    fun sendAutopilotAck() = sendCommandAck(
+        MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+        MAV_RESULT.MAV_RESULT_ACCEPTED
+    )
 
     fun sendAutopilotVersion() {
         val msg = msg_autopilot_version()
-        msg.capabilities =
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT.toLong() or
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT.toLong() or
-//                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET.toLong() or
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED.toLong() or
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT.toLong() or
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION.toLong() or
-                    MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2.toLong()
+        msg.capabilities = listOf(
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION,
+            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
+        ).fold(0L) { acc, value -> acc or value.toLong() }
+
         msg.flight_sw_version = MessageUtils.packVersion(
             4,
             18,
@@ -95,8 +104,8 @@ class CommandController (
             FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
         ) // Match SDK version
         // TODO: Identify SDK and Aircraft too
-        msg.os_sw_version = 0  // Possibly Android version
-        msg.middleware_sw_version = 0  // Possibly WenuLink version
+        msg.os_sw_version = 0 // Possibly Android version
+        msg.middleware_sw_version = 0 // Possibly WenuLink version
         client.sendMessage(msg)
     }
 
@@ -104,26 +113,32 @@ class CommandController (
         val requestedMode = commandMsg.param2.toLong()
         logger.d { "FlightMode requested: $requestedMode" }
         aircraft.modeTransition(requestedMode) { error ->
-            if (error == null)
+            if (error == null) {
                 sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-            else
+            } else {
                 sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            }
         }
     }
 
     fun processArmDisarm(commandMsg: msg_command_long, aircraft: AircraftHandler) {
-        val mustArm = commandMsg.param1 == 1F
-        val mustDisarm = commandMsg.param1 == 0F
-        var resultStr = "NO_ACTION"
-        if (mustArm) resultStr = "arm"
-        if (mustDisarm) resultStr = "disarm"
-        logger.d { "Requesting to $resultStr motors" }
+        val action = when (commandMsg.param1) {
+            1f -> true
+            0f -> false
+            else -> null
+        }
 
-        if (mustArm || mustDisarm) {
-            if (mustArm) aircraft.armMotors(true)
-            if (mustDisarm) aircraft.armMotors(false)
-            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-        } else sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        if (action == null) {
+            logger.d { "Invalid arm/disarm request: ${commandMsg.param1}" }
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            return
+        }
+
+        logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
+
+        aircraft.armMotors(action)
+
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
 
     fun processTakeoff(commandMsg: msg_command_long, aircraft: AircraftHandler) {
@@ -137,5 +152,4 @@ class CommandController (
         aircraft.land()
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
-
 }
