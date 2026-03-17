@@ -1,34 +1,29 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.BatteryData
-import org.WenuLink.adapters.RCData
 import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
 import io.getstream.log.taggedLogger
-import kotlin.getValue
 import kotlin.math.round
+import org.WenuLink.adapters.BatteryData
+import org.WenuLink.adapters.RCData
 
 object RCManager {
-    private val logger by taggedLogger("RCManager")
+    private val logger by taggedLogger(RCManager::class.java.simpleName)
     private var lastData: RCData? = null
     private val lastBatteryData: BatteryData = BatteryData()
     private var rcInstance: RemoteController? = null
 
     @Synchronized
-    fun init(remoteController: RemoteController)  {
+    fun init(remoteController: RemoteController) {
         rcInstance = remoteController
         logger.i { "Remote Controller connected" }
     }
 
     @Synchronized
-    fun isUpdated(): Boolean {
-        return lastData != null && lastBatteryData.percentCharge > -1
-    }
+    fun isUpdated(): Boolean = lastData != null && lastBatteryData.percentCharge > -1
 
     @Synchronized
-    fun isRCConnected(): Boolean {
-        return rcInstance != null
-    }
+    fun isRCConnected(): Boolean = rcInstance != null
 
     fun startListeners() {
         startHardwareListener()
@@ -41,14 +36,10 @@ object RCManager {
     }
 
     @Synchronized
-    fun getBatteryData(): BatteryData {
-        return lastBatteryData
-    }
+    fun getBatteryData(): BatteryData = lastBatteryData
 
     @Synchronized
-    fun getHardwareData(): RCData? {
-        return lastData
-    }
+    fun getHardwareData(): RCData? = lastData
 
     @Synchronized
     private fun updateData(data: RCData?) {
@@ -76,9 +67,9 @@ object RCManager {
                     leftStickHorizontal = hardwareState.leftStick!!.horizontalPosition,
                     rightStickVertical = hardwareState.rightStick!!.verticalPosition,
                     rightStickHorizontal = hardwareState.rightStick!!.horizontalPosition,
-                    buttonC1 = hardwareState.c1Button?.isClicked ?: false,
-                    buttonC2 = hardwareState.c2Button?.isClicked ?: false,
-                    buttonC3 = hardwareState.c3Button?.isClicked ?: false,
+                    buttonC1 = hardwareState.c1Button?.isClicked == true,
+                    buttonC2 = hardwareState.c2Button?.isClicked == true,
+                    buttonC3 = hardwareState.c3Button?.isClicked == true,
                     mode = hardwareState.flightModeSwitch
                 )
             )

@@ -4,8 +4,8 @@ import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_ack
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_RESULT
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 object AsyncUtils {
     suspend fun waitReadiness(
@@ -27,23 +27,21 @@ object AsyncUtils {
     ): Boolean {
         val startTime = System.currentTimeMillis()
 
-        if (timeout == -1L) waitReady(intervalTime, isReady)
+        if (timeout == -1L) {
+            waitReady(intervalTime, isReady)
+        }
         else while (!isReady() && System.currentTimeMillis() - startTime < timeout) {
             delay(intervalTime) // Wait for the next check
         }
         return isReady()
     }
 
-    suspend fun waitReady(
-        intervalTime: Long = 10,
-        isReady: () -> Boolean
-    ) {
+    suspend fun waitReady(intervalTime: Long = 10, isReady: () -> Boolean) {
         while (!isReady()) {
             delay(intervalTime) // Wait for the next check
         }
     }
 }
-
 
 object MessageUtils {
     fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
@@ -52,7 +50,7 @@ object MessageUtils {
     fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
 
     // deg E7 to float
-    fun coordinateMAVLink2DJI(value: Int): Double  = value.toDouble() / 10_000_000.0
+    fun coordinateMAVLink2DJI(value: Int): Double = value.toDouble() / 10_000_000.0
 
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
@@ -69,7 +67,11 @@ object MessageUtils {
                 (type and 0xFF)).toLong()
     }
 
-    fun msgCommandAck(messageID: Int, result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED, progress: Int = -1): MAVLinkMessage {
+    fun msgCommandAck(
+        messageID: Int,
+        result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
+        progress: Int = -1
+    ): MAVLinkMessage {
         val msg = msg_command_ack()
         msg.command = messageID
         if (progress > -1) {
@@ -81,8 +83,8 @@ object MessageUtils {
         return msg
     }
 
-    fun msgRequestAck(result: Int = MAV_RESULT.MAV_RESULT_DENIED, progress: Int = -1): MAVLinkMessage {
-        return msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
-    }
-
+    fun msgRequestAck(
+        result: Int = MAV_RESULT.MAV_RESULT_DENIED,
+        progress: Int = -1
+    ): MAVLinkMessage = msgCommandAck(MAV_CMD.MAV_CMD_REQUEST_MESSAGE, result, progress)
 }

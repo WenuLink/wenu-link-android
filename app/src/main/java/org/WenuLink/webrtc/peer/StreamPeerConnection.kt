@@ -18,10 +18,6 @@
 package org.WenuLink.webrtc.peer
 
 import io.getstream.log.taggedLogger
-import org.WenuLink.webrtc.utils.addRtcIceCandidate
-import org.WenuLink.webrtc.utils.createValue
-import org.WenuLink.webrtc.utils.setValue
-import org.WenuLink.webrtc.utils.stringify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,6 +27,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.WenuLink.webrtc.utils.addRtcIceCandidate
+import org.WenuLink.webrtc.utils.createValue
+import org.WenuLink.webrtc.utils.setValue
+import org.WenuLink.webrtc.utils.stringify
 import org.webrtc.CandidatePairChangeEvent
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
@@ -61,12 +61,12 @@ class StreamPeerConnection(
     private val onStreamAdded: ((MediaStream) -> Unit)?,
     private val onNegotiationNeeded: ((StreamPeerConnection, StreamPeerType) -> Unit)?,
     private val onIceCandidate: ((IceCandidate, StreamPeerType) -> Unit)?,
-    private val onVideoTrack: ((RtpTransceiver?) -> Unit)?,
+    private val onVideoTrack: ((RtpTransceiver?) -> Unit)?
 ) : PeerConnection.Observer {
 
     private val typeTag = type.stringify()
 
-    private val logger by taggedLogger("StreamPeerConnection")
+    private val logger by taggedLogger(StreamPeerConnection::class.java.simpleName)
 
     /**
      * The wrapped connection for all the WebRTC communication.
@@ -133,7 +133,9 @@ class StreamPeerConnection(
      * @return An empty [Result], if the operation has been successful or not.
      */
     suspend fun setRemoteDescription(sessionDescription: SessionDescription): Result<Unit> {
-        logger.d { "[setRemoteDescription] #sfu; #$typeTag; answerSdp: ${sessionDescription.stringify()}" }
+        logger.d {
+            "[setRemoteDescription] #sfu; #$typeTag; answerSdp: ${sessionDescription.stringify()}"
+        }
         return setValue {
             connection.setRemoteDescription(
                 it,
@@ -145,7 +147,10 @@ class StreamPeerConnection(
         }.also {
             pendingIceMutex.withLock {
                 pendingIceCandidates.forEach { iceCandidate ->
-                    logger.i { "[setRemoteDescription] #sfu; #subscriber; pendingRtcIceCandidate: $iceCandidate" }
+                    logger.i {
+                        "[setRemoteDescription] #sfu; #subscriber; " +
+                            "pendingRtcIceCandidate: $iceCandidate"
+                    }
                     connection.addRtcIceCandidate(iceCandidate)
                 }
                 pendingIceCandidates.clear()
@@ -165,7 +170,9 @@ class StreamPeerConnection(
             sessionDescription.type,
             sessionDescription.description.mungeCodecs()
         )
-        logger.d { "[setLocalDescription] #sfu; #$typeTag; offerSdp: ${sessionDescription.stringify()}" }
+        logger.d {
+            "[setLocalDescription] #sfu; #$typeTag; offerSdp: ${sessionDescription.stringify()}"
+        }
         return setValue { connection.setLocalDescription(it, sdp) }
     }
 
@@ -178,21 +185,23 @@ class StreamPeerConnection(
      */
     suspend fun addIceCandidate(iceCandidate: IceCandidate): Result<Unit> {
         if (connection.remoteDescription == null) {
-            logger.w { "[addIceCandidate] #sfu; #$typeTag; postponed (no remoteDescription): $iceCandidate" }
+            logger.w {
+                "[addIceCandidate] #sfu; #$typeTag; postponed (no remoteDescription): $iceCandidate"
+            }
+
             pendingIceMutex.withLock {
                 pendingIceCandidates.add(iceCandidate)
             }
-            return Result.failure(RuntimeException("RemoteDescription is not set"))
+
+            return Result.failure(RuntimeException("RemoteDescription not set"))
         }
+
         logger.d { "[addIceCandidate] #sfu; #$typeTag; rtcIceCandidate: $iceCandidate" }
+
         return connection.addRtcIceCandidate(iceCandidate).also {
             logger.v { "[addIceCandidate] #sfu; #$typeTag; completed: $it" }
         }
     }
-
-    /**
-     * Peer connection listeners.
-     */
 
     /**
      * Triggered whenever there's a new [RtcIceCandidate] for the call. Used to update our tracks
@@ -214,9 +223,7 @@ class StreamPeerConnection(
      */
     override fun onAddStream(stream: MediaStream?) {
         logger.i { "[onAddStream] #sfu; #$typeTag; stream: $stream" }
-        if (stream != null) {
-            onStreamAdded?.invoke(stream)
-        }
+        if (stream != null) onStreamAdded?.invoke(stream)
     }
 
     /**
@@ -227,11 +234,16 @@ class StreamPeerConnection(
      * @param mediaStreams The streams that were added containing their appropriate tracks.
      */
     override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
-        logger.i { "[onAddTrack] #sfu; #$typeTag; receiver: $receiver, mediaStreams: $mediaStreams" }
+        logger.i {
+            "[onAddTrack] #sfu; #$typeTag; receiver: $receiver, mediaStreams: $mediaStreams"
+        }
         mediaStreams?.forEach { mediaStream ->
             logger.v { "[onAddTrack] #sfu; #$typeTag; mediaStream: $mediaStream" }
             mediaStream.audioTracks?.forEach { remoteAudioTrack ->
-                logger.v { "[onAddTrack] #sfu; #$typeTag; remoteAudioTrack: ${remoteAudioTrack.stringify()}" }
+                logger.v {
+                    "[onAddTrack] #sfu; #$typeTag; " +
+                        "remoteAudioTrack: ${remoteAudioTrack.stringify()}"
+                }
                 remoteAudioTrack.setEnabled(true)
             }
             onStreamAdded?.invoke(mediaStream)
@@ -263,10 +275,11 @@ class StreamPeerConnection(
         when (newState) {
             PeerConnection.IceConnectionState.CLOSED,
             PeerConnection.IceConnectionState.FAILED,
-            PeerConnection.IceConnectionState.DISCONNECTED,
-                -> statsJob?.cancel()
+            PeerConnection.IceConnectionState.DISCONNECTED
+            -> statsJob?.cancel()
 
             PeerConnection.IceConnectionState.CONNECTED -> statsJob = observeStats()
+
             else -> Unit
         }
     }
@@ -274,9 +287,7 @@ class StreamPeerConnection(
     /**
      * @return The [RTCStatsReport] for the active connection.
      */
-    fun getStats(): StateFlow<RTCStatsReport?> {
-        return statsFlow
-    }
+    fun getStats(): StateFlow<RTCStatsReport?> = statsFlow
 
     /**
      * Observes the local connection stats and emits it to [statsFlow] that users can consume.
@@ -336,7 +347,6 @@ class StreamPeerConnection(
     override fun toString(): String =
         "StreamPeerConnection(type='$typeTag', constraints=$mediaConstraints)"
 
-    private fun String.mungeCodecs(): String {
-        return this.replace("vp9", "VP9").replace("vp8", "VP8").replace("h264", "H264")
-    }
+    private fun String.mungeCodecs(): String =
+        this.replace("vp9", "VP9").replace("vp8", "VP8").replace("h264", "H264")
 }

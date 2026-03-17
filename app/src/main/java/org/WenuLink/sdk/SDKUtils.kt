@@ -1,9 +1,8 @@
-/**
+/*
  * based on https://github.com/dji-sdk/Mobile-SDK-Android/blob/master/Sample%20Code/app/src/main/java/com/dji/sdk/sample/internal/utils/ModuleVerificationUtil.java
  */
 package org.WenuLink.sdk
 
-import android.util.Log
 import dji.common.error.DJIError
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
@@ -11,20 +10,17 @@ import dji.sdk.base.BaseProduct
 import dji.sdk.products.Aircraft
 import dji.sdk.realname.AppActivationManager
 import dji.sdk.sdkmanager.DJISDKManager
-
+import io.getstream.log.taggedLogger
 
 object SDKUtils {
-    fun getUsbAction(): String {
-        return DJISDKManager.USB_ACCESSORY_ATTACHED
-    }
+    private val logger by taggedLogger(SDKUtils::class.java.simpleName)
 
-    fun getProductInstance(): BaseProduct? {
-        return DJISDKManager.getInstance().product
-    }
+    fun getUsbAction(): String = DJISDKManager.USB_ACCESSORY_ATTACHED
 
-    fun isAircraftConnected(): Boolean {
-        return getProductInstance() != null && getProductInstance() is Aircraft
-    }
+    fun getProductInstance(): BaseProduct? = DJISDKManager.getInstance().product
+
+    fun isAircraftConnected(): Boolean =
+        getProductInstance() != null && getProductInstance() is Aircraft
 
     fun getAircraftInstance(): Aircraft? {
         if (!isAircraftConnected()) {
@@ -33,9 +29,8 @@ object SDKUtils {
         return getProductInstance() as Aircraft?
     }
 
-    fun getAppActivationManager(): AppActivationManager? {
-        return DJISDKManager.getInstance().appActivationManager
-    }
+    fun getAppActivationManager(): AppActivationManager? =
+        DJISDKManager.getInstance().appActivationManager
 
     fun getGPSSignalLevelArray(inputLevel: GPSSignalLevel): BooleanArray {
         // Create a boolean array with the same size as the number of enum constants
@@ -49,13 +44,15 @@ object SDKUtils {
         return result
     }
 
-    fun createCompletionCallback(onResult: (String?) -> Unit): CommonCallbacks.CompletionCallback<DJIError> {
-        return CommonCallbacks.CompletionCallback<DJIError> { error ->
-            if (error == null) onResult(null)
-            else {
-                Log.e("SDKUtils", "CompletionCallback onFailure $error")
+    fun createCompletionCallback(
+        onResult: (String?) -> Unit
+    ): CommonCallbacks.CompletionCallback<DJIError> =
+        CommonCallbacks.CompletionCallback<DJIError> { error ->
+            if (error == null) {
+                onResult(null)
+            } else {
+                logger.e { "CompletionCallback onFailure $error" }
                 onResult(error.description)
             }
         }
-    }
 }

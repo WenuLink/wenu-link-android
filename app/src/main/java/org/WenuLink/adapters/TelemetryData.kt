@@ -44,7 +44,7 @@ data class RCData(
 ) {
     private fun stickValue2percent(value: Int): Int {
         // transform from DJI range [-660, 660] => [0, 100]
-        return (((value + 660).toFloat() / 1320F) * 100).roundToInt()
+        return (((value + 660).toFloat() / 1320f) * 100).roundToInt()
     }
 
     private fun stickValue2rcValue(value: Int): Int {
@@ -58,17 +58,15 @@ data class RCData(
             leftStickVertical = stickValue2rcValue(this.leftStickVertical),
             leftStickHorizontal = stickValue2rcValue(this.leftStickHorizontal),
             rightStickVertical = stickValue2rcValue(this.rightStickVertical),
-            rightStickHorizontal = stickValue2rcValue(this.rightStickHorizontal),
+            rightStickHorizontal = stickValue2rcValue(this.rightStickHorizontal)
         )
         return currRC
     }
 
-    fun hasCenteredJoystick(): Boolean {
-        return this.leftStickVertical == 0 &&
-                this.leftStickHorizontal == 0 &&
-                this.rightStickVertical == 0 &&
-                this.rightStickHorizontal == 0
-    }
+    fun hasCenteredJoystick(): Boolean = this.leftStickVertical == 0 &&
+        this.leftStickHorizontal == 0 &&
+        this.rightStickVertical == 0 &&
+        this.rightStickHorizontal == 0
 }
 
 data class BatteryData(
@@ -77,7 +75,7 @@ data class BatteryData(
     var current: Int = -1,
     var fullChargeCapacity: Int = -1,
     var chargeRemaining: Int = -1,
-    var temperature: Float = -1.0F,
+    var temperature: Float = -1.0f,
     var voltageCells: IntArray? = null
 ) {
 
@@ -87,21 +85,23 @@ data class BatteryData(
         if (other.current != -1) current = other.current
         if (other.fullChargeCapacity != -1) fullChargeCapacity = other.fullChargeCapacity
         if (other.chargeRemaining != -1) chargeRemaining = other.chargeRemaining
-        if (other.temperature != -1.0F) temperature = other.temperature
-        if (other.voltageCells != null) voltageCells = other.voltageCells?.clone() // Clone to avoid reference issues
+        if (other.temperature != -1.0f) temperature = other.temperature
+        other.voltageCells?.let {
+            voltageCells = other.voltageCells?.clone() // Clone to avoid reference issues
+        }
     }
 
-    override fun toString(): String {
-        return "BatteryData(percentCharge=$percentCharge%, voltage=$voltage V, current=$current A, " +
-                "fullChargeCapacity=$fullChargeCapacity A, fullChargeCapacity=$chargeRemaining A, temperature=$temperature °C, voltageCells=${voltageCells?.joinToString()})"
-    }
+    override fun toString(): String = "BatteryData(" +
+        "percentCharge=$percentCharge%, " +
+        "voltage=$voltage V, " +
+        "current=$current A, " +
+        "fullChargeCapacity=$fullChargeCapacity A, " +
+        "fullChargeCapacity=$chargeRemaining A, " +
+        "temperature=$temperature °C, " +
+        "voltageCells=${voltageCells?.joinToString()})"
 }
 
-data class Coordinates3D(
-    val lat: Double,
-    val long: Double,
-    val alt: Float
-)
+data class Coordinates3D(val lat: Double, val long: Double, val alt: Float)
 
 data class MessageRate(
     val messageID: Int,

@@ -17,14 +17,14 @@
 
 package org.WenuLink.webrtc.utils
 
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import org.webrtc.AddIceObserver
 import org.webrtc.IceCandidate
 import org.webrtc.PeerConnection
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
-suspend fun PeerConnection.addRtcIceCandidate(iceCandidate: IceCandidate): Result<Unit> {
-    return suspendCoroutine { cont ->
+suspend fun PeerConnection.addRtcIceCandidate(iceCandidate: IceCandidate): Result<Unit> =
+    suspendCoroutine { cont ->
         addIceCandidate(
             iceCandidate,
             object : AddIceObserver {
@@ -38,4 +38,3 @@ suspend fun PeerConnection.addRtcIceCandidate(iceCandidate: IceCandidate): Resul
             }
         )
     }
-}

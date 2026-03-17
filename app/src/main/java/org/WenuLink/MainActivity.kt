@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -38,32 +37,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-
-import org.WenuLink.views.HomeViewModel
+import io.getstream.log.taggedLogger
 import org.WenuLink.sdk.SDKManager
 import org.WenuLink.ui.theme.WenuLinkTheme
+import org.WenuLink.views.HomeViewModel
 import org.WenuLink.views.ServicesViewModel
-
 
 class MainActivity : ComponentActivity() {
     companion object {
-        fun getIntent(context: Context): Intent {
-            return Intent(context, MainActivity::class.java).apply {
-                action = SDKManager.getIntentAction()
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
+        fun getIntent(context: Context): Intent = Intent(context, MainActivity::class.java).apply {
+            action = SDKManager.getIntentAction()
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
     }
 
-    private val TAG: String = MainActivity::class.java.simpleName
+    private val logger by taggedLogger(MainActivity::class.java.simpleName)
 
     private val homeViewModel: HomeViewModel by viewModels()
     private val servicesViewModel: ServicesViewModel by viewModels()
 
     private fun checkAndRequestPermissions() {
         homeViewModel.updateWorkflow("Checking permissions")
+
         var permissionsList = arrayOf(
             Manifest.permission.VIBRATE,
             Manifest.permission.INTERNET,
@@ -75,7 +72,7 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.CHANGE_WIFI_STATE,
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_PHONE_STATE
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -87,14 +84,17 @@ class MainActivity : ComponentActivity() {
         }
 
         val missingPermissions = permissionsList.filter {
-            ContextCompat.checkSelfPermission(applicationContext, it) != PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(applicationContext, it) !=
+                PackageManager.PERMISSION_GRANTED
         }
 
         if (missingPermissions.isNotEmpty()) {
             homeViewModel.updateWorkflow("Waiting for pending permissions")
             val requestPermissionLauncher =
-                registerForActivityResult(ActivityResultContracts.
-                RequestMultiplePermissions()) { permissionsMap ->
+                registerForActivityResult(
+                    ActivityResultContracts
+                        .RequestMultiplePermissions()
+                ) { permissionsMap ->
                     if (permissionsMap.all { it.value }) {
                         onPermissionsGranted()
                     } else {
@@ -134,14 +134,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun onPermissionsGranted() {
-        Log.i(TAG, "All permissions granted")
+        logger.i { "All permissions granted" }
         homeViewModel.updatePermission(true)
         homeViewModel.updateWorkflow("Waiting for SDK")
         homeViewModel.startSDK(applicationContext)
     }
 
     private fun onPermissionsDenied() {
-        Log.e(TAG, "Some permissions denied")
+        logger.e { "Some permissions denied" }
         homeViewModel.updatePermission(false)
         homeViewModel.updateWorkflow("Missing permission(s), please restart the app.")
     }
@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // Deinitialize sdk only when no service is running
-        if(!servicesViewModel.isServiceRunning.value){
+        if (!servicesViewModel.isServiceRunning.value) {
             homeViewModel.stopSDK(applicationContext)
         }
         // TODO: mostrar aviso para forzar salida
@@ -177,6 +177,8 @@ class MainActivity : ComponentActivity() {
         // Logs
         var logMessages by remember { mutableStateOf(listOf<String>()) }
 
+        fun buttonLabel(isRunning: Boolean) = if (isRunning) "Stop" else "Start"
+
         // UI code here using telemetry and status
         Column(
             modifier = modifier.padding(16.dp),
@@ -185,30 +187,26 @@ class MainActivity : ComponentActivity() {
         ) {
             Text("App status:")
             Text(workflowStatus)
-            if(isPermissionsGranted) {
+            if (isPermissionsGranted) {
                 Spacer(Modifier.height(4.dp))
-                Text("SDK is registered?: $isSDKOk")
+                Text("SDK registered?: $isSDKOk")
                 Spacer(Modifier.height(2.dp))
-                Text("DataFlowing is active?: $isDataFlowing")
+                Text("DataFlow active?: $isDataFlowing")
                 Spacer(Modifier.height(2.dp))
-                Text("MAVLinkService's up?: $isMAVLinkRunning")
+                Text("MAVLinkService up?: $isMAVLinkRunning")
                 Spacer(Modifier.height(2.dp))
-                Text("WebRTCService's up?: $isWebRTCRunning")
+                Text("WebRTCService up?: $isWebRTCRunning")
                 Spacer(Modifier.height(8.dp))
                 Text("SDK status:")
                 Text(sdkStatus)
             }
 
-            if(isSDKOk){
+            if (isSDKOk) {
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
                     servicesViewModel.runService(!isServiceRunning, false)
                 }) {
-                    Text(if (isServiceRunning) {
-                        "Stop WenuLink Service"
-                    } else {
-                        "Start WenuLink Service"
-                    })
+                    Text("${buttonLabel(isServiceRunning)} WenuLink Service")
                 }
 
                 if (isSimulationReady && !isServiceRunning) {
@@ -221,41 +219,40 @@ class MainActivity : ComponentActivity() {
 
                 if (isServiceRunning) {
                     HorizontalDivider()
+
                     Button(onClick = {
                         servicesViewModel.forceStop()
                     }) {
                         Text("FORCE STOP")
                     }
+
                     HorizontalDivider()
+
                     Button(onClick = {
                         servicesViewModel.runMAVLink(!isMAVLinkRunning)
                     }) {
-                        Text(if (isMAVLinkRunning) {
-                            "Stop MAVLink"
-                        } else {
-                            "Start MAVLink"
-                        })
+                        Text("${buttonLabel(isMAVLinkRunning)} MAVLink")
                     }
+
                     Button(onClick = {
                         servicesViewModel.runWebRTC(!isWebRTCRunning)
                     }) {
-                        Text(if (isWebRTCRunning) {
-                            "Stop WebRTC"
-                        } else {
-                            "Start WebRTC"
-                        })
+                        Text("${buttonLabel(isWebRTCRunning)} WebRTC")
                     }
                 }
             }
+
             HorizontalDivider()
+
             Button(
                 onClick = {
-                    logMessages = logMessages + "Log manual em ${System.currentTimeMillis()}"
+                    logMessages = logMessages + "Manual Log at ${System.currentTimeMillis()}"
                 },
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Text("Adicionar Log (Teste)")
+                Text("Add Test Log")
             }
+
             Card(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     modifier = Modifier.padding(8.dp),

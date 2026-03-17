@@ -37,9 +37,7 @@ import org.webrtc.SoftwareVideoEncoderFactory
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
 
-class StreamPeerConnectionFactory constructor(
-  private val context: Context,
-) {
+class StreamPeerConnectionFactory constructor(private val context: Context) {
     private val webRtcLogger by taggedLogger("Call:WebRTC")
 
     val eglBaseContext: EglBase.Context by lazy {
@@ -130,14 +128,14 @@ class StreamPeerConnectionFactory constructor(
      * receive tracks.
      */
     fun makePeerConnection(
-      coroutineScope: CoroutineScope,
-      configuration: PeerConnection.RTCConfiguration,
-      type: StreamPeerType,
-      mediaConstraints: MediaConstraints,
-      onStreamAdded: ((MediaStream) -> Unit)? = null,
-      onNegotiationNeeded: ((StreamPeerConnection, StreamPeerType) -> Unit)? = null,
-      onIceCandidateRequest: ((IceCandidate, StreamPeerType) -> Unit)? = null,
-      onVideoTrack: ((RtpTransceiver?) -> Unit)? = null,
+        coroutineScope: CoroutineScope,
+        configuration: PeerConnection.RTCConfiguration,
+        type: StreamPeerType,
+        mediaConstraints: MediaConstraints,
+        onStreamAdded: ((MediaStream) -> Unit)? = null,
+        onNegotiationNeeded: ((StreamPeerConnection, StreamPeerType) -> Unit)? = null,
+        onIceCandidateRequest: ((IceCandidate, StreamPeerType) -> Unit)? = null,
+        onVideoTrack: ((RtpTransceiver?) -> Unit)? = null
     ): StreamPeerConnection {
         val peerConnection = StreamPeerConnection(
             coroutineScope = coroutineScope,
@@ -164,16 +162,14 @@ class StreamPeerConnectionFactory constructor(
      * @return [PeerConnection] that's fully set up.
      */
     private fun makePeerConnectionInternal(
-      configuration: PeerConnection.RTCConfiguration,
-      observer: PeerConnection.Observer?,
-    ): PeerConnection {
-        return requireNotNull(
-            factory.createPeerConnection(
-                configuration,
-                observer
-            )
+        configuration: PeerConnection.RTCConfiguration,
+        observer: PeerConnection.Observer?
+    ): PeerConnection = requireNotNull(
+        factory.createPeerConnection(
+            configuration,
+            observer
         )
-    }
+    )
 
     /**
      * Builds a [VideoSource] from the [factory] that can be used for regular video share (camera)
@@ -193,10 +189,8 @@ class StreamPeerConnectionFactory constructor(
      * @param trackId The unique ID for this track.
      * @return [VideoTrack] That represents a video feed.
      */
-    fun makeVideoTrack(
-      source: VideoSource,
-      trackId: String,
-    ): VideoTrack = factory.createVideoTrack(trackId, source)
+    fun makeVideoTrack(source: VideoSource, trackId: String): VideoTrack =
+        factory.createVideoTrack(trackId, source)
 
     /**
      * Builds an [AudioSource] from the [factory] that can be used for audio sharing.
@@ -215,8 +209,6 @@ class StreamPeerConnectionFactory constructor(
      * @param trackId The unique ID for this track.
      * @return [AudioTrack] That represents an audio feed.
      */
-    fun makeAudioTrack(
-      source: AudioSource,
-      trackId: String,
-    ): AudioTrack = factory.createAudioTrack(trackId, source)
+    fun makeAudioTrack(source: AudioSource, trackId: String): AudioTrack =
+        factory.createAudioTrack(trackId, source)
 }
