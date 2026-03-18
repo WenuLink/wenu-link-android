@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
@@ -111,10 +110,9 @@ class WenuLinkService : Service() {
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
 
-        // Start Aircraft
+        // Wait basic Aircraft's state
         serviceScope.launch {
-            aircraft.boot()
-            val bootOk = AsyncUtils.waitTimeout(1000L, 10000L, aircraft.state::isStandBy)
+            val bootOk = AsyncUtils.waitTimeout(1000L, 10000L, ::isAircraftReady)
             // Prevent infinite waiting. Terminating all services if the Aircraft is not ready.
             if (!bootOk) {
                 terminate()
@@ -134,7 +132,7 @@ class WenuLinkService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    fun isAircraftReady() = ::aircraft.isInitialized
+    fun isAircraftReady() = ::aircraft.isInitialized && !aircraft.isPowerOff
 
     fun stopCommands() {
         // mission's logic already stop according to the mission kind
@@ -193,7 +191,6 @@ class WenuLinkService : Service() {
                 return@launch
             }
             mavlink.launchService(onResult)
-            watchRCInput(100L)
         }
     }
 
@@ -231,17 +228,5 @@ class WenuLinkService : Service() {
             aircraft.unload()
         }
         AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
-    }
-
-    suspend fun watchRCInput(intervalTime: Long = 100L) {
-        while (!isPowerOff()) {
-            // Watch for joystick inputs
-            aircraft.rcInput?.hasCenteredJoystick()?.let {
-                serviceScope.launch {
-                    if (!it) aircraft.manualControl() // stop everything and gain the control back
-                }
-            }
-            delay(intervalTime)
-        }
     }
 }

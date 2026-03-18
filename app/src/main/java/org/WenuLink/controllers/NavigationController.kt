@@ -26,12 +26,12 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.TelemetryHandler
+import org.WenuLink.adapters.aircraft.RepositionCommand
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -296,9 +296,11 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
-        aircraft.doReposition(
-            target = coordinate,
-            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+        aircraft.dispatchCommand(
+            RepositionCommand(
+                coordinate,
+                if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+            )
         )
 
         client.sendMessage(

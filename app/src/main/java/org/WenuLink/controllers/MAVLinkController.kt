@@ -382,30 +382,31 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         return isStationConnected()
     }
 
-    fun isSystemReady(): Boolean {
-        val navigation = controllers.filterIsInstance<NavigationController>().first()
-        val parameter = controllers.filterIsInstance<ParameterController>().first()
-        // TODO: Values must persist. Once connected, QGC does not ask for mission or parameter items twice
-        // TODO: Implement as a setting or app-level variable
-        return navigation.wasRequested && parameter.wasRequested && aircraft.state.isHomeSet()
-    }
-
-    suspend fun waitSystemReady(timeout: Long = 60000L): Boolean {
+    suspend fun waitServicesRequest(timeout: Long = 30000L): Boolean {
         // https://docs.qgroundcontrol.com/master/en/qgc-dev-guide/communication_flow.html
         if (!isStationConnected()) return false
-        logger.d { "Waiting for MAVLink microservices." }
-        val systemReady = AsyncUtils.waitTimeout(
-            1000,
-            timeout,
-            ::isSystemReady
-        )
-        if (systemReady) {
-            logger.i { "MAVLink microservices initialized." }
-        } else {
-            logger.d { "Unable to check for Mission and Parameter request, possibly already set." }
+
+        logger.d { "Waiting for Parameters request." }
+        fun parametersRequested() =
+            controllers.filterIsInstance<ParameterController>().first().wasRequested
+        if (!AsyncUtils.waitTimeout(1000, timeout, ::parametersRequested)) {
+            // If PARAM_REQUEST_LIST is not sent (timeout), a service restart is assumed
+            logger.d { "Unable to check for Parameters request, possibly already requested." }
+            notifySystemReady()
+            return true
         }
 
-        return isSystemReady()
+        // Check for mission items after request parameters
+        logger.d { "Waiting for Mission items request." }
+        fun missionRequested() =
+            controllers.filterIsInstance<NavigationController>().first().wasRequested
+        if (!AsyncUtils.waitTimeout(1000, timeout, ::missionRequested)) {
+            logger.d { "Unable to check for Mission request, possibly already set." }
+        }
+
+        // unlock even after timeout
+        notifySystemReady()
+        return true
     }
 
     suspend fun loadParameters(): Boolean {
@@ -418,8 +419,11 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
     }
 
     suspend fun waitHomePosition(): Boolean {
-        // Wait for home position and add messages
-        aircraft.waitHome()
+        // Wait for home position to send GPS_GLOBAL_ORIGIN and periodic HOME_POSITION
+        val isHomeSet = aircraft.waitHomeSet(360000) // 5min
+
+        if (!isHomeSet) return false
+
         // Send origin coordinates
         val navController = controllers.filterIsInstance<NavigationController>().first()
         client?.sendMessage(navController.msgGpsGlobalOrigin(aircraft)!!)

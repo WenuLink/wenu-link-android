@@ -126,8 +126,8 @@ class MAVLinkService(aircraft: AircraftHandler) {
         if (hasParams) logger.d { "Parameters loaded" }
 
         mavlinkScope?.launch {
-            isReady = controller.waitSystemReady(60000L)
-            if (isReady) controller.notifySystemReady()
+            // TODO: move timeout to a UserPreference due to user's local network latency
+            isReady = controller.waitServicesRequest(30000L)
 
             logger.d {
                 "MAVLinkService (ready?=$isReady) " +
@@ -136,9 +136,10 @@ class MAVLinkService(aircraft: AircraftHandler) {
                     "(sending=${sendingJob?.isActive})"
             }
 
-            val hasHome = controller.waitHomePosition()
-            if (hasHome) logger.d { "Home position acquired" }
             onResult(null)
+
+            // non-blocking wait for home position to report GPS_GLOBAL_ORIGIN
+            controller.waitHomePosition()
         }
     }
 
