@@ -342,7 +342,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     // TODO: start, pause, and resume procedures
 
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
-        val coordinates = aircraft.homeCoordinates ?: return null
+        val coordinates = aircraft.state.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
@@ -416,7 +416,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun msgGpsGlobalOrigin(aircraft: AircraftHandler): MAVLinkMessage? {
-        val homeLoc = aircraft.homeCoordinates ?: return null
+        val homeLoc = aircraft.state.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)

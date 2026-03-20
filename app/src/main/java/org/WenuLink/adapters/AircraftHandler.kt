@@ -39,15 +39,14 @@ class AircraftHandler {
         private set
     var copterFlightMode = ArduCopterFlightMode.STABILIZE
         private set
-    val state = AircraftStateMachine()
+    val stateMachine = AircraftStateMachine()
+    val state: AircraftState get() = stateMachine.state
     var sensorsTimestamp: Long = startTimestamp
     var homeTimestamp: Long = startTimestamp
     var sensorsHealthy = false
         private set
     val mission = MissionHandler.getInstance()
     val telemetry = TelemetryHandler.getInstance()
-    val homeCoordinates: Coordinates3D?
-        get() = FCManager.getHomePosition()
     var isPowerOff = true
     val rcInput: RCData?
         get() = telemetry.getRCData()
@@ -159,7 +158,10 @@ class AircraftHandler {
         if (!isPowerOff) return
 
         // Check for home position
-        state.homeSet(homeCoordinates != null)
+        val homePos = FCManager.getHomePosition()
+        if (homePos != null) {
+            stateMachine.updateHomePosition(homePos)
+        }
 
         // Check for arm and flying conditions
         val fcState = state.resolveFrom(
@@ -167,11 +169,11 @@ class AircraftHandler {
             FCManager.isFlying()
         )
 
-        if (!state.hasStateChanged(fcState)) return
+        if (!stateMachine.hasStateChanged(fcState)) return
 
         logger.w { "State reconciliation: $state -> $fcState" }
         // Force new logic state update only when different
-        state.forceSet(fcState)
+        stateMachine.forceSet(fcState)
     }
 
     fun processUserPreferences(): Boolean {
@@ -358,7 +360,7 @@ class AircraftHandler {
                 handlerScope.launch {
                     logger.d { "Waypoint reached" }
 
-                    if (index == 0 && state.isMissionWaypoint()) {
+                    if (index == 0 && stateMachine.isMissionWaypoint()) {
                         // Call pause only for second element
                         // assumes 0 = arm, 1 = takeoff/initial alt.
                         mission.pauseWaypoint()
@@ -398,16 +400,16 @@ class AircraftHandler {
 
     fun cancelMission() {
         logger.d { "cancel mission" }
-        if (state.isMissionWaypoint()) mission.stopWaypoint()
-        if (state.isTimelineCommand()) mission.cancelCommand()
+        if (stateMachine.isMissionWaypoint()) mission.stopWaypoint()
+        if (stateMachine.isTimelineCommand()) mission.cancelCommand()
     }
 
     fun controlTransition(authority: ControlAuthority) {
         // Decide policy: reject or stop mission
-        if (!state.isNewControlAuthority(authority)) return
+        if (!stateMachine.isNewControlAuthority(authority)) return
         cancelMission()
-        logger.d { "Control transition: ${state.control}->$authority" }
-        state.setControlAuthority(authority)
+        logger.d { "Control transition: ${state.controlAuthority}->$authority" }
+        stateMachine.setControlAuthority(authority)
     }
 
     fun manualControl() {

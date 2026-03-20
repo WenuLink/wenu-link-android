@@ -3,7 +3,6 @@ package org.WenuLink.adapters
 import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_MODE_FLAG
 import com.MAVLink.enums.MAV_STATE
-import org.WenuLink.sdk.FCManager
 
 enum class ControlAuthority {
     NONE,
@@ -12,106 +11,155 @@ enum class ControlAuthority {
     REMOTE_CONTROLLER
 }
 
-sealed interface AircraftState {
+data class AircraftState(
+    val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
+    val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
+    val controlAuthority: ControlAuthority = ControlAuthority.NONE,
+    val homeCoordinates: Coordinates3D? = null,
+) {
 
-    fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean
+    fun isHomeSet() = homeCoordinates != null
 
-    fun reduce(from: AircraftStateMachine.UnifiedState): AircraftStateMachine.UnifiedState
+    fun isStandBy() = mavlink == MAV_STATE.MAV_STATE_STANDBY
+
+    fun isArmed() = mavlink == MAV_STATE.MAV_STATE_ACTIVE
+
+    fun isFlying() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+
+    fun isOnTheGround() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+
+    fun resolveFrom(isArmed: Boolean, isFlying: Boolean): AircraftState {
+        val mavState = when (this.mavlink) {
+            MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
+            MAV_STATE.MAV_STATE_CRITICAL,
+            MAV_STATE.MAV_STATE_EMERGENCY -> this.mavlink
+
+            else -> if (isArmed) {
+                MAV_STATE.MAV_STATE_ACTIVE
+            } else {
+                MAV_STATE.MAV_STATE_STANDBY
+            }
+        }
+
+        val landedState = when {
+            !isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING ->
+                MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+
+            isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND ->
+                MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
+
+            isFlying -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+
+            else -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+        }
+
+        return this.copy(
+            mavlink = mavState,
+            landed = landedState
+        )
+    }
 }
 
-object BootAircraftState : AircraftState {
+sealed interface StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    fun canTransition(from: AircraftState): Boolean
+
+    fun reduce(from: AircraftState): AircraftState
+}
+
+object BootTransition : StateTransition {
+
+    override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_UNINIT
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
+        from: AircraftState
+    ): AircraftState = from.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
 }
 
-object StandbyAircraftState : AircraftState {
+object StandbyTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED ||
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(
+        from: AircraftState
+    ): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_STANDBY,
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
     )
 }
 
-object ArmAircraftState : AircraftState {
+object ArmTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_STANDBY
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
+        from: AircraftState
+    ): AircraftState = from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
 }
 
-object TakeoffAircraftState : AircraftState {
+object TakeoffTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState =
+        from: AircraftState
+    ): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF)
 }
 
-object FlyingAircraftState : AircraftState {
+object FlyingTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED ||
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF ||
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState =
+        from: AircraftState
+    ): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
 }
 
-object LandAircraftState : AircraftState {
+object LandTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(
+        from: AircraftState
+    ): AircraftState = from.copy(
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
     )
 }
 
-object FlightTerminationAircraftState : AircraftState {
+object FlightTerminationTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(
+        from: AircraftState
+    ): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION
     )
 }
 
-object PowerOffAircraftState : AircraftState {
+object PowerOffTransition : StateTransition {
 
-    override fun canTransition(from: AircraftStateMachine.UnifiedState): Boolean =
+    override fun canTransition(from: AircraftState): Boolean =
         from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
     override fun reduce(
-        from: AircraftStateMachine.UnifiedState
-    ): AircraftStateMachine.UnifiedState = from.copy(
+        from: AircraftState
+    ): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_POWEROFF
     )
 }
@@ -121,22 +169,11 @@ object PowerOffAircraftState : AircraftState {
  * FSM / Reducer pattern.
  */
 class AircraftStateMachine {
-    data class UnifiedState(
-        val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
-        val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
-        val isHomeSet: Boolean = false,
-        val controlAuthority: ControlAuthority = ControlAuthority.NONE
-    )
 
-    private var state = UnifiedState()
+    var state = AircraftState()
+    private set
 
-    val mavlink: Int get() = state.mavlink
-
-    val landed: Int get() = state.landed
-
-    val control: ControlAuthority get() = state.controlAuthority
-
-    fun setControlAuthority(controlAuthority: ControlAuthority): UnifiedState {
+    fun setControlAuthority(controlAuthority: ControlAuthority): AircraftState {
         state = state.copy(controlAuthority = controlAuthority)
         return state
     }
@@ -149,60 +186,19 @@ class AircraftStateMachine {
 
     fun isNewControlAuthority(authority: ControlAuthority) = state.controlAuthority != authority
 
-    fun homeSet(isHomeSet: Boolean = true): UnifiedState {
-        state = state.copy(isHomeSet = isHomeSet)
-        return state
-    }
-
-    fun isHomeSet() = state.isHomeSet
-
-    fun isStandBy() = state.mavlink == MAV_STATE.MAV_STATE_STANDBY
-
-    fun isArmed() = state.mavlink == MAV_STATE.MAV_STATE_ACTIVE
-
-    fun isFlying() = state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
-
-    fun isOnTheGround() = state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-
-    fun hasStateChanged(target: UnifiedState): Boolean = state.mavlink != target.mavlink ||
-        state.landed != target.landed
-
-    fun forceSet(target: UnifiedState) {
+    fun forceSet(target: AircraftState) {
         state = target
     }
 
-    fun resolveFrom(isArmed: Boolean, isFlying: Boolean): UnifiedState {
-        val mavState = when (state.mavlink) {
-            MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
-            MAV_STATE.MAV_STATE_CRITICAL,
-            MAV_STATE.MAV_STATE_EMERGENCY -> state.mavlink
+    fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
+        state.landed != target.landed
 
-            else -> if (isArmed) {
-                MAV_STATE.MAV_STATE_ACTIVE
-            } else {
-                MAV_STATE.MAV_STATE_STANDBY
-            }
-        }
-
-        val landedState = when {
-            !isFlying && state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-
-            isFlying && state.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
-
-            isFlying -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
-
-            else -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-        }
-
-        return state.copy(
-            mavlink = mavState,
-            landed = landedState
-        )
+    fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
+      state = state.copy(homeCoordinates = homeCoordinates)
+      return state
     }
 
-    fun dispatch(event: AircraftState): Result<UnifiedState> {
+    fun dispatch(event: StateTransition): Result<AircraftState> {
         if (!event.canTransition(state)) {
             return Result.failure(
                 IllegalStateException("Invalid transition: $event -> $state")

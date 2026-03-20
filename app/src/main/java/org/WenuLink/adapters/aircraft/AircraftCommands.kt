@@ -2,14 +2,13 @@ package org.WenuLink.adapters.aircraft
 
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.ArduCopterFlightMode
-import org.WenuLink.adapters.ArmAircraftState
-import org.WenuLink.adapters.BootAircraftState
+import org.WenuLink.adapters.ArmTransition
+import org.WenuLink.adapters.BootTransition
 import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.FlightTerminationAircraftState
-import org.WenuLink.adapters.FlyingAircraftState
-import org.WenuLink.adapters.LandAircraftState
-import org.WenuLink.adapters.StandbyAircraftState
-import org.WenuLink.adapters.TakeoffAircraftState
+import org.WenuLink.adapters.FlyingTransition
+import org.WenuLink.adapters.LandTransition
+import org.WenuLink.adapters.StandbyTransition
+import org.WenuLink.adapters.TakeoffTransition
 
 sealed interface AircraftCommand {
     suspend fun validate(ctx: AircraftHandler): String?
@@ -21,7 +20,7 @@ data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
         if (!ctx.isPowerOff) "Already booted" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(BootAircraftState)
+        ctx.stateMachine.dispatch(BootTransition)
             .onSuccess {
                 ctx.boot(timeout)
                 onResult(null)
@@ -41,7 +40,7 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
         else -> null
     }
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(ArmAircraftState)
+        ctx.stateMachine.dispatch(ArmTransition)
             .onSuccess {
                 // TODO: update according to each mode
                 // https://ardupilot.org/copter/docs/arming_the_motors.html
@@ -71,7 +70,7 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
     }
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(StandbyAircraftState)
+        ctx.stateMachine.dispatch(StandbyTransition)
             .onSuccess {
                 // continue execution
                 ctx.disarmMotors()
@@ -93,7 +92,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
         else -> null
     }
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(TakeoffAircraftState)
+        ctx.stateMachine.dispatch(TakeoffTransition)
             .onSuccess {
                 // continue execution
                 ctx.takeOff() // ctx.takeOff(initialAltitude)
@@ -119,7 +118,7 @@ data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand 
         if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(LandAircraftState)
+        ctx.stateMachine.dispatch(LandTransition)
             .onSuccess {
                 // continue execution
                 ctx.land() // ctx.land(forceConfirmation)
@@ -145,7 +144,7 @@ data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Fl
         if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(FlyingAircraftState)
+        ctx.stateMachine.dispatch(FlyingTransition)
             .onSuccess {
                 // continue execution
                 ctx.doReposition(targetCoordinates, speed)
@@ -164,7 +163,7 @@ object GoHomeCommand : AircraftCommand {
         if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(FlyingAircraftState)
+        ctx.stateMachine.dispatch(FlyingTransition)
             .onSuccess {
                 // continue execution
                 ctx.doGoHome()
