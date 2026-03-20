@@ -15,7 +15,7 @@ data class AircraftState(
     val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
     val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
     val controlAuthority: ControlAuthority = ControlAuthority.NONE,
-    val homeCoordinates: Coordinates3D? = null,
+    val homeCoordinates: Coordinates3D? = null
 ) {
 
     fun isHomeSet() = homeCoordinates != null
@@ -72,9 +72,8 @@ object BootTransition : StateTransition {
     override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_UNINIT
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
+    override fun reduce(from: AircraftState): AircraftState =
+        from.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
 }
 
 object StandbyTransition : StateTransition {
@@ -83,9 +82,7 @@ object StandbyTransition : StateTransition {
         from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED ||
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_STANDBY,
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
     )
@@ -96,9 +93,8 @@ object ArmTransition : StateTransition {
     override fun canTransition(from: AircraftState): Boolean =
         from.mavlink == MAV_STATE.MAV_STATE_STANDBY
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
+    override fun reduce(from: AircraftState): AircraftState =
+        from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
 }
 
 object TakeoffTransition : StateTransition {
@@ -107,9 +103,7 @@ object TakeoffTransition : StateTransition {
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState =
+    override fun reduce(from: AircraftState): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF)
 }
 
@@ -120,9 +114,7 @@ object FlyingTransition : StateTransition {
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF ||
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState =
+    override fun reduce(from: AircraftState): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
 }
 
@@ -132,9 +124,7 @@ object LandTransition : StateTransition {
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
     )
 }
@@ -145,9 +135,7 @@ object FlightTerminationTransition : StateTransition {
         from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
             from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION
     )
 }
@@ -157,9 +145,7 @@ object PowerOffTransition : StateTransition {
     override fun canTransition(from: AircraftState): Boolean =
         from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
-    override fun reduce(
-        from: AircraftState
-    ): AircraftState = from.copy(
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_POWEROFF
     )
 }
@@ -171,7 +157,7 @@ object PowerOffTransition : StateTransition {
 class AircraftStateMachine {
 
     var state = AircraftState()
-    private set
+        private set
 
     fun setControlAuthority(controlAuthority: ControlAuthority): AircraftState {
         state = state.copy(controlAuthority = controlAuthority)
@@ -194,8 +180,8 @@ class AircraftStateMachine {
         state.landed != target.landed
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
-      state = state.copy(homeCoordinates = homeCoordinates)
-      return state
+        state = state.copy(homeCoordinates = homeCoordinates)
+        return state
     }
 
     fun dispatch(event: StateTransition): Result<AircraftState> {
