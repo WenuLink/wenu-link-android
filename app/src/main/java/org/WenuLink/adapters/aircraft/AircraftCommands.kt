@@ -130,10 +130,9 @@ data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand 
                     return
                 }
 
-                onResult(null)
+                ctx.dispatchCommand(DisarmCommand(), onResult)
             }
             .onFailure { e ->
-                ctx.disarmMotors()
                 onResult(e.message)
             }
     }
@@ -165,7 +164,7 @@ object GoHomeCommand : AircraftCommand {
         if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.state.dispatch(FlightTerminationAircraftState)
+        ctx.state.dispatch(FlyingAircraftState)
             .onSuccess {
                 // continue execution
                 ctx.doGoHome()

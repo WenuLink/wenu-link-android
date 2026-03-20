@@ -8,7 +8,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.aircraft.AircraftCommand
@@ -41,13 +40,15 @@ class AircraftHandler {
     var copterFlightMode = ArduCopterFlightMode.STABILIZE
         private set
     val state = AircraftStateMachine()
+    var sensorsTimestamp: Long = startTimestamp
+    var homeTimestamp: Long = startTimestamp
     var sensorsHealthy = false
         private set
     val mission = MissionHandler.getInstance()
     val telemetry = TelemetryHandler.getInstance()
     val homeCoordinates: Coordinates3D?
         get() = FCManager.getHomePosition()
-    var isPowerOff = false
+    var isPowerOff = true
     val rcInput: RCData?
         get() = telemetry.getRCData()
     private var commandJob: Job? = null
@@ -153,17 +154,6 @@ class AircraftHandler {
         }
     }
 
-    fun applyState(event: AircraftState) {
-        val result = state.dispatch(event)
-
-        if (result.isFailure) {
-            logger.w { "Invalid state transition: $event" }
-            return
-        }
-
-        enforceModeConsistency()
-    }
-
     fun syncState() {
         // TODO: read components metadata
         if (!isPowerOff) return
@@ -189,7 +179,11 @@ class AircraftHandler {
         return true
     }
 
-    suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
+    suspend fun sensorChecks(timeout: Long = 10000L, allowedInterval: Long = 1000L): Boolean {
+        // only allows check sensors after 1
+        val currentTimestamp = System.currentTimeMillis()
+        if ((currentTimestamp - sensorsTimestamp) < allowedInterval) return sensorsHealthy
+
         val perSensorTime = (timeout.toFloat() / 4).roundToLong()
         logger.i { "Waiting sensors data" }
         var sensorsOk = true
@@ -220,11 +214,27 @@ class AircraftHandler {
         if (!gyroOk) logger.e { "Gyroscope error!" }
         sensorsOk = sensorsOk && gyroOk
 
-        val homeSet = waitHomeSet(perSensorTime)
-        if (!homeSet) logger.e { "Home Location not set!" }
+        val homeSet = homePositionCheck(perSensorTime)
         sensorsOk = sensorsOk && homeSet
 
+        sensorsTimestamp = currentTimestamp
+
         return sensorsOk
+    }
+
+    suspend fun homePositionCheck(timeout: Long = 1000L, allowedInterval: Long = 5000L): Boolean {
+        if (state.isHomeSet()) return true
+
+        // Allow to check for home every 5 seconds
+        val currentTimestamp = System.currentTimeMillis()
+        if ((currentTimestamp - homeTimestamp) <= allowedInterval) return state.isHomeSet()
+
+        val homeSet = waitHomeSet(timeout)
+        if (!homeSet) logger.e { "Home Location not set!" }
+
+        homeTimestamp = currentTimestamp
+
+        return state.isHomeSet()
     }
 
     // check for home location and set
@@ -266,7 +276,6 @@ class AircraftHandler {
     suspend fun waitTelemetry(timeout: Long = 5000L): Boolean = telemetry.waitDataReading(timeout)
 
     suspend fun boot(timeout: Long = 5000L) {
-        applyState(BootAircraftState)
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
 
@@ -303,7 +312,7 @@ class AircraftHandler {
                     // --- Safety hooks ---
                     rcInput?.hasCenteredJoystick()?.let {
                         // stop everything to if any joystick is moved
-                        manualControl()
+                        if (!it) manualControl()
                     }
 
                     if (!sensorsHealthy && state.isFlying()) {
@@ -315,7 +324,6 @@ class AircraftHandler {
                         logger.w { "Unexpected telemetry stop!" }
                         // you could trigger RTL or LAND here
                     }
-
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -461,13 +469,11 @@ class AircraftHandler {
 
     fun takeOff() {
         logger.d { "Aircraft taking off" }
-        applyState(TakeoffAircraftState)
         FCManager.startTakeoff()
     }
 
     fun land() {
         logger.d { "Aircraft landing" }
-        applyState(LandAircraftState)
 
         controlTransition(ControlAuthority.TIMELINE_COMMAND)
         mission.doLand { error ->
