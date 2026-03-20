@@ -288,8 +288,6 @@ class AircraftHandler {
         return telemetry.waitDataRemoving(delay)
     }
 
-    suspend fun waitTelemetry(timeout: Long = 5000L): Boolean = telemetry.waitDataReading(timeout)
-
     suspend fun waitBoot(timeout: Long = 5000L): Boolean = AsyncUtils.waitTimeout(
         500,
         timeout

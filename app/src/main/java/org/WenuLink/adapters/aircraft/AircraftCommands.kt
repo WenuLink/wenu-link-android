@@ -113,7 +113,7 @@ data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand 
                     return
                 }
 
-                ctx.dispatchCommand(DisarmCommand(), onResult)
+                onResult(null)
             }
             .onFailure { e ->
                 onResult(e.message)
