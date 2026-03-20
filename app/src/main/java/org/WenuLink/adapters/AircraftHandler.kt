@@ -56,7 +56,7 @@ class AircraftHandler {
 
     @Volatile
     private var currentCommand: AircraftCommand? = null
-    private var guardJob: Job? = null
+    private var monitorJob: Job? = null
 
     init {
         dispatchCommand(BootCommand(5000))
@@ -90,6 +90,10 @@ class AircraftHandler {
     }
 
     fun dispatchCommand(cmd: AircraftCommand, onResult: (String?) -> Unit = {}) {
+        currentCommand?.let { busyCmd ->
+            onResult("Still busy with: ${busyCmd::class.simpleName}. Skipping.")
+            return
+        }
         commandChannel.trySend(cmd to onResult)
     }
 
@@ -153,27 +157,60 @@ class AircraftHandler {
         }
     }
 
-    fun syncState() {
-        // TODO: read components metadata
+    suspend fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
         if (!isPowerOff) return
+        val currentTimestamp = System.currentTimeMillis()
 
         // Check for home position
         val homePos = FCManager.getHomePosition()
-        if (homePos != null) {
-            stateMachine.updateHomePosition(homePos)
+        // only allow requests after homeInterval ms
+        if ((currentTimestamp - homeTimestamp) >= homeInterval) {
+            if (homePos == null) {
+                val homeSet = waitHomeSet(100L)
+                if (!homeSet) logger.e { "Home Location still not set!" }
+            } else {
+                stateMachine.updateHomePosition(homePos)
+            }
+            homeTimestamp = currentTimestamp
         }
 
-        // Check for arm and flying conditions
+        // only allows check sensors after sensorsInterval ms
+        if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
+            sensorsHealthy = sensorChecks(100L) && state.isHomeSet()
+            sensorsTimestamp = currentTimestamp
+        }
+
+        // Check for arm and flying conditions always
         val fcState = state.resolveFrom(
             FCManager.areMotorsArmed(),
             FCManager.isFlying()
         )
 
+        // Force new logic state update only when different
         if (!stateMachine.hasStateChanged(fcState)) return
 
         logger.w { "State reconciliation: $state -> $fcState" }
-        // Force new logic state update only when different
+
         stateMachine.forceSet(fcState)
+        enforceModeConsistency()
+    }
+
+    private fun safetyChecks() {
+        // --- Safety hooks ---
+        rcInput?.hasCenteredJoystick()?.let {
+            // stop everything to if any joystick is moved
+            if (!it) manualControl()
+        }
+
+        if (!sensorsHealthy && state.isFlying()) {
+            logger.w { "Sensors lost during flight!" }
+            // you could trigger RTL or LAND here
+        }
+
+        if (!telemetry.isActive()) {
+            logger.w { "Unexpected telemetry stop!" }
+            // you could trigger RTL or LAND here
+        }
     }
 
     fun processUserPreferences(): Boolean {
@@ -181,12 +218,8 @@ class AircraftHandler {
         return true
     }
 
-    suspend fun sensorChecks(timeout: Long = 10000L, allowedInterval: Long = 1000L): Boolean {
-        // only allows check sensors after 1
-        val currentTimestamp = System.currentTimeMillis()
-        if ((currentTimestamp - sensorsTimestamp) < allowedInterval) return sensorsHealthy
-
-        val perSensorTime = (timeout.toFloat() / 4).roundToLong()
+    suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
+        val perSensorTime = (timeout.toFloat() / 3).roundToLong()
         logger.i { "Waiting sensors data" }
         var sensorsOk = true
         if (!AsyncUtils.waitTimeout(100L, timeout, isReady = telemetry::isReadingSensors)) {
@@ -216,27 +249,7 @@ class AircraftHandler {
         if (!gyroOk) logger.e { "Gyroscope error!" }
         sensorsOk = sensorsOk && gyroOk
 
-        val homeSet = homePositionCheck(perSensorTime)
-        sensorsOk = sensorsOk && homeSet
-
-        sensorsTimestamp = currentTimestamp
-
         return sensorsOk
-    }
-
-    suspend fun homePositionCheck(timeout: Long = 1000L, allowedInterval: Long = 5000L): Boolean {
-        if (state.isHomeSet()) return true
-
-        // Allow to check for home every 5 seconds
-        val currentTimestamp = System.currentTimeMillis()
-        if ((currentTimestamp - homeTimestamp) <= allowedInterval) return state.isHomeSet()
-
-        val homeSet = waitHomeSet(timeout)
-        if (!homeSet) logger.e { "Home Location not set!" }
-
-        homeTimestamp = currentTimestamp
-
-        return state.isHomeSet()
     }
 
     // check for home location and set
@@ -265,7 +278,7 @@ class AircraftHandler {
         // Start telemetry process
         telemetry.launchTelemetry(true)
         // Second wait to receive the data ready for broadcast
-        return waitTelemetry(timeout)
+        return telemetry.waitDataReading(timeout)
     }
 
     suspend fun stopTelemetry(delay: Long = 1000L): Boolean {
@@ -277,6 +290,11 @@ class AircraftHandler {
 
     suspend fun waitTelemetry(timeout: Long = 5000L): Boolean = telemetry.waitDataReading(timeout)
 
+    suspend fun waitBoot(timeout: Long = 5000L): Boolean = AsyncUtils.waitTimeout(
+        500,
+        timeout
+    ) { isPowerOff }
+
     suspend fun boot(timeout: Long = 5000L) {
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
@@ -287,6 +305,7 @@ class AircraftHandler {
         if (!startTelemetry(timeout)) return
         logger.d { "\tInit. telemetry: OK" }
 
+        sensorsHealthy = sensorChecks(timeout)
         logger.d { "\tSensors healthy?: $sensorsHealthy" }
 
         // initial standby state is async, until then, manual control
@@ -296,36 +315,18 @@ class AircraftHandler {
         isPowerOff = false
     }
 
-    private fun startGuardLoop(serviceScope: CoroutineScope) {
-        guardJob?.cancel()
+    private fun startMonitorJob(scope: CoroutineScope) {
+        monitorJob?.cancel()
 
-        guardJob = serviceScope.launch {
+        monitorJob = scope.launch {
             while (isActive) {
                 try {
-                    // --- Update sensors health ---
-                    sensorsHealthy = sensorChecks(1000L)
-
                     // --- Sync real aircraft state ---
                     syncState()
 
-                    // --- Enforce consistency ---
-                    enforceModeConsistency()
+                    safetyChecks()
 
-                    // --- Safety hooks ---
-                    rcInput?.hasCenteredJoystick()?.let {
-                        // stop everything to if any joystick is moved
-                        if (!it) manualControl()
-                    }
-
-                    if (!sensorsHealthy && state.isFlying()) {
-                        logger.w { "Sensors lost during flight!" }
-                        // you could trigger RTL or LAND here
-                    }
-
-                    if (!telemetry.isActive()) {
-                        logger.w { "Unexpected telemetry stop!" }
-                        // you could trigger RTL or LAND here
-                    }
+                    // TODO: mission.updateState() -> syncMission()
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -340,7 +341,7 @@ class AircraftHandler {
         telemetry.registerHandlerScope(handlerScope)
         registerMissionListeners(handlerScope)
         startCommandProcessor(handlerScope)
-        startGuardLoop(handlerScope)
+        startMonitorJob(handlerScope)
     }
 
     private fun registerMissionListeners(handlerScope: CoroutineScope) {
@@ -398,6 +399,14 @@ class AircraftHandler {
         }
     }
 
+    fun stopCommand() {
+        logger.d { "Stop command" }
+        if (currentCommand != null) {
+            // TODO: stop logic of current command, possibly already implemented in MissionHandler
+            currentCommand = null
+        }
+    }
+
     fun cancelMission() {
         logger.d { "cancel mission" }
         if (stateMachine.isMissionWaypoint()) mission.stopWaypoint()
@@ -407,7 +416,9 @@ class AircraftHandler {
     fun controlTransition(authority: ControlAuthority) {
         // Decide policy: reject or stop mission
         if (!stateMachine.isNewControlAuthority(authority)) return
+        // Always stop everything
         cancelMission()
+        stopCommand()
         logger.d { "Control transition: ${state.controlAuthority}->$authority" }
         stateMachine.setControlAuthority(authority)
     }
@@ -425,8 +436,8 @@ class AircraftHandler {
         // Stop ongoing processes
         commandJob?.cancel()
         commandJob = null
-        guardJob?.cancel()
-        guardJob = null
+        monitorJob?.cancel()
+        monitorJob = null
         // Reverse boot sequence if needed
         stopTelemetry(500L)
         isPowerOff = true

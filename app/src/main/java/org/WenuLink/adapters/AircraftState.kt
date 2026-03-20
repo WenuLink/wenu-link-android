@@ -62,15 +62,19 @@ data class AircraftState(
 
 sealed interface StateTransition {
 
-    fun canTransition(from: AircraftState): Boolean
+    fun canTransition(from: AircraftState): String?
 
     fun reduce(from: AircraftState): AircraftState
 }
 
 object BootTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.mavlink == MAV_STATE.MAV_STATE_UNINIT
+    override fun canTransition(from: AircraftState): String? {
+        if (from.mavlink != MAV_STATE.MAV_STATE_UNINIT) {
+            return "Already initialized"
+        }
+        return null
+    }
 
     override fun reduce(from: AircraftState): AircraftState =
         from.copy(mavlink = MAV_STATE.MAV_STATE_BOOT)
@@ -78,9 +82,11 @@ object BootTransition : StateTransition {
 
 object StandbyTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED ||
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+    override fun canTransition(from: AircraftState): String? = if (from.isFlying()) {
+        "Aircraft is flying"
+    } else {
+        null
+    }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_STANDBY,
@@ -90,8 +96,11 @@ object StandbyTransition : StateTransition {
 
 object ArmTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.mavlink == MAV_STATE.MAV_STATE_STANDBY
+    override fun canTransition(from: AircraftState): String? = if (!from.isStandBy()) {
+        "Not ready to arm"
+    } else {
+        null
+    }
 
     override fun reduce(from: AircraftState): AircraftState =
         from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE)
@@ -99,9 +108,11 @@ object ArmTransition : StateTransition {
 
 object TakeoffTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+    override fun canTransition(from: AircraftState): String? = when {
+        !from.isArmed() -> "Not armed"
+        !from.isOnTheGround() -> "Not on the ground"
+        else -> null
+    }
 
     override fun reduce(from: AircraftState): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF)
@@ -109,10 +120,10 @@ object TakeoffTransition : StateTransition {
 
 object FlyingTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED ||
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF ||
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+    override fun canTransition(from: AircraftState): String? = when {
+        !from.isArmed() -> "Not armed"
+        else -> null
+    }
 
     override fun reduce(from: AircraftState): AircraftState =
         from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
@@ -120,9 +131,11 @@ object FlyingTransition : StateTransition {
 
 object LandTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+    override fun canTransition(from: AircraftState): String? = when {
+        !from.isArmed() -> "Not armed"
+        !from.isFlying() -> "Not flying"
+        else -> null
+    }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
@@ -131,9 +144,11 @@ object LandTransition : StateTransition {
 
 object FlightTerminationTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.mavlink == MAV_STATE.MAV_STATE_ACTIVE &&
-            from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+    override fun canTransition(from: AircraftState): String? = when {
+        !from.isArmed() -> "Not armed"
+        !from.isFlying() -> "Not flying"
+        else -> null
+    }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_FLIGHT_TERMINATION
@@ -142,8 +157,11 @@ object FlightTerminationTransition : StateTransition {
 
 object PowerOffTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): Boolean =
-        from.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+    override fun canTransition(from: AircraftState): String? = when {
+        !from.isStandBy() -> "Still armed"
+        !from.isOnTheGround() -> "Still flying"
+        else -> null
+    }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_POWEROFF
@@ -185,9 +203,10 @@ class AircraftStateMachine {
     }
 
     fun dispatch(event: StateTransition): Result<AircraftState> {
-        if (!event.canTransition(state)) {
+        val transitMessage = event.canTransition(state)
+        if (transitMessage != null) {
             return Result.failure(
-                IllegalStateException("Invalid transition: $event -> $state")
+                IllegalStateException("Invalid transition: $event -> $state: $transitMessage")
             )
         }
 

@@ -11,7 +11,7 @@ import org.WenuLink.adapters.StandbyTransition
 import org.WenuLink.adapters.TakeoffTransition
 
 sealed interface AircraftCommand {
-    suspend fun validate(ctx: AircraftHandler): String?
+    suspend fun validate(ctx: AircraftHandler): String? = null
     suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit)
 }
 
@@ -35,8 +35,6 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
     override suspend fun validate(ctx: AircraftHandler): String? = when {
         !ctx.sensorsHealthy -> "Sensors failing"
-        !ctx.state.isStandBy() -> "Not in standby"
-        !ctx.state.isOnTheGround() -> "Not in ground"
         else -> null
     }
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
@@ -63,12 +61,6 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
 data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
-    override suspend fun validate(ctx: AircraftHandler): String? = when {
-        ctx.state.isStandBy() -> null
-        ctx.state.isFlying() -> "Aircraft is flying"
-        else -> null
-    }
-
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
         ctx.stateMachine.dispatch(StandbyTransition)
             .onSuccess {
@@ -86,11 +78,6 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
 data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
 
-    override suspend fun validate(ctx: AircraftHandler): String? = when {
-        !ctx.state.isArmed() -> "Not armed"
-        !ctx.state.isOnTheGround() -> "Not on the ground"
-        else -> null
-    }
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
         ctx.stateMachine.dispatch(TakeoffTransition)
             .onSuccess {
@@ -113,9 +100,6 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
 }
 
 data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand {
-
-    override suspend fun validate(ctx: AircraftHandler): String? =
-        if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
         ctx.stateMachine.dispatch(LandTransition)
@@ -140,8 +124,8 @@ data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand 
 data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Float?) :
     AircraftCommand {
 
-    override suspend fun validate(ctx: AircraftHandler): String? =
-        if (!ctx.state.isFlying()) "Not flying" else null
+//    override suspend fun validate(ctx: AircraftHandler): String? =
+//        if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
         ctx.stateMachine.dispatch(FlyingTransition)
@@ -159,8 +143,8 @@ data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Fl
 
 object GoHomeCommand : AircraftCommand {
 
-    override suspend fun validate(ctx: AircraftHandler): String? =
-        if (!ctx.state.isFlying()) "Not flying" else null
+//    override suspend fun validate(ctx: AircraftHandler): String? =
+//        if (!ctx.state.isFlying()) "Not flying" else null
 
     override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
         ctx.stateMachine.dispatch(FlyingTransition)

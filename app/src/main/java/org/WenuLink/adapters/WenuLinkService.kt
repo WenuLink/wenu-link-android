@@ -112,7 +112,7 @@ class WenuLinkService : Service() {
 
         // Wait basic Aircraft's state
         serviceScope.launch {
-            val bootOk = AsyncUtils.waitTimeout(1000L, 10000L, ::isAircraftReady)
+            val bootOk = aircraft.waitBoot(10000L)
             // Prevent infinite waiting. Terminating all services if the Aircraft is not ready.
             if (!bootOk) {
                 terminate()
@@ -131,8 +131,6 @@ class WenuLinkService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    fun isAircraftReady() = ::aircraft.isInitialized && !aircraft.isPowerOff
 
     fun stopCommands() {
         // mission's logic already stop according to the mission kind
@@ -185,7 +183,7 @@ class WenuLinkService : Service() {
 
         logger.d { "Start MAVLinkService protocol." }
         return serviceScope.launch {
-            if (!aircraft.waitTelemetry(5000L)) {
+            if (!aircraft.waitBoot(5000L)) {
                 logger.w { "Unable to start service, no telemetry." }
                 stopMAVLinkService()
                 return@launch
@@ -206,7 +204,7 @@ class WenuLinkService : Service() {
 
     fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isReady(): Boolean = isAircraftReady() // && (isMAVLinkReady() || isWebRTCReady())
+    fun isReady(): Boolean = ::aircraft.isInitialized && !aircraft.isPowerOff
 
     fun isPowerOff(): Boolean = aircraft.isPowerOff
 
