@@ -9,10 +9,10 @@ import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
 import kotlin.getValue
-import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.IMUState as AppIMUState
-import org.WenuLink.adapters.SensorState as AppSensorState
-import org.WenuLink.adapters.TelemetryData
+import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.adapters.aircraft.IMUState as AppIMUState
+import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
+import org.WenuLink.adapters.aircraft.TelemetryData
 
 object FCManager {
     private val logger by taggedLogger(FCManager::class.java.simpleName)

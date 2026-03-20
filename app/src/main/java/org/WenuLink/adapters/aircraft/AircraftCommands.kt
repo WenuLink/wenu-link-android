@@ -1,15 +1,5 @@
 package org.WenuLink.adapters.aircraft
 
-import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.ArduCopterFlightMode
-import org.WenuLink.adapters.ArmTransition
-import org.WenuLink.adapters.BootTransition
-import org.WenuLink.adapters.Coordinates3D
-import org.WenuLink.adapters.FlyingTransition
-import org.WenuLink.adapters.LandTransition
-import org.WenuLink.adapters.StandbyTransition
-import org.WenuLink.adapters.TakeoffTransition
-
 sealed interface AircraftCommand {
     suspend fun validate(ctx: AircraftHandler): String? = null
     suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit)

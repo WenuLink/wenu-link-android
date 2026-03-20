@@ -7,7 +7,7 @@ import dji.sdk.airlink.AirLink
 import dji.sdk.battery.Battery
 import dji.sdk.products.Aircraft
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.BatteryData
+import org.WenuLink.adapters.aircraft.BatteryData
 
 object AircraftManager {
     private val logger by taggedLogger(AircraftManager::class.java.simpleName)

@@ -7,7 +7,7 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import dji.sdk.flightcontroller.Simulator
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.TelemetryData
+import org.WenuLink.adapters.aircraft.TelemetryData
 
 object SimManager {
     private val logger by taggedLogger(SimManager::class.java.simpleName)

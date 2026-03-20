@@ -26,12 +26,12 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
-import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
-import org.WenuLink.adapters.TelemetryHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.RepositionCommand
+import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
 

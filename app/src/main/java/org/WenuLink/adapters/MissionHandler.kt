@@ -6,6 +6,7 @@ import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
 import kotlin.math.max
 import kotlin.math.min
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
 import org.WenuLink.sdk.MissionActionManager

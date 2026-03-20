@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.math.roundToInt

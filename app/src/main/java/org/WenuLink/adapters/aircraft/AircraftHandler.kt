@@ -1,8 +1,7 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import com.MAVLink.enums.MAV_MODE_FLAG
 import io.getstream.log.taggedLogger
-import kotlin.getValue
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,8 +9,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.WenuLink.adapters.aircraft.AircraftCommand
-import org.WenuLink.adapters.aircraft.BootCommand
+import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
@@ -45,14 +44,14 @@ class AircraftHandler {
     var homeTimestamp: Long = startTimestamp
     var sensorsHealthy = false
         private set
-    val mission = MissionHandler.getInstance()
-    val telemetry = TelemetryHandler.getInstance()
+    val mission = MissionHandler.Companion.getInstance()
+    val telemetry = TelemetryHandler.Companion.getInstance()
     var isPowerOff = true
     val rcInput: RCData?
         get() = telemetry.getRCData()
     private var commandJob: Job? = null
     private val commandChannel =
-        Channel<Pair<AircraftCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
+        Channel<Pair<AircraftCommand, (String?) -> Unit>>(capacity = Channel.Factory.UNLIMITED)
 
     @Volatile
     private var currentCommand: AircraftCommand? = null

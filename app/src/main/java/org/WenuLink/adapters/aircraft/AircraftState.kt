@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_MODE_FLAG

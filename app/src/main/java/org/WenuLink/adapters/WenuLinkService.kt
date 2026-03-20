@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
