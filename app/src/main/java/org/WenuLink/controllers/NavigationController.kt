@@ -26,12 +26,12 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.TelemetryHandler
+import org.WenuLink.adapters.aircraft.RepositionCommand
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -296,9 +296,11 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
-        aircraft.doReposition(
-            target = coordinate,
-            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+        aircraft.dispatchCommand(
+            RepositionCommand(
+                coordinate,
+                if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+            )
         )
 
         client.sendMessage(
@@ -340,7 +342,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     // TODO: start, pause, and resume procedures
 
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
-        val coordinates = aircraft.homeCoordinates ?: return null
+        val coordinates = aircraft.state.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
@@ -413,7 +415,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun msgGpsGlobalOrigin(aircraft: AircraftHandler): MAVLinkMessage? {
-        val homeLoc = aircraft.homeCoordinates ?: return null
+        val homeLoc = aircraft.state.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)

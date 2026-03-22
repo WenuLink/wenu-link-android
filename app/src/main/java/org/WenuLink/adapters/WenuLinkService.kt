@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
@@ -111,10 +110,9 @@ class WenuLinkService : Service() {
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
 
-        // Start Aircraft
+        // Wait basic Aircraft's state
         serviceScope.launch {
-            aircraft.boot()
-            val bootOk = AsyncUtils.waitTimeout(1000L, 10000L, aircraft.state::isStandBy)
+            val bootOk = aircraft.waitBoot(10000L)
             // Prevent infinite waiting. Terminating all services if the Aircraft is not ready.
             if (!bootOk) {
                 terminate()
@@ -133,8 +131,6 @@ class WenuLinkService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    fun isAircraftReady() = ::aircraft.isInitialized
 
     fun stopCommands() {
         // mission's logic already stop according to the mission kind
@@ -187,13 +183,12 @@ class WenuLinkService : Service() {
 
         logger.d { "Start MAVLinkService protocol." }
         return serviceScope.launch {
-            if (!aircraft.waitTelemetry(5000L)) {
+            if (!aircraft.waitBoot(5000L)) {
                 logger.w { "Unable to start service, no telemetry." }
                 stopMAVLinkService()
                 return@launch
             }
             mavlink.launchService(onResult)
-            watchRCInput(100L)
         }
     }
 
@@ -209,7 +204,7 @@ class WenuLinkService : Service() {
 
     fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isReady(): Boolean = isAircraftReady() // && (isMAVLinkReady() || isWebRTCReady())
+    fun isReady(): Boolean = ::aircraft.isInitialized && !aircraft.isPowerOff
 
     fun isPowerOff(): Boolean = aircraft.isPowerOff
 
@@ -231,17 +226,5 @@ class WenuLinkService : Service() {
             aircraft.unload()
         }
         AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
-    }
-
-    suspend fun watchRCInput(intervalTime: Long = 100L) {
-        while (!isPowerOff()) {
-            // Watch for joystick inputs
-            aircraft.rcInput?.hasCenteredJoystick()?.let {
-                serviceScope.launch {
-                    if (!it) aircraft.manualControl() // stop everything and gain the control back
-                }
-            }
-            delay(intervalTime)
-        }
     }
 }

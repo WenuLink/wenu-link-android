@@ -167,15 +167,18 @@ class TelemetryHandler {
     fun isReadingSensors() = lastIMUState != null
 
     @Synchronized
-    fun getIMUState() = lastIMUState
-
-    @Synchronized
     fun updateIMUState(imuState: IMUState?) {
         lastIMUState = imuState
     }
 
     @Synchronized
     fun isCompassOk() = FCManager.compassOk()
+
+    @Synchronized
+    fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } ?: false
+
+    @Synchronized
+    fun isGyroscopeOk() = lastIMUState?.gyroscope?.all { it == SensorState.OK } ?: false
 
     fun startBroadcast() {
         if (isReadingData()) {
@@ -205,7 +208,8 @@ class TelemetryHandler {
     fun isActive(): Boolean = _isListeningRC.value &&
         _isListeningAircraft.value &&
         _isBroadcasting.value &&
-        isReadingData()
+        isReadingData() &&
+        hasData()
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
         isListeningRC.distinctUntilChangedBy { it }
