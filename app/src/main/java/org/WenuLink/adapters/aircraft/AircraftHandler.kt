@@ -2,9 +2,12 @@ package org.WenuLink.adapters.aircraft
 
 import com.MAVLink.enums.MAV_MODE_FLAG
 import io.getstream.log.taggedLogger
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -44,17 +47,15 @@ class AircraftHandler {
     var homeTimestamp: Long = startTimestamp
     var sensorsHealthy = false
         private set
-    val mission = MissionHandler.Companion.getInstance()
-    val telemetry = TelemetryHandler.Companion.getInstance()
+    val mission = MissionHandler.getInstance()
+    val telemetry = TelemetryHandler.getInstance()
     var isPowerOff = true
     val rcInput: RCData?
         get() = telemetry.getRCData()
     private var commandJob: Job? = null
+    private var currentCommandJob: Deferred<String?>? = null
     private val commandChannel =
-        Channel<Pair<AircraftCommand, (String?) -> Unit>>(capacity = Channel.Factory.UNLIMITED)
-
-    @Volatile
-    private var currentCommand: AircraftCommand? = null
+        Channel<Pair<AircraftCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
     private var monitorJob: Job? = null
 
     init {
@@ -66,34 +67,50 @@ class AircraftHandler {
 
         commandJob = scope.launch {
             for ((cmd, onResult) in commandChannel) {
-                currentCommand = cmd
-
                 try {
                     logger.d { "Executing: ${cmd::class.simpleName}" }
 
-                    val error = cmd.validate(this@AircraftHandler)
-                    if (error != null) {
-                        onResult(error)
+                    val validationError = cmd.validate(this@AircraftHandler)
+                    if (validationError != null) {
+                        onResult(validationError)
                         continue
                     }
 
-                    cmd.execute(this@AircraftHandler, onResult)
+                    val deferred = async {
+                        cmd.execute(this@AircraftHandler)
+                    }
+                    currentCommandJob = deferred
+
+                    val executionError = deferred.await()
+                    onResult(executionError)
+                } catch (e: CancellationException) {
+                    logger.w { "Command cancelled: ${cmd::class.simpleName}: $e" }
+                    cmd.onStop(this@AircraftHandler)
+                    onResult(null)
                 } catch (e: Exception) {
                     logger.e { "Command failed: ${cmd::class.simpleName} -> ${e.message}" }
                     onResult(e.message)
                 } finally {
-                    currentCommand = null
+                    currentCommandJob = null
                 }
             }
         }
     }
 
     fun dispatchCommand(cmd: AircraftCommand, onResult: (String?) -> Unit = {}) {
-        currentCommand?.let { busyCmd ->
-            onResult("Still busy with: ${busyCmd::class.simpleName}. Skipping.")
-            return
+        val result = commandChannel.trySend(cmd to onResult)
+        if (result.isFailure) {
+            onResult("Failed to enqueue command: ${cmd::class.simpleName}")
         }
-        commandChannel.trySend(cmd to onResult)
+    }
+
+    fun stopCommand(): String? {
+        logger.d { "Stop command" }
+        val job = currentCommandJob ?: return "No running command"
+
+        job.cancel(CancellationException("Stopped by user"))
+
+        return null
     }
 
     private fun setMode(mode: ArduCopterFlightMode) {
@@ -292,14 +309,14 @@ class AircraftHandler {
         timeout
     ) { isPowerOff }
 
-    suspend fun boot(timeout: Long = 5000L) {
+    suspend fun boot(timeout: Long = 5000L): String? {
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
 
-        if (!processUserPreferences()) return
+        if (!processUserPreferences()) return "No user preferences"
         logger.d { "\tLoading preferences: TBD" }
 
-        if (!startTelemetry(timeout)) return
+        if (!startTelemetry(timeout)) return "No telemetry"
         logger.d { "\tInit. telemetry: OK" }
 
         sensorsHealthy = sensorChecks(timeout)
@@ -310,6 +327,7 @@ class AircraftHandler {
 
         logger.d { "Aircraft boot: OK" }
         isPowerOff = false
+        return null
     }
 
     private fun startMonitorJob(scope: CoroutineScope) {
@@ -396,14 +414,6 @@ class AircraftHandler {
         }
     }
 
-    fun stopCommand() {
-        logger.d { "Stop command" }
-        if (currentCommand != null) {
-            // TODO: stop logic of current command, possibly already implemented in MissionHandler
-            currentCommand = null
-        }
-    }
-
     fun cancelMission() {
         logger.d { "cancel mission" }
         if (stateMachine.isMissionWaypoint()) mission.stopWaypoint()
@@ -430,13 +440,15 @@ class AircraftHandler {
     }
 
     suspend fun unload() {
+        // Stop monitor
+        monitorJob?.cancel()
+        monitorJob = null
+        sensorsHealthy = false
+        // Reverse boot sequence
+        stopTelemetry(500L)
         // Stop ongoing processes
         commandJob?.cancel()
         commandJob = null
-        monitorJob?.cancel()
-        monitorJob = null
-        // Reverse boot sequence if needed
-        stopTelemetry(500L)
         isPowerOff = true
     }
 

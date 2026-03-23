@@ -67,6 +67,18 @@ sealed interface StateTransition {
     fun reduce(from: AircraftState): AircraftState
 }
 
+object InitialTransition : StateTransition {
+
+    override fun canTransition(from: AircraftState): String? = when {
+        from.mavlink != MAV_STATE.MAV_STATE_BOOT -> "Not from boot"
+        from.mavlink != MAV_STATE.MAV_STATE_POWEROFF -> "Not from power off"
+        else -> null
+    }
+
+    override fun reduce(from: AircraftState): AircraftState =
+        from.copy(mavlink = MAV_STATE.MAV_STATE_UNINIT)
+}
+
 object BootTransition : StateTransition {
 
     override fun canTransition(from: AircraftState): String? {
@@ -177,8 +189,27 @@ class AircraftStateMachine {
     var state = AircraftState()
         private set
 
+    fun canDispatch(event: StateTransition): String? = event.canTransition(state)
+
+    fun dispatch(event: StateTransition): AircraftState {
+        state = event.reduce(state)
+        return state
+    }
+
+    fun forceSet(target: AircraftState) {
+        state = target
+    }
+
+    fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
+        state.landed != target.landed
+
     fun setControlAuthority(controlAuthority: ControlAuthority): AircraftState {
         state = state.copy(controlAuthority = controlAuthority)
+        return state
+    }
+
+    fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
+        state = state.copy(homeCoordinates = homeCoordinates)
         return state
     }
 
@@ -189,30 +220,6 @@ class AircraftStateMachine {
     fun isRemoteController() = state.controlAuthority == ControlAuthority.REMOTE_CONTROLLER
 
     fun isNewControlAuthority(authority: ControlAuthority) = state.controlAuthority != authority
-
-    fun forceSet(target: AircraftState) {
-        state = target
-    }
-
-    fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
-        state.landed != target.landed
-
-    fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
-        state = state.copy(homeCoordinates = homeCoordinates)
-        return state
-    }
-
-    fun dispatch(event: StateTransition): Result<AircraftState> {
-        val transitMessage = event.canTransition(state)
-        if (transitMessage != null) {
-            return Result.failure(
-                IllegalStateException("Invalid transition: $event -> $state: $transitMessage")
-            )
-        }
-
-        state = event.reduce(state)
-        return Result.success(state)
-    }
 }
 
 /**

@@ -170,11 +170,6 @@ class CommandController(override var client: MAVLinkClient) : IController {
         logger.d { "processLanding: $commandMsg" }
         aircraft.dispatchCommand(LandCommand()) { landError ->
             logger.d { "processLanding: $landError" }
-            if (landError == null) {
-                aircraft.dispatchCommand(DisarmCommand()) { disarmError ->
-                    logger.d { "processDisarming: $disarmError" }
-                }
-            }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
