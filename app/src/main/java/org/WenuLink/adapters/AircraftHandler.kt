@@ -348,6 +348,7 @@ class AircraftHandler {
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
         telemetry.registerHandlerScope(handlerScope)
+        cameras.registerHandlerScope(handlerScope)
         registerMissionListeners(handlerScope)
         startCommandProcessor(handlerScope)
         startMonitorJob(handlerScope)

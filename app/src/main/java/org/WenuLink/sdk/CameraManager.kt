@@ -9,6 +9,7 @@ import dji.common.util.CommonCallbacks
 import dji.sdk.camera.Camera
 import dji.sdk.camera.VideoFeeder
 import dji.sdk.codec.DJICodecManager
+import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
@@ -277,13 +278,10 @@ object CameraManager {
 
     fun isSingleShoot() = captureMode == SettingsDefinitions.ShootPhotoMode.SINGLE
 
+    fun canRecordVideo() = mInstance?.isCaptureInVideoSupported ?: false
+
     suspend fun requestPhotoShoot(): String? {
         val camera = mInstance ?: return "Camera instance is null"
-
-        // Ensure for CameraMode.SHOOT_PHOTO
-        if (!isPhotoMode()) {
-            return "Camera mode is not SHOOT_PHOTO"
-        }
 
         // Ensure for ShootPhotoMode.SINGLE
         if (!isSingleShoot()) {
@@ -308,6 +306,46 @@ object CameraManager {
                     cont.resume(null)
                 }
             }
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+            }
+        }
+    }
+    suspend fun requestStartVideoRecording(): String? {
+        val camera = mInstance ?: return "No camera instance"
+
+        // Launch capture
+        return suspendCancellableCoroutine { cont ->
+
+            camera.startRecordVideo { error ->
+                if (error != null) {
+                    cont.resume(error.description)
+                } else {
+                    cont.resume(null)
+                }
+            }
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+            }
+        }
+    }
+
+    suspend fun requestStopVideoRecording(): String? {
+        val camera = mInstance ?: return "No camera instance"
+
+        // stop capture
+        return suspendCancellableCoroutine { cont ->
+            camera.stopRecordVideo(
+                SDKUtils.createCompletionCallback { error ->
+                    if (error != null) {
+                        cont.resume(error)
+                    } else {
+                        cont.resume(null)
+                    }
+                }
+            )
 
             cont.invokeOnCancellation {
                 // Add SDK cancel if available

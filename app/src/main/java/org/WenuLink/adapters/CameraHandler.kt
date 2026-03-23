@@ -5,11 +5,10 @@ import io.getstream.log.taggedLogger
 import kotlin.getValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import org.WenuLink.adapters.actions.CameraAction
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import org.WenuLink.adapters.actions.CameraCommand
 import org.WenuLink.sdk.CameraManager
 
 class CameraHandler {
@@ -24,16 +23,51 @@ class CameraHandler {
             return mInstance!!
         }
     }
-    private val logger by taggedLogger("CameraHandler")
-    private val _cameraActions = MutableSharedFlow<CameraAction>(
-        extraBufferCapacity = 10
-    )
 
-    val cameraActions = _cameraActions.asSharedFlow()
-
+    private val logger by taggedLogger(CameraHandler::class.java.simpleName)
     private val availableCameras: MutableList<CameraMetadata> = mutableListOf()
     val list: List<CameraMetadata>
         get() = availableCameras.toList()
+    private var commandJob: Job? = null
+    private var currentCommand: CameraCommand? = null
+    private val commandChannel =
+        Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
+    var sequenceIndex: Int = 0
+    var captureTimestamp: Long = 0
+
+    private fun startCommandProcessor(scope: CoroutineScope) {
+        commandJob?.cancel()
+
+        commandJob = scope.launch {
+            for ((cmd, onResult) in commandChannel) {
+                currentCommand = cmd
+
+                try {
+                    logger.d { "Executing: ${cmd::class.simpleName}" }
+
+                    val error = cmd.validate(this@CameraHandler)
+                    if (error != null) {
+                        onResult(error)
+                        continue
+                    }
+
+                    cmd.execute(this@CameraHandler, onResult)
+                } catch (e: Exception) {
+                    logger.e { "Command failed: ${cmd::class.simpleName} -> ${e.message}" }
+                    onResult(e.message)
+                } finally {
+                    currentCommand = null
+                }
+            }
+        }
+    }
+
+    fun dispatchCommand(cmd: CameraCommand, onResult: (String?) -> Unit = {}) {
+        val result = commandChannel.trySend(cmd to onResult)
+        if (result.isFailure) {
+            onResult("Failed to enqueue command: ${cmd::class.simpleName}")
+        }
+    }
 
     suspend fun initCameras(): Boolean {
         if (!CameraManager.isConnected()) {
@@ -63,13 +97,15 @@ class CameraHandler {
             )
         )
         logger.d { "availableCameras(${availableCameras.size})" }
-        updateMode(CAMERA_MODE.CAMERA_MODE_IMAGE, 0)
+        setMode(CAMERA_MODE.CAMERA_MODE_IMAGE, 0)
 
         logger.d { "Managing ${availableCameras.size} detected camera(s)" }
         return true
     }
 
-    private fun transitionToMode(newMode: Int, cameraIdx: Int = 0) {
+    fun getCamera(cameraIdx: Int): CameraMetadata? = availableCameras.getOrNull(cameraIdx)
+
+    fun setMode(newMode: Int, cameraIdx: Int = 0) {
         val captureType = when (newMode) {
             CAMERA_MODE.CAMERA_MODE_IMAGE -> CameraCaptureType.IMAGE
             CAMERA_MODE.CAMERA_MODE_VIDEO -> CameraCaptureType.VIDEO
@@ -83,121 +119,46 @@ class CameraHandler {
             captureTime = 0
         )
 
-        availableCameras[cameraIdx] =
-            availableCameras[cameraIdx].copy(state = newState)
-    }
-
-    suspend fun setPhotoMode(cameraIdx: Int = 0): Boolean {
-        if (CameraManager.isPhotoMode()) return true
-
-        val error = CameraManager.setPhotoMode()
-        logger.d { "Camera setPhotoMode error: $error" }
-
-        return error == null
-    }
-
-    suspend fun setVideoMode(cameraIdx: Int = 0): Boolean {
-        if (CameraManager.isVideoMode()) return true
-
-        val error = CameraManager.setVideoMode()
-        logger.d { "Camera setVideoMode error: $error" }
-
-        return error == null
-    }
-
-    suspend fun updateMode(newMode: Int, cameraIdx: Int = 0): Boolean {
-        val success = when (newMode) {
-            CAMERA_MODE.CAMERA_MODE_IMAGE -> setPhotoMode(cameraIdx)
-            CAMERA_MODE.CAMERA_MODE_VIDEO -> setVideoMode(cameraIdx)
-            else -> false
+        getCamera(cameraIdx)?.let {
+            availableCameras.set(cameraIdx, it.copy(state = newState))
         }
-
-        if (success) {
-            transitionToMode(newMode, cameraIdx)
-        }
-
-        return success
     }
 
     fun updateCaptureStatus(newStatus: CameraCaptureStatus, cameraIdx: Int = 0) {
-        val camera = availableCameras[cameraIdx]
-        availableCameras[cameraIdx] =
-            camera.copy(
-                state = camera.state.copy(
-                    captureStatus = newStatus
+        getCamera(cameraIdx)?.let {
+            availableCameras.set(
+                cameraIdx,
+                it.copy(
+                    state = it.state.copy(
+                        captureStatus = newStatus
+                    )
                 )
             )
+        }
     }
 
     fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0): Boolean =
         availableCameras[cameraIdx].state.captureStatus == status
 
-    fun captureInProgress(cameraIdx: Int = 0): Boolean =
-        checkCaptureStatus(CameraCaptureStatus.IN_PROGRESS)
+    fun captureInProgress(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
+        CameraCaptureStatus.IN_PROGRESS,
+        cameraIdx
+    )
 
-    fun captureIdle(cameraIdx: Int = 0): Boolean = checkCaptureStatus(CameraCaptureStatus.IDLE)
+    fun captureIdle(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
+        CameraCaptureStatus.IDLE,
+        cameraIdx
+    )
 
-    fun requestAction(action: CameraAction) {
-        _cameraActions.tryEmit(action)
-    }
+    fun isPhotoMode(cameraIdx: Int = 0): Boolean =
+        (getCamera(cameraIdx)?.state?.mavlinkMode ?: -1) == CAMERA_MODE.CAMERA_MODE_IMAGE
+
+    fun isVideoMode(cameraIdx: Int = 0): Boolean =
+        (getCamera(cameraIdx)?.state?.mavlinkMode ?: -1) == CAMERA_MODE.CAMERA_MODE_VIDEO
+
+    fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 
     fun registerHandlerScope(scope: CoroutineScope) {
-        _cameraActions
-            .onEach { action ->
-                handleAction(action)
-            }
-            .launchIn(scope)
-    }
-
-    private suspend fun handleAction(action: CameraAction) {
-        when (action) {
-            is CameraAction.SetMode -> {
-                val error = CameraManager.setPhotoMode()
-                action.onResult(error)
-                if (error == null) {
-                    updateMode(action.mode, action.cameraIdx)
-                }
-            }
-
-            is CameraAction.TakePhoto -> {
-                val error = shootPhoto(action.cameraIdx)
-                action.onResult(error)
-            }
-
-            is CameraAction.StartRecord -> {
-                setVideoMode()
-                updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS)
-                // start recording here
-            }
-
-            is CameraAction.StopRecord -> {
-                updateCaptureStatus(CameraCaptureStatus.IDLE)
-                // stop recording here
-            }
-
-            is CameraAction.GimbalPitch -> {
-                // call gimbal handler
-            }
-        }
-    }
-
-    suspend fun shootPhoto(cameraIdx: Int = 0): String? {
-        if (!captureIdle(cameraIdx)) {
-            return "Camera is busy!"
-        }
-
-        val isPhotoMode = setPhotoMode(cameraIdx)
-
-        if (isPhotoMode) {
-            // mark IN_PROGRESS
-            updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraIdx)
-            // Trigger camera and wait for photo to be taken
-            val error = CameraManager.requestPhotoShoot()
-            // mark IDLE back
-            updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
-            return error
-        } else {
-            return "No in PhotoMode!"
-        }
+        startCommandProcessor(scope)
     }
 }

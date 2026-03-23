@@ -15,11 +15,7 @@ import com.MAVLink.enums.STORAGE_STATUS
 import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
-import kotlin.coroutines.resume
-import kotlin.getValue
 import kotlin.math.roundToLong
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.CameraCaptureStatus
 import org.WenuLink.adapters.CameraMetadata
@@ -27,7 +23,10 @@ import org.WenuLink.adapters.ImageMetadata
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.TelemetryMapper
-import org.WenuLink.adapters.actions.CameraAction
+import org.WenuLink.adapters.actions.SetModeCommand
+import org.WenuLink.adapters.actions.StartRecordCommand
+import org.WenuLink.adapters.actions.StopRecordCommand
+import org.WenuLink.adapters.actions.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -36,10 +35,10 @@ import org.WenuLink.mavlink.MAVLinkClient
  * https://mavlink.io/en/services/camera.html
  *
  */
-class CameraController(override val client: MAVLinkClient) : IController {
+class CameraController(override val client: MAVLinkClient, val mainController: MAVLinkController) :
+    IController {
 
-    private val logger by taggedLogger("CameraController")
-    private var imageIndex: Int = 0
+    private val logger by taggedLogger(CameraController::class.java.simpleName)
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
@@ -48,8 +47,10 @@ class CameraController(override val client: MAVLinkClient) : IController {
         var processed = true
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg, aircraft)
-            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> {}
-            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> {}
+            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> requestStartCapture(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> requestStopCapture(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE -> requestStartRecording(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg, aircraft)
             else -> processed = false
         }
         return processed
@@ -134,23 +135,19 @@ class CameraController(override val client: MAVLinkClient) : IController {
         val index: Int = commandLongMsg.param1.toInt()
         val mode: Int = commandLongMsg.param2.toInt()
 
-        aircraft.cameras.requestAction(
-            CameraAction.SetMode(
-                cameraIdx = index,
-                mode = mode,
-                onResult = { error ->
-                    sendCommandAck(
-                        commandLongMsg.command,
-                        if (error == null) {
-                            MAV_RESULT.MAV_RESULT_ACCEPTED
-                        } else {
-                            MAV_RESULT.MAV_RESULT_FAILED
-                        },
-                        progress = 100
-                    )
-                }
+        aircraft.cameras.dispatchCommand(
+            SetModeCommand(mode, index)
+        ) { error ->
+            sendCommandAck(
+                commandLongMsg.command,
+                if (error == null) {
+                    MAV_RESULT.MAV_RESULT_ACCEPTED
+                } else {
+                    MAV_RESULT.MAV_RESULT_FAILED
+                },
+                progress = 100
             )
-        )
+        }
     }
 
     private fun sendStorageStatus(aircraft: AircraftHandler) {
@@ -170,40 +167,49 @@ class CameraController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    private fun requestStartCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val targetCamera: Int = commandLongMsg.param1.toInt()
-        val cameraInfo: CameraMetadata? = aircraft.cameras.list.getOrNull(targetCamera)
-
+    private fun getCamera(targetCamera: Int, aircraft: AircraftHandler): CameraMetadata? {
+        val cameraInfo = aircraft.cameras.getCamera(targetCamera)
         if (cameraInfo == null) {
-            client.sendMessage(
-                MessageUtils.msgCommandAck(
-                    commandLongMsg.msgid,
-                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
-                )
-            )
             logger.d { "Camera index $targetCamera not found" }
-            return
         }
-        client.sendMessage(
-            MessageUtils.msgCommandAck(
-                commandLongMsg.msgid,
-                MAV_RESULT.MAV_RESULT_ACCEPTED
-            )
-        )
-        val intervalTime: Float = commandLongMsg.param2 // seconds
-        val totalImages: Int = commandLongMsg.param3.toInt()
-        val initSequence: Int = commandLongMsg.param4.toInt()
-        imageIndex = initSequence
+        return cameraInfo
     }
 
-    suspend fun shootPhoto(aircraft: AircraftHandler): ImageMetadata? =
-        suspendCancellableCoroutine { cont ->
-            val cameraInfo = aircraft.cameras.list.first()
-            aircraft.cameras.requestAction(
-                CameraAction.TakePhoto(cameraInfo.id) { error ->
+    private fun requestShootPhoto(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler,
+        cameraInfo: CameraMetadata
+    ) {
+        val intervalTime: Float = commandLongMsg.param2 // seconds
+        val initSequence: Int = commandLongMsg.param4.toInt()
+        val totalPhotos: Int = commandLongMsg.param3.toInt()
+
+        fun mustCapture() = if (totalPhotos == 0) {
+            aircraft.cameras.sequenceIndex != -1
+        } else {
+            aircraft.cameras.sequenceIndex <= totalPhotos
+        }
+
+        aircraft.cameras.sequenceIndex = initSequence
+
+        while (mustCapture()) {
+            if ((System.currentTimeMillis() - aircraft.cameras.captureTimestamp) < intervalTime) {
+                continue
+            }
+            if (!aircraft.cameras.captureIdle(cameraInfo.id)) {
+                continue
+            }
+
+            aircraft.cameras.dispatchCommand(
+                TakePhotoCommand(cameraInfo.id)
+            )
+                { error ->
                     val captureOk = error == null
+                    if (!captureOk) {
+                        logger.w { "Error in shootPhoto: $error" }
+                    }
                     val photoData = ImageMetadata(
-                        index = imageIndex,
+                        index = aircraft.cameras.sequenceIndex,
                         captureOk = captureOk,
                         cameraID = cameraInfo.id,
                         telemetry = aircraft.telemetry.getData()!!
@@ -212,30 +218,133 @@ class CameraController(override val client: MAVLinkClient) : IController {
                     client.sendMessage(
                         msgImageCaptured(photoData)
                     )
-                    imageIndex++
-                    cont.resume(photoData)
                 }
+        }
+    }
+
+    private fun requestStartCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+
+        if (cameraInfo == null) {
+            client.sendMessage(
+                MessageUtils.msgCommandAck(
+                    commandLongMsg.msgid,
+                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
+                )
             )
-            cont.invokeOnCancellation {
-                // Add SDK cancel if available
-                cont.resume(null)
-            }
+            return
         }
 
-    private suspend fun startPhotoCapture(
-        intervalSeconds: Float,
-        totalPhotos: Int,
-        aircraft: AircraftHandler
-    ) {
-        var takenPhotos = 0
-        while (takenPhotos <= totalPhotos) {
-            if (takenPhotos > 0) delay((intervalSeconds * 1000).roundToLong())
+        client.sendMessage(
+            MessageUtils.msgCommandAck(
+                commandLongMsg.msgid,
+                MAV_RESULT.MAV_RESULT_ACCEPTED
+            )
+        )
 
-            val photoData = shootPhoto(aircraft)
-            if (photoData?.captureOk == true) {
-                takenPhotos += 1
-            }
+        requestShootPhoto(commandLongMsg, aircraft, cameraInfo)
+    }
+
+    private fun requestStopCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+
+        if (cameraInfo == null) {
+            client.sendMessage(
+                MessageUtils.msgCommandAck(
+                    commandLongMsg.msgid,
+                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
+                )
+            )
+            return
         }
+
+        client.sendMessage(
+            MessageUtils.msgCommandAck(
+                commandLongMsg.msgid,
+                MAV_RESULT.MAV_RESULT_ACCEPTED
+            )
+        )
+
+        aircraft.cameras.sequenceIndex = -1
+    }
+
+    private fun requestStartRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt(), aircraft)
+
+        if (cameraInfo == null) {
+            client.sendMessage(
+                MessageUtils.msgCommandAck(
+                    commandLongMsg.msgid,
+                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
+                )
+            )
+            return
+        }
+
+        client.sendMessage(
+            MessageUtils.msgCommandAck(
+                commandLongMsg.msgid,
+                MAV_RESULT.MAV_RESULT_ACCEPTED
+            )
+        )
+
+        val streamID = commandLongMsg.param1.toInt()
+        val statusFreq = commandLongMsg.param2 // Hz
+
+        aircraft.cameras.dispatchCommand(
+            StartRecordCommand(cameraInfo.id)
+        )
+            { error ->
+                val captureOk = error == null
+                if (!captureOk) {
+                    logger.w { "Error in requestStartRecording: $error" }
+                } else {
+                    // setting messages frequency
+                    mainController.setMessageRate(
+                        msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
+                        ((1f / statusFreq) * 1_000).roundToLong()
+                    )
+                }
+            }
+    }
+
+    private fun requestStopRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt(), aircraft)
+
+        if (cameraInfo == null) {
+            client.sendMessage(
+                MessageUtils.msgCommandAck(
+                    commandLongMsg.msgid,
+                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
+                )
+            )
+            return
+        }
+
+        client.sendMessage(
+            MessageUtils.msgCommandAck(
+                commandLongMsg.msgid,
+                MAV_RESULT.MAV_RESULT_ACCEPTED
+            )
+        )
+
+        val streamID = commandLongMsg.param1.toInt()
+
+        aircraft.cameras.dispatchCommand(
+            StopRecordCommand(cameraInfo.id)
+        )
+            { error ->
+                val captureOk = error == null
+                if (!captureOk) {
+                    logger.w { "Error in requestStopRecording: $error" }
+                } else {
+                    // deactivating messages
+                    mainController.setMessageRate(
+                        msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
+                        -1
+                    )
+                }
+            }
     }
 
     fun msgCameraInformation(cameraInfo: CameraMetadata): msg_camera_information =
@@ -248,7 +357,7 @@ class CameraController(override val client: MAVLinkClient) : IController {
                 23,
                 FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
             ) // Match SDK version or if possible the Component's own FW version
-            // TODO: check if can be obtained from SDK
+            // TODO: check if it can be obtained from SDK
             focal_length = Float.NaN
             sensor_size_h = Float.NaN
             sensor_size_v = Float.NaN
@@ -290,7 +399,7 @@ class CameraController(override val client: MAVLinkClient) : IController {
     fun msgCaptureStatus(cameraInfo: CameraMetadata): msg_camera_capture_status {
         // TODO: add proper updates
         var imageStatus = CameraCaptureStatus.IDLE
-        var imageInterval: Float = 0F
+        var imageInterval: Float = 0f
         var videoStatus = CameraCaptureStatus.IDLE
         var videoTime: Long = 0
         if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE) {

@@ -146,7 +146,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         controllers += CommandController(client)
         controllers += ParameterController(client)
         controllers += NavigationController(client)
-        controllers += CameraController(client)
+        controllers += CameraController(client, this)
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
@@ -332,7 +332,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         val request = msg as msg_request_data_stream
 
         val dataList = availableDataList[request.req_stream_id.toInt()]
-        if (dataList == null || dataList.isEmpty()) return
+        if (dataList.isNullOrEmpty()) return
 
         var timeInterval: Int = -1
         if (request.start_stop.toInt() == 1) {
@@ -343,7 +343,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
                 1_000_000
             } // Hz to micro seconds if must start
             else {
-                ((1.0 / timeInterval.toFloat()) * 1_000_000).roundToInt()
+                ((1.0 / timeInterval.toFloat()) * 1_000).roundToInt()
             }
         }
 
