@@ -174,7 +174,7 @@ class AircraftHandler {
     }
 
     suspend fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
-        if (!isPowerOff) return
+        if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
 
         // Check for home position
@@ -304,10 +304,8 @@ class AircraftHandler {
         return telemetry.waitDataRemoving(delay)
     }
 
-    suspend fun waitBoot(timeout: Long = 5000L): Boolean = AsyncUtils.waitTimeout(
-        500,
-        timeout
-    ) { isPowerOff }
+    suspend fun waitBoot(timeout: Long = 5000L): Boolean =
+        AsyncUtils.waitTimeout(500, timeout) { !isPowerOff }
 
     suspend fun boot(timeout: Long = 5000L): String? {
         sensorsHealthy = false

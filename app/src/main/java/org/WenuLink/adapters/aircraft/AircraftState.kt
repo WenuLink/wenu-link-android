@@ -28,6 +28,12 @@ data class AircraftState(
 
     fun isOnTheGround() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
+    fun isUninitialized() = mavlink == MAV_STATE.MAV_STATE_UNINIT
+
+    fun isBoot() = mavlink == MAV_STATE.MAV_STATE_BOOT
+
+    fun isPowerOff() = mavlink == MAV_STATE.MAV_STATE_POWEROFF
+
     fun resolveFrom(isArmed: Boolean, isFlying: Boolean): AircraftState {
         val mavState = when (this.mavlink) {
             MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
@@ -69,11 +75,12 @@ sealed interface StateTransition {
 
 object InitialTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): String? = when {
-        from.mavlink != MAV_STATE.MAV_STATE_BOOT -> "Not from boot"
-        from.mavlink != MAV_STATE.MAV_STATE_POWEROFF -> "Not from power off"
-        else -> null
-    }
+    override fun canTransition(from: AircraftState): String? =
+        if (!(from.isBoot() || from.isPowerOff())) {
+            "Cannot reset to initial from MAV_STATE=${from.mavlink}"
+        } else {
+            null
+        }
 
     override fun reduce(from: AircraftState): AircraftState =
         from.copy(mavlink = MAV_STATE.MAV_STATE_UNINIT)
@@ -81,11 +88,10 @@ object InitialTransition : StateTransition {
 
 object BootTransition : StateTransition {
 
-    override fun canTransition(from: AircraftState): String? {
-        if (from.mavlink != MAV_STATE.MAV_STATE_UNINIT) {
-            return "Already initialized"
-        }
-        return null
+    override fun canTransition(from: AircraftState): String? = if (!from.isUninitialized()) {
+        "Already initialized"
+    } else {
+        null
     }
 
     override fun reduce(from: AircraftState): AircraftState =
