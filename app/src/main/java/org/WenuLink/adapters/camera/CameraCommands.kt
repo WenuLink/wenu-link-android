@@ -1,8 +1,6 @@
-package org.WenuLink.adapters.actions
+package org.WenuLink.adapters.camera
 
 import com.MAVLink.enums.CAMERA_MODE
-import org.WenuLink.adapters.aircraft.CameraCaptureStatus
-import org.WenuLink.adapters.CameraHandler
 import org.WenuLink.sdk.CameraManager
 
 sealed interface CameraCommand {

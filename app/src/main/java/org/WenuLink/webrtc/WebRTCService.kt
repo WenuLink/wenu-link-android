@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import org.WenuLink.adapters.CameraCapturer
+import org.WenuLink.adapters.camera.CameraCapturer
 import org.WenuLink.webrtc.peer.StreamPeerConnection
 import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
 import org.WenuLink.webrtc.peer.StreamPeerType

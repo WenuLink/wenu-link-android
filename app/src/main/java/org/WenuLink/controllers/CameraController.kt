@@ -16,17 +16,17 @@ import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.adapters.aircraft.CameraCaptureStatus
-import org.WenuLink.adapters.aircraft.CameraMetadata
-import org.WenuLink.adapters.aircraft.ImageMetadata
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.TelemetryMapper
-import org.WenuLink.adapters.actions.SetModeCommand
-import org.WenuLink.adapters.actions.StartRecordCommand
-import org.WenuLink.adapters.actions.StopRecordCommand
-import org.WenuLink.adapters.actions.TakePhotoCommand
+import org.WenuLink.adapters.camera.CameraCaptureStatus
+import org.WenuLink.adapters.camera.CameraMetadata
+import org.WenuLink.adapters.camera.ImageMetadata
+import org.WenuLink.adapters.camera.SetModeCommand
+import org.WenuLink.adapters.camera.StartRecordCommand
+import org.WenuLink.adapters.camera.StopRecordCommand
+import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**

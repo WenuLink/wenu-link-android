@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.camera
 
 import android.content.Context
 import android.media.MediaFormat
