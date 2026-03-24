@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.controllers.MAVLinkController
 

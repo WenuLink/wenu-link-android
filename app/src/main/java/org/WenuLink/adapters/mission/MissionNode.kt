@@ -1,6 +1,6 @@
 package org.WenuLink.adapters.mission
 
-import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.aircraft.Coordinates3D
 
 sealed class MissionNode(
     val coordinates3D: Coordinates3D,

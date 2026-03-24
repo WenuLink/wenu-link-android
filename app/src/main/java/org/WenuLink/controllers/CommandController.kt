@@ -8,8 +8,8 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.ArduCopterFlightMode
+import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand

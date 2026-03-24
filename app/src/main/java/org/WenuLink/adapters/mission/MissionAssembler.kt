@@ -1,6 +1,6 @@
 package org.WenuLink.adapters.mission
 
-import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.aircraft.Coordinates3D
 
 class MissionAssembler {
     private val nodes = mutableListOf<MissionNode>()

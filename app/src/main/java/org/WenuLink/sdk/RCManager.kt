@@ -4,8 +4,8 @@ import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
 import io.getstream.log.taggedLogger
 import kotlin.math.round
-import org.WenuLink.adapters.BatteryData
-import org.WenuLink.adapters.RCData
+import org.WenuLink.adapters.aircraft.BatteryData
+import org.WenuLink.adapters.aircraft.RCData
 
 object RCManager {
     private val logger by taggedLogger(RCManager::class.java.simpleName)

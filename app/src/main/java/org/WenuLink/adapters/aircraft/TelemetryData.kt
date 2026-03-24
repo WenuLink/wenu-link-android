@@ -1,9 +1,11 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import com.MAVLink.enums.CAMERA_MODE
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
+import org.WenuLink.adapters.MessageUtils
 import kotlin.Int
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Data class to hold telemetry info.
@@ -204,7 +206,7 @@ data class ImageMetadata(
 
 data class Quaternion(val w: Double, val x: Double, val y: Double, val z: Double) {
     fun normalized(): Quaternion {
-        val norm = kotlin.math.sqrt(w * w + x * x + y * y + z * z)
+        val norm = sqrt(w * w + x * x + y * y + z * z)
         return Quaternion(w / norm, x / norm, y / norm, z / norm)
     }
 

@@ -8,6 +8,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+import org.WenuLink.adapters.aircraft.Quaternion
 
 object AsyncUtils {
     suspend fun waitReadiness(

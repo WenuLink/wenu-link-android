@@ -16,7 +16,7 @@ import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import dji.sdk.mission.timeline.actions.TakeOffAction
 import io.getstream.log.taggedLogger
 import kotlin.reflect.KClass
-import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.aircraft.Coordinates3D
 
 /**
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html

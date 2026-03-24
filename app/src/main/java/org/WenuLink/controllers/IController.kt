@@ -3,7 +3,7 @@ package org.WenuLink.controllers
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
-import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**

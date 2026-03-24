@@ -1,7 +1,7 @@
 package org.WenuLink.adapters.actions
 
 import com.MAVLink.enums.CAMERA_MODE
-import org.WenuLink.adapters.CameraCaptureStatus
+import org.WenuLink.adapters.aircraft.CameraCaptureStatus
 import org.WenuLink.adapters.CameraHandler
 import org.WenuLink.sdk.CameraManager
 

@@ -9,6 +9,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.actions.CameraCommand
+import org.WenuLink.adapters.aircraft.CameraCaptureStatus
+import org.WenuLink.adapters.aircraft.CameraCaptureType
+import org.WenuLink.adapters.aircraft.CameraMetadata
+import org.WenuLink.adapters.aircraft.CameraState
 import org.WenuLink.sdk.CameraManager
 
 class CameraHandler {
