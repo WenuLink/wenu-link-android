@@ -190,9 +190,9 @@ uses for building. The easiest way is to use Android Studio's built-in
 terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
 The path varies by OS:
 
-Windows: `C:\Program Files\Android\Android Studio\jbr`
-macOS: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
-Linux: `/opt/android-studio/jbr`
+- Windows: `C:\Program Files\Android\Android Studio\jbr`
+- macOS: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
+- Linux: `/opt/android-studio/jbr`
 
 #### Recommended: pre-commit hook
 

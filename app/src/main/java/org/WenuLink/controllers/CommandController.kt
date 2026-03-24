@@ -8,9 +8,9 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.LandCommand
@@ -170,11 +170,6 @@ class CommandController(override var client: MAVLinkClient) : IController {
         logger.d { "processLanding: $commandMsg" }
         aircraft.dispatchCommand(LandCommand()) { landError ->
             logger.d { "processLanding: $landError" }
-            if (landError == null) {
-                aircraft.dispatchCommand(DisarmCommand()) { disarmError ->
-                    logger.d { "processDisarming: $disarmError" }
-                }
-            }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }

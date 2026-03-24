@@ -7,6 +7,7 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import kotlin.math.max
 import kotlin.math.min
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
 import org.WenuLink.sdk.MissionActionManager
@@ -43,27 +44,26 @@ class MissionHandler {
     @Synchronized
     fun updateState() {
         logger.d { "updateMissionState: ${MissionManager.currentState}" }
-        if (MissionManager.isWaitingMission()) {
-            currentState = MISSION_STATE.MISSION_STATE_NO_MISSION
-        } else if (MissionManager.isMissionReady()) {
-            currentState = MISSION_STATE.MISSION_STATE_NOT_STARTED
-        } else if (MissionManager.isMissionStarted()) {
-            currentState = MISSION_STATE.MISSION_STATE_ACTIVE
-        } else if (MissionManager.isMissionPaused()) {
-            currentState = MISSION_STATE.MISSION_STATE_PAUSED
+        currentState = when {
+            MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
+            MissionManager.isMissionReady() -> MISSION_STATE.MISSION_STATE_NOT_STARTED
+            MissionManager.isMissionStarted() -> MISSION_STATE.MISSION_STATE_ACTIVE
+            MissionManager.isMissionPaused() -> MISSION_STATE.MISSION_STATE_PAUSED
+            else -> currentState
         }
     }
 
     fun setSpeed(speed: Float) {
-        if (speed < -15f || speed > 15f) logger.w { "Clipping new speed $speed in [-15, 15]" }
-        flightSpeed = min(max(speed, -15f), 15f)
+        val range = -15f..15f
+        flightSpeed = speed.coerceIn(range)
+        if (speed !in range) logger.w { "Clipped speed $speed to [$range]" }
     }
 
-    fun getItemCoordinates(itemMsg: msg_mission_item_int): Coordinates3D {
-        val latitude = MessageUtils.coordinateMAVLink2DJI(itemMsg.x)
-        val longitude = MessageUtils.coordinateMAVLink2DJI(itemMsg.y)
-        return Coordinates3D(latitude, longitude, itemMsg.z)
-    }
+    fun getItemCoordinates(itemMsg: msg_mission_item_int): Coordinates3D = Coordinates3D(
+        MessageUtils.coordinateMAVLink2DJI(itemMsg.x),
+        MessageUtils.coordinateMAVLink2DJI(itemMsg.y),
+        itemMsg.z
+    )
 
     fun getWaypointNode(index: Int) = assembler.getNode(index)
 
@@ -83,42 +83,7 @@ class MissionHandler {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
                 assembler.addTakeoff(getItemCoordinates(itemMsg))
 
-            MAV_CMD.MAV_CMD_NAV_WAYPOINT -> {
-                // Assumes Global only
-                val coordinates = getItemCoordinates(itemMsg)
-                val delay = itemMsg.param1.toInt()
-                val yaw: Float = itemMsg.param4
-
-                // TODO: airframe check
-//                val frameReference = itemMsg.frame.toInt()
-//                // We only support the following frame models:
-//                // 0 = Global (WGS84) coordinate frame + altitude relative to mean sea level (MSL).
-//                // 3 = Global (WGS84) coordinate frame + altitude relative to the home position.
-//                if (frameReference != 0 && frameReference != 3) {
-//                    logger.w { "frameReference: $frameReference is not available" }
-//                    sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED_FRAME)
-//                    return
-//                }
-
-                assembler.addWaypoint(coordinates)
-
-                // Delay (seconds)
-                if (delay > 0) {
-                    assembler.addActionToLast(
-                        MissionAction.Delay(delay)
-                    )
-                }
-
-                // Yaw (rad → deg)
-                if (yaw != 0f) {
-                    val deg = (yaw * 180f / Math.PI).toInt()
-                    assembler.addActionToLast(
-                        MissionAction.Rotate(deg)
-                    )
-                }
-
-                logger.d { "Waypoint: ($coordinates) (Yaw=$yaw deg) (Delay=$delay)" }
-            }
+            MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_DELAY ->
                 assembler.addActionToLast(MissionAction.Delay(itemMsg.param1.toInt()))
@@ -142,6 +107,43 @@ class MissionHandler {
         }
 
         return true
+    }
+
+    private fun assembleWaypointNode(itemMsg: msg_mission_item_int) {
+        // Assumes Global only
+        val coordinates = getItemCoordinates(itemMsg)
+        val delay = itemMsg.param1.toInt()
+        val yaw: Float = itemMsg.param4
+
+        // TODO: airframe check
+//         val frameReference = itemMsg.frame.toInt()
+//         // We only support the following frame models:
+//         // 0 = Global (WGS84) coordinate frame + altitude relative to mean sea level (MSL).
+//         // 3 = Global (WGS84) coordinate frame + altitude relative to the home position.
+//         if (frameReference != 0 && frameReference != 3) {
+//             logger.w { "frameReference: $frameReference is not available" }
+//             sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED_FRAME)
+//             return
+//         }
+
+        assembler.addWaypoint(coordinates)
+
+        // Delay (seconds)
+        if (delay > 0) {
+            assembler.addActionToLast(
+                MissionAction.Delay(delay)
+            )
+        }
+
+        // Yaw (rad → deg)
+        if (yaw != 0f) {
+            val deg = (yaw * 180f / Math.PI).toInt()
+            assembler.addActionToLast(
+                MissionAction.Rotate(deg)
+            )
+        }
+
+        logger.d { "Waypoint: ($coordinates) (Yaw=$yaw deg) (Delay=$delay)" }
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) {

@@ -1,151 +1,152 @@
 package org.WenuLink.adapters.aircraft
 
 sealed interface AircraftCommand {
-    suspend fun validate(ctx: AircraftHandler): String? = null
-    suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit)
+    fun validate(ctx: AircraftHandler): String?
+    suspend fun execute(ctx: AircraftHandler): String?
+    suspend fun onStop(ctx: AircraftHandler)
 }
 
 data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
-    override suspend fun validate(ctx: AircraftHandler): String? =
-        if (!ctx.isPowerOff) "Already booted" else null
+    override fun validate(ctx: AircraftHandler): String? {
+        if (!ctx.isPowerOff) return "Already booted"
+        return ctx.stateMachine.canDispatch(BootTransition)
+    }
 
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
         ctx.stateMachine.dispatch(BootTransition)
-            .onSuccess {
-                ctx.boot(timeout)
-                onResult(null)
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+        return ctx.boot(timeout)
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.stateMachine.dispatch(InitialTransition)
     }
 }
 
 data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
-    override suspend fun validate(ctx: AircraftHandler): String? = when {
-        !ctx.sensorsHealthy -> "Sensors failing"
-        else -> null
+    override fun validate(ctx: AircraftHandler): String? {
+        if (!ctx.sensorsHealthy) return "Sensors failing"
+        return ctx.stateMachine.canDispatch(ArmTransition)
     }
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.stateMachine.dispatch(ArmTransition)
-            .onSuccess {
-                // TODO: update according to each mode
-                // https://ardupilot.org/copter/docs/arming_the_motors.html
-                val armed = if (ctx.copterFlightMode == ArduCopterFlightMode.STABILIZE) {
-                    // Manual takeoff
-                    ctx.armMotors()
-                    ctx.waitArmTransition(true, timeout)
-                } else {
-                    // Automatic takeoff only must wait for state changes
-                    true
-                }
 
-                onResult(if (armed) null else "Unable to arm motors")
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
+        ctx.stateMachine.dispatch(ArmTransition)
+        // TODO: update according to each mode
+        // https://ardupilot.org/copter/docs/arming_the_motors.html
+        val armed = if (ctx.copterFlightMode == ArduCopterFlightMode.STABILIZE) {
+            // Manual takeoff
+            ctx.armMotors()
+            ctx.waitArmTransition(true, timeout)
+        } else {
+            // Automatic takeoff only must wait for state changes
+            true
+        }
+
+        return if (armed) null else "Unable to arm motors"
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchCommand(DisarmCommand())
     }
 }
 
 data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
-        ctx.stateMachine.dispatch(StandbyTransition)
-            .onSuccess {
-                // continue execution
-                ctx.disarmMotors()
-                val disarmed = ctx.waitArmTransition(false, timeout)
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(StandbyTransition)
 
-                onResult(if (disarmed) null else "Unable to disarm motors")
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
+        ctx.stateMachine.dispatch(StandbyTransition)
+        ctx.disarmMotors()
+        val disarmed = ctx.waitArmTransition(false, timeout)
+
+        return if (disarmed) null else "Unable to disarm motors"
     }
+
+    override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
 }
 
 data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
 
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(TakeoffTransition)
+
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
         ctx.stateMachine.dispatch(TakeoffTransition)
-            .onSuccess {
-                // continue execution
-                ctx.takeOff() // ctx.takeOff(initialAltitude)
-                val isFlying = ctx.awaitFlightState(true)
+        ctx.takeOff() // ctx.takeOff(initialAltitude)
+        val isFlying = ctx.awaitFlightState(true)
 
-                if (!isFlying) {
-                    onResult("Unable to takeoff")
-                    ctx.disarmMotors()
-                    return
-                }
+        if (!isFlying) {
+            ctx.dispatchCommand(LandCommand(true))
+            return "Unable to takeoff"
+        }
 
-                onResult(null)
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+        return null
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchCommand(LandCommand(true))
     }
 }
 
-data class LandCommand(val forceConfirmation: Boolean = true) : AircraftCommand {
+data class LandCommand(val withLandingConfirmation: Boolean = true) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(LandTransition)
 
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
         ctx.stateMachine.dispatch(LandTransition)
-            .onSuccess {
-                // continue execution
-                ctx.land() // ctx.land(forceConfirmation)
-                val onTheGround = ctx.awaitFlightState(false)
+        ctx.land() // ctx.land(forceConfirmation)
+        val onTheGround = ctx.awaitFlightState(false)
 
-                if (!onTheGround) {
-                    onResult("Unable to land")
-                    return
-                }
+        if (!onTheGround) return "Unable to land"
 
-                onResult(null)
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+        ctx.dispatchCommand(DisarmCommand())
+
+        return null
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.manualControl()
     }
 }
 
 data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Float?) :
     AircraftCommand {
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(FlyingTransition)
 
-//    override suspend fun validate(ctx: AircraftHandler): String? =
-//        if (!ctx.state.isFlying()) "Not flying" else null
-
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
         ctx.stateMachine.dispatch(FlyingTransition)
-            .onSuccess {
-                // continue execution
-                ctx.doReposition(targetCoordinates, speed)
-                // TODO: wait for reaching location
-                onResult(null)
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+        ctx.doReposition(targetCoordinates, speed)
+        // TODO: wait for reaching location?
+        return null
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.manualControl()
     }
 }
 
 object GoHomeCommand : AircraftCommand {
 
-//    override suspend fun validate(ctx: AircraftHandler): String? =
-//        if (!ctx.state.isFlying()) "Not flying" else null
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(FlyingTransition)
 
-    override suspend fun execute(ctx: AircraftHandler, onResult: (String?) -> Unit) {
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
         ctx.stateMachine.dispatch(FlyingTransition)
-            .onSuccess {
-                // continue execution
-                ctx.doGoHome()
-                // TODO: wait for reaching location
-                onResult(null)
-            }
-            .onFailure { e ->
-                onResult(e.message)
-            }
+        ctx.doGoHome()
+        // TODO: wait for reaching location?
+        return null
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.manualControl()
     }
 }
