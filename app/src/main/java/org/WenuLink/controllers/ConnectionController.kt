@@ -24,9 +24,9 @@ import io.getstream.log.taggedLogger
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.TelemetryHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -210,7 +210,7 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
 
     fun msgHUD(telemetry: TelemetryHandler): MAVLinkMessage? {
         val telemetryData = telemetry.getData() ?: return null
-        val rcData = telemetry.getRCData() ?: return null
+        val rcData = telemetry.getRCData()?.toMAVLink() ?: return null
         val msg = msg_vfr_hud()
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
@@ -225,12 +225,11 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         if (heading < 0) heading += 360
         msg.heading = heading.toInt().toShort()
         // vertical info
-        msg.throttle = rcData.toMAVLink().throttleSetting
+        msg.throttle = rcData.throttleSetting
         msg.alt = -telemetryData.altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down
         msg.climb = -telemetryData.velocityZ
-//        client.sendMessage(msg)
         return msg
     }
 
@@ -245,7 +244,6 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         // AirLink's UpLinkSignalQuality
         msg.remrssi = ((airlinkSignal[1] / 100f) * 255f).roundToInt().toShort()
         return msg
-//        client.sendMessage(msg)
     }
 
     fun msgPowerStatus(): MAVLinkMessage = msg_power_status()

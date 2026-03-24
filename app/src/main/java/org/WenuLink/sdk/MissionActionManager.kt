@@ -16,7 +16,7 @@ import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import dji.sdk.mission.timeline.actions.TakeOffAction
 import io.getstream.log.taggedLogger
 import kotlin.reflect.KClass
-import org.WenuLink.adapters.Coordinates3D
+import org.WenuLink.adapters.aircraft.Coordinates3D
 
 /**
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html
@@ -28,7 +28,7 @@ object MissionActionManager {
         val event: TimelineEvent
     )
 
-    private val logger by taggedLogger("TimelineMissionManager")
+    private val logger by taggedLogger("MissionActionManager")
 
     private val missionControl: MissionControl
         get() = MissionControl.getInstance()
@@ -55,6 +55,10 @@ object MissionActionManager {
         missionControl.pauseTimeline()
     }
 
+    fun resume() {
+        missionControl.resumeTimeline()
+    }
+
     // ---- Actions ----
 
     fun scheduleTakeOff(): DJIError? = missionControl.scheduleElement(TakeOffAction())
@@ -75,6 +79,13 @@ object MissionActionManager {
             autoConfirmLandingEnabled = autoConfirm
         }
         return missionControl.scheduleElement(land)
+    }
+
+    fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? {
+        val goHome = GoHomeAction().apply {
+            autoConfirmLandingEnabled = autoConfirm
+        }
+        return missionControl.scheduleElement(goHome)
     }
 
     // ---- Listener and callbacks ----

@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
@@ -33,6 +34,7 @@ class TelemetryHandler {
     private val _isListeningAircraft = MutableStateFlow(false)
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private var lastTelemetryData: TelemetryData? = null
+    private var lastIMUState: IMUState? = null
     val isSimulationAvailable: Boolean
         get() = SimManager.isAvailable()
     val isSimulationActive: Boolean
@@ -74,8 +76,7 @@ class TelemetryHandler {
         SimManager.unregisterStateCallback()
         if (register) {
             SimManager.registerStateCallback { state ->
-                // TODO: Some telemetry values such as velocities must be updated
-                updateTelemetryData(SimManager.state2telemetry(state))
+                updateTelemetryData(SimManager.state2telemetry(state, lastTelemetryData))
             }
         }
     }
@@ -104,6 +105,8 @@ class TelemetryHandler {
         } else {
             registerRealState(register)
         }
+        // Sensor listeners
+        registerSensorState(register)
     }
 
     fun listenRemoteController(listen: Boolean) {
@@ -150,6 +153,34 @@ class TelemetryHandler {
         }
     }
 
+    fun registerSensorState(listen: Boolean) {
+        FCManager.unregisterIMUState() // always clear first
+        if (listen) {
+            FCManager.registerIMUState { imuState ->
+                updateIMUState(imuState)
+            }
+        } else {
+            updateIMUState(null)
+        }
+    }
+
+    @Synchronized
+    fun isReadingSensors() = lastIMUState != null
+
+    @Synchronized
+    fun updateIMUState(imuState: IMUState?) {
+        lastIMUState = imuState
+    }
+
+    @Synchronized
+    fun isCompassOk() = FCManager.compassOk()
+
+    @Synchronized
+    fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } ?: false
+
+    @Synchronized
+    fun isGyroscopeOk() = lastIMUState?.gyroscope?.all { it == SensorState.OK } ?: false
+
     fun startBroadcast() {
         if (isReadingData()) {
             logger.d { "Telemetry already flowing!" }
@@ -178,7 +209,8 @@ class TelemetryHandler {
     fun isActive(): Boolean = _isListeningRC.value &&
         _isListeningAircraft.value &&
         _isBroadcasting.value &&
-        isReadingData()
+        isReadingData() &&
+        hasData()
 
     fun registerHandlerScope(handlerScope: CoroutineScope) {
         isListeningRC.distinctUntilChangedBy { it }

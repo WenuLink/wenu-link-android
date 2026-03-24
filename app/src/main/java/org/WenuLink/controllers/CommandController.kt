@@ -8,9 +8,13 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.CoroutineScope
-import org.WenuLink.adapters.AircraftHandler
 import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
+import org.WenuLink.adapters.aircraft.ArmCommand
+import org.WenuLink.adapters.aircraft.DisarmCommand
+import org.WenuLink.adapters.aircraft.LandCommand
+import org.WenuLink.adapters.aircraft.TakeoffCommand
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -33,15 +37,16 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
+        aircraft: AircraftHandler
     ): Boolean {
+        if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
+
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_DO_SET_MODE ->
                 setMode(commandLongMsg, aircraft)
 
             MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM ->
-                processArmDisarm(commandLongMsg, aircraft, serviceScope)
+                processArmDisarm(commandLongMsg, aircraft)
 
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
                 processTakeoff(commandLongMsg, aircraft)
@@ -84,13 +89,6 @@ class CommandController(override var client: MAVLinkClient) : IController {
         MAV_RESULT.MAV_RESULT_ACCEPTED
     )
 
-    fun packVersion(major: Int, minor: Int, patch: Int, type: Int): Long = (
-        (major shl 24) or
-            (minor shl 16) or
-            (patch shl 8) or
-            (type and 0xFF)
-        ).toLong()
-
     fun sendAutopilotVersion() {
         val msg = msg_autopilot_version()
         msg.capabilities = listOf(
@@ -103,7 +101,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
             MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
         ).fold(0L) { acc, value -> acc or value.toLong() }
 
-        msg.flight_sw_version = packVersion(
+        msg.flight_sw_version = MessageUtils.packVersion(
             4,
             18,
             23,
@@ -118,18 +116,22 @@ class CommandController(override var client: MAVLinkClient) : IController {
     fun setMode(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         val requestedMode = commandMsg.param2.toLong()
         logger.d { "FlightMode requested: $requestedMode" }
-        if (aircraft.modeTransition(requestedMode)) {
-            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-        } else {
+        val customMode = ArduCopterFlightMode.from(requestedMode)
+
+        if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        } else {
+            aircraft.requestMode(customMode)
+                .onSuccess {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+                }
+                .onFailure {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+                }
         }
     }
 
-    fun processArmDisarm(
-        commandMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
-    ) {
+    fun processArmDisarm(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         val action = when (commandMsg.param1) {
             1f -> true
             0f -> false
@@ -144,20 +146,31 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
         logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
 
-        aircraft.armMotors(action)
+        val command = if (action) {
+            ArmCommand()
+        } else {
+            DisarmCommand()
+        }
+        aircraft.dispatchCommand(command) { error ->
+            logger.d { "processTakeoff: $error" }
+        }
 
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
 
     fun processTakeoff(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         logger.d { "processTakeoff: $commandMsg" }
-        aircraft.takeOff()
+        aircraft.dispatchCommand(TakeoffCommand()) { error ->
+            logger.d { "processTakeoff: $error" }
+        }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
 
     fun processLanding(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         logger.d { "processLanding: $commandMsg" }
-        aircraft.land()
+        aircraft.dispatchCommand(LandCommand()) { landError ->
+            logger.d { "processLanding: $landError" }
+        }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }
 }

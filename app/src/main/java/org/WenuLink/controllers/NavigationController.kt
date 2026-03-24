@@ -26,12 +26,12 @@ import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CoroutineScope
-import org.WenuLink.adapters.AircraftHandler
-import org.WenuLink.adapters.Coordinates3D
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
-import org.WenuLink.adapters.TelemetryHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.adapters.aircraft.RepositionCommand
+import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -79,8 +79,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
+        aircraft: AircraftHandler
     ): Boolean {
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, aircraft)
@@ -114,8 +113,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     override fun processCommandInt(
         commandIntMsg: msg_command_int,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
+        aircraft: AircraftHandler
     ): Boolean {
         when (commandIntMsg.command) {
             MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, aircraft)
@@ -298,9 +296,11 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
-        aircraft.doReposition(
-            target = coordinate,
-            speed = if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+        aircraft.dispatchCommand(
+            RepositionCommand(
+                coordinate,
+                if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+            )
         )
 
         client.sendMessage(
@@ -342,7 +342,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     // TODO: start, pause, and resume procedures
 
     fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
-        val coordinates = aircraft.homeCoordinates ?: return null
+        val coordinates = aircraft.state.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
@@ -355,7 +355,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
+        msg.alt =
+            MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude + telemetryData.takeOffAltitude)
         // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
         // but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)
@@ -415,7 +416,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun msgGpsGlobalOrigin(aircraft: AircraftHandler): MAVLinkMessage? {
-        val homeLoc = aircraft.homeCoordinates ?: return null
+        val homeLoc = aircraft.state.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)

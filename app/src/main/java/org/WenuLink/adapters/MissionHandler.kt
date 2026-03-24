@@ -4,6 +4,9 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
+import kotlin.math.max
+import kotlin.math.min
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
 import org.WenuLink.sdk.MissionActionManager
@@ -143,7 +146,10 @@ class MissionHandler {
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) {
-        if (!MissionManager.isWaitingMission()) return
+        if (!MissionManager.isWaitingMission()) {
+            onResult("Unable to upload mission, another mission was already uploaded")
+            return
+        }
 
         val mission = assembler.build()
         MissionManager.uploadMission(
@@ -271,6 +277,24 @@ class MissionHandler {
         logger.i { "scheduleLand" }
 
         MissionActionManager.registerLandFinished {
+            onResult(null)
+        }
+
+        MissionActionManager.start()
+    }
+
+    fun doGoHome(onResult: (String?) -> Unit) {
+        MissionActionManager.clear()
+        val error = MissionActionManager.scheduleGoHome()
+
+        if (error != null) {
+            onResult("Error in Land: ${error.description}")
+            return
+        }
+
+        logger.i { "scheduleGoHome" }
+
+        MissionActionManager.registerGoHomeFinished {
             onResult(null)
         }
 

@@ -3,8 +3,7 @@ package org.WenuLink.controllers
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
-import kotlinx.coroutines.CoroutineScope
-import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -22,17 +21,11 @@ interface IController {
         return false
     }
 
-    fun processCommandLong(
-        commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
-    ): Boolean = false
+    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
+        false
 
-    fun processCommandInt(
-        commandIntMsg: msg_command_int,
-        aircraft: AircraftHandler,
-        serviceScope: CoroutineScope
-    ): Boolean = false
+    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
+        false
 
     fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
         false

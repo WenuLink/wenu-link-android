@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.aircraft
 
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.math.roundToInt
@@ -7,6 +7,7 @@ import kotlin.math.roundToInt
  * Data class to hold telemetry info.
  */
 data class TelemetryData(
+    val timestamp: Long = System.currentTimeMillis(),
     val roll: Double,
     val pitch: Double,
     val yaw: Double,
@@ -53,9 +54,7 @@ data class RCData(
 
     fun toMAVLink(): RCData {
         val currRC = this.copy(
-            // Percent: [0, 100]
             throttleSetting = stickValue2percent(this.throttleSetting),
-            // Value: [1000, 2000] with 1500 as center...
             leftStickVertical = stickValue2rcValue(this.leftStickVertical),
             leftStickHorizontal = stickValue2rcValue(this.leftStickHorizontal),
             rightStickVertical = stickValue2rcValue(this.rightStickVertical),
@@ -108,4 +107,15 @@ data class MessageRate(
     val messageID: Int,
     var microSecondsInterval: Long,
     var lastUpdateStamp: Long = 0
+)
+
+enum class SensorState {
+    BOOT, // Boot states
+    CALIBRATION_NEEDED, // Calibration needed states
+    OK // Ok states
+}
+
+data class IMUState(
+    val gyroscope: MutableList<SensorState> = mutableListOf(),
+    val accelerometer: MutableList<SensorState> = mutableListOf()
 )

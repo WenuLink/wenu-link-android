@@ -7,7 +7,7 @@ import com.MAVLink.common.msg_param_set
 import com.MAVLink.common.msg_param_value
 import io.getstream.log.taggedLogger
 import kotlin.math.round
-import org.WenuLink.adapters.AircraftHandler
+import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
@@ -33,6 +33,8 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         private set
 
     suspend fun load() {
+        if (wasInitialized) return
+
         registry.loadParameters()
         wasInitialized = true
     }

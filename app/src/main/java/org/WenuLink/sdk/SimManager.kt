@@ -7,7 +7,7 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import dji.sdk.flightcontroller.Simulator
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.TelemetryData
+import org.WenuLink.adapters.aircraft.TelemetryData
 
 object SimManager {
     private val logger by taggedLogger(SimManager::class.java.simpleName)
@@ -16,13 +16,8 @@ object SimManager {
     var simInstance: Simulator? = null
         private set
     private var satelliteCount: Int = -1
-    private var velocityX: Float = 0f
-    private var velocityY: Float = 0f
-    private var velocityZ: Float = 0f
-    private var flightTime: Int = 0
-    private var takeOffAltitude: Float = 0f
+    private var takeOffAltitude: Float = 0F
     private var initStamp: Long = 0L
-    private var updateStamp: Long = 0L
     private var takeOffStamp: Long = 0L
     private var landStamp: Long = 0L
 
@@ -47,49 +42,51 @@ object SimManager {
         hasCallback = false
     }
 
-    fun completeTelemetryData(telemetryT: TelemetryData, state: SimulatorState) {
-        val stamp = System.currentTimeMillis() / 1000 // to seconds
-        val dT = stamp - updateStamp
-        velocityX = (state.positionX - telemetryT.positionX) / dT
-        velocityY = (state.positionY - telemetryT.positionY) / dT
-        velocityZ = (state.positionZ - telemetryT.positionZ) / dT
+    @Synchronized
+    fun state2telemetry(state: SimulatorState, previousData: TelemetryData? = null): TelemetryData {
+        val data = TelemetryData(
+            roll = state.roll.toDouble(),
+            pitch = state.pitch.toDouble(),
+            yaw = state.yaw.toDouble(),
+            latitude = state.location.latitude,
+            longitude = state.location.longitude,
+            altitude = state.positionZ,
+            positionX = state.positionX,
+            positionY = state.positionY,
+            positionZ = state.positionZ,
+            velocityX = 0F,
+            velocityY = 0F,
+            velocityZ = 0F,
+            flightTime = 0,
+            takeOffAltitude = takeOffAltitude,
+            isFlying = state.isFlying,
+            motorsOn = state.areMotorsOn(),
+            satelliteCount = satelliteCount,
+            gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
+        )
+        // complete data from previous one
+        if (previousData == null) return data
 
-        if (state.isFlying && !telemetryT.isFlying) {
-            takeOffStamp = stamp
-            landStamp = stamp
+        // perform updates comparing previous and current state
+        if (data.isFlying) {
+            if (!previousData.isFlying) takeOffStamp = data.timestamp
+            landStamp = data.timestamp
         }
 
-        if (state.isFlying && telemetryT.isFlying) landStamp = stamp
-
-        flightTime = (landStamp - takeOffStamp).toInt()
-        updateStamp = stamp
+        // compute velocities
+        val dT = (data.timestamp - previousData.timestamp).toFloat() / 1000F // to seconds
+        return data.copy(
+            flightTime = (landStamp - takeOffStamp).toInt(),
+            velocityX = (data.positionX - previousData.positionX) / dT,
+            velocityY = (data.positionY - previousData.positionY) / dT,
+            velocityZ = (data.positionZ - previousData.positionZ) / dT
+        )
     }
-
-    @Synchronized
-    fun state2telemetry(state: SimulatorState): TelemetryData = TelemetryData(
-        roll = state.roll.toDouble(),
-        pitch = state.pitch.toDouble(),
-        yaw = state.yaw.toDouble(),
-        latitude = state.location.latitude,
-        longitude = state.location.longitude,
-        altitude = state.positionZ,
-        positionX = state.positionX,
-        positionY = state.positionY,
-        positionZ = state.positionZ,
-        velocityX = velocityX,
-        velocityY = velocityY,
-        velocityZ = velocityZ,
-        flightTime = flightTime,
-        takeOffAltitude = takeOffAltitude,
-        isFlying = state.isFlying,
-        motorsOn = state.areMotorsOn(),
-        satelliteCount = satelliteCount,
-        gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
-    )
 
     fun run(
         lat: Double = -8.066478642777481,
         long: Double = -34.98744367551871,
+        alt: Float = 24.0F,
         updateFrequency: Int = 10,
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit
@@ -101,12 +98,7 @@ object SimManager {
         logger.d { "Simulation start." }
         this.satelliteCount = satelliteCount
         initStamp = System.currentTimeMillis() / 1000 // to seconds
-        updateStamp = initStamp
-        velocityX = 0f
-        velocityY = 0f
-        velocityZ = 0f
-        flightTime = 0
-        takeOffAltitude = 0f
+        takeOffAltitude = alt
 
         simInstance?.start(
             InitializationData.createInstance(

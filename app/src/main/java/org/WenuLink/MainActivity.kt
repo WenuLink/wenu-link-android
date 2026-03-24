@@ -209,7 +209,7 @@ class MainActivity : ComponentActivity() {
                     Text("${buttonLabel(isServiceRunning)} WenuLink Service")
                 }
 
-                if (isSimulationReady && !isMAVLinkRunning) {
+                if (isSimulationReady && !isServiceRunning) {
                     Button(onClick = {
                         servicesViewModel.runService(run = true, simEnabled = true)
                     }) {
