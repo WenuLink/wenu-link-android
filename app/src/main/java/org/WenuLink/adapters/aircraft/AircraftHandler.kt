@@ -2,23 +2,22 @@ package org.WenuLink.adapters.aircraft
 
 import com.MAVLink.enums.MAV_MODE_FLAG
 import io.getstream.log.taggedLogger
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MissionHandler
+import org.WenuLink.adapters.commands.CommandProcessor
+import org.WenuLink.adapters.commands.ICommand
+import org.WenuLink.adapters.commands.IHandler
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
-class AircraftHandler {
+class AircraftHandler : IHandler<AircraftHandler> {
     companion object {
         private var mInstance: AircraftHandler? = null
 
@@ -27,7 +26,7 @@ class AircraftHandler {
                 mInstance = AircraftHandler()
             }
             if (serviceScope != null) {
-                mInstance!!.registerHandlerScope(serviceScope)
+                mInstance!!.registerScope(serviceScope)
             }
 
             return mInstance!!
@@ -50,68 +49,18 @@ class AircraftHandler {
     val mission = MissionHandler.getInstance()
     val telemetry = TelemetryHandler.getInstance()
     var isPowerOff = true
-    val rcInput: RCData?
-        get() = telemetry.getRCData()
-    private var commandJob: Job? = null
-    private var currentCommandJob: Deferred<String?>? = null
-    private val commandChannel =
-        Channel<Pair<AircraftCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
+    private val processor = CommandProcessor(this)
     private var monitorJob: Job? = null
 
     init {
-        dispatchCommand(BootCommand(5000))
+        dispatchCommand(BootCommand(5000)) { }
     }
 
-    private fun startCommandProcessor(scope: CoroutineScope) {
-        commandJob?.cancel()
-
-        commandJob = scope.launch {
-            for ((cmd, onResult) in commandChannel) {
-                try {
-                    logger.d { "Executing: ${cmd::class.simpleName}" }
-
-                    val validationError = cmd.validate(this@AircraftHandler)
-                    if (validationError != null) {
-                        onResult(validationError)
-                        continue
-                    }
-
-                    val deferred = async {
-                        cmd.execute(this@AircraftHandler)
-                    }
-                    currentCommandJob = deferred
-
-                    val executionError = deferred.await()
-                    onResult(executionError)
-                } catch (e: CancellationException) {
-                    logger.w { "Command cancelled: ${cmd::class.simpleName}: $e" }
-                    cmd.onStop(this@AircraftHandler)
-                    onResult(null)
-                } catch (e: Exception) {
-                    logger.e { "Command failed: ${cmd::class.simpleName} -> ${e.message}" }
-                    onResult(e.message)
-                } finally {
-                    currentCommandJob = null
-                }
-            }
-        }
+    override fun dispatchCommand(cmd: ICommand<AircraftHandler>, onResult: (String?) -> Unit) {
+        processor.dispatch(cmd, onResult)
     }
 
-    fun dispatchCommand(cmd: AircraftCommand, onResult: (String?) -> Unit = {}) {
-        val result = commandChannel.trySend(cmd to onResult)
-        if (result.isFailure) {
-            onResult("Failed to enqueue command: ${cmd::class.simpleName}")
-        }
-    }
-
-    fun stopCommand(): String? {
-        logger.d { "Stop command" }
-        val job = currentCommandJob ?: return "No running command"
-
-        job.cancel(CancellationException("Stopped by user"))
-
-        return null
-    }
+    override fun stopCommand(): String? = processor.cancel()
 
     private fun setMode(mode: ArduCopterFlightMode) {
         copterFlightMode = mode
@@ -213,9 +162,9 @@ class AircraftHandler {
 
     private fun safetyChecks() {
         // --- Safety hooks ---
-        rcInput?.hasCenteredJoystick()?.let {
+        if (telemetry.hasRCInput()) {
             // stop everything to if any joystick is moved
-            if (!it) manualControl()
+            manualControl()
         }
 
         if (!sensorsHealthy && state.isFlying()) {
@@ -350,11 +299,11 @@ class AircraftHandler {
         }
     }
 
-    fun registerHandlerScope(handlerScope: CoroutineScope) {
-        telemetry.registerHandlerScope(handlerScope)
-        registerMissionListeners(handlerScope)
-        startCommandProcessor(handlerScope)
-        startMonitorJob(handlerScope)
+    override fun registerScope(scope: CoroutineScope) {
+        telemetry.registerHandlerScope(scope)
+        registerMissionListeners(scope)
+        startMonitorJob(scope)
+        processor.start(scope)
     }
 
     private fun registerMissionListeners(handlerScope: CoroutineScope) {
@@ -444,9 +393,7 @@ class AircraftHandler {
         sensorsHealthy = false
         // Reverse boot sequence
         stopTelemetry(500L)
-        // Stop ongoing processes
-        commandJob?.cancel()
-        commandJob = null
+        processor.stop()
         isPowerOff = true
     }
 

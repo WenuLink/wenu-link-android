@@ -301,7 +301,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
                 coordinate,
                 if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
             )
-        )
+        ) { error -> }
 
         client.sendMessage(
             MessageUtils.msgCommandAck(
