@@ -36,7 +36,8 @@ data class CameraMetadata(
     val width: Int,
     val height: Int,
     val fps: Int,
-    val state: CameraState = CameraState()
+    val state: CameraState = CameraState(),
+    val capabilities: Long
 )
 
 data class ImageMetadata(

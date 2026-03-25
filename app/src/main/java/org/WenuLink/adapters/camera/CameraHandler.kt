@@ -1,5 +1,6 @@
 package org.WenuLink.adapters.camera
 
+import com.MAVLink.enums.CAMERA_CAP_FLAGS
 import com.MAVLink.enums.CAMERA_MODE
 import io.getstream.log.taggedLogger
 import kotlin.getValue
@@ -8,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.sdk.CameraManager
 
 class CameraHandler {
@@ -33,7 +33,7 @@ class CameraHandler {
     private val commandChannel =
         Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
     var sequenceIndex: Int = 0
-    var captureTimestamp: Long = 0
+    var captureTimestamp: Long = System.currentTimeMillis()
 
     private fun startCommandProcessor(scope: CoroutineScope) {
         commandJob?.cancel()
@@ -75,14 +75,6 @@ class CameraHandler {
         }
         logger.d { "initCamera" }
         CameraManager.retrieveMetadata()
-        fun hasFirmware() = CameraManager.fwVersion != null
-        val hasFW = AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 60000L, ::hasFirmware)
-        fun hasSerialNumber() = CameraManager.serialNumber != null
-        val hasSN = AsyncUtils.waitTimeout(
-            intervalTime = 1000L,
-            timeout = 60000L,
-            ::hasSerialNumber
-        )
 
         // for now assumes a single camera, however this class should manage multi camera if must
         availableCameras.add(
@@ -93,7 +85,11 @@ class CameraHandler {
                 fwVersion = CameraManager.fwVersion!!,
                 width = CameraManager.frameWidth,
                 height = CameraManager.frameHeight,
-                fps = CameraManager.frameRate.roundToInt()
+                fps = CameraManager.frameRate.roundToInt(),
+                capabilities = CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_IMAGE.toLong() or
+                    CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_VIDEO.toLong() or
+                    CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_VIDEO_STREAM.toLong() or
+                    CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
             )
         )
         logger.d { "availableCameras(${availableCameras.size})" }
@@ -103,7 +99,8 @@ class CameraHandler {
         return true
     }
 
-    fun getCamera(cameraIdx: Int): CameraMetadata? = availableCameras.getOrNull(cameraIdx)
+    fun getCamera(cameraId: Int): CameraMetadata? =
+        availableCameras.firstOrNull { it.id == cameraId }
 
     fun setMode(newMode: Int, cameraIdx: Int = 0) {
         val captureType = when (newMode) {
@@ -138,7 +135,7 @@ class CameraHandler {
     }
 
     fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0): Boolean =
-        availableCameras[cameraIdx].state.captureStatus == status
+        getCamera(cameraIdx)?.state?.captureStatus == status
 
     fun captureInProgress(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
         CameraCaptureStatus.IN_PROGRESS,
@@ -151,10 +148,10 @@ class CameraHandler {
     )
 
     fun isPhotoMode(cameraIdx: Int = 0): Boolean =
-        (getCamera(cameraIdx)?.state?.mavlinkMode ?: -1) == CAMERA_MODE.CAMERA_MODE_IMAGE
+        getCamera(cameraIdx)?.state?.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE
 
     fun isVideoMode(cameraIdx: Int = 0): Boolean =
-        (getCamera(cameraIdx)?.state?.mavlinkMode ?: -1) == CAMERA_MODE.CAMERA_MODE_VIDEO
+        getCamera(cameraIdx)?.state?.mavlinkMode == CAMERA_MODE.CAMERA_MODE_VIDEO
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 

@@ -343,7 +343,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
                 1_000_000
             } // Hz to micro seconds if must start
             else {
-                ((1.0 / timeInterval.toFloat()) * 1_000).roundToInt()
+                ((1.0 / timeInterval.toFloat()) * 1_000_000).roundToInt()
             }
         }
 

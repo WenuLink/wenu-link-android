@@ -70,15 +70,14 @@ object CameraManager {
             }
 
             override fun onFailure(p0: DJIError?) {
-                if (p0 != null) {
-                    onResult(p0.description, false)
-                }
+                onResult(p0?.description ?: "Unknown error", false)
             }
         }
 
     suspend fun retrieveFirmwareVersion(): String? = suspendCancellableCoroutine { cont ->
         if (fwVersion != null) {
             cont.resume(fwVersion)
+            return@suspendCancellableCoroutine
         }
         mInstance?.getFirmwareVersion(
             createCompletionCallback { firmwareVersion, _ ->
@@ -90,6 +89,7 @@ object CameraManager {
     suspend fun retrieveSerialNumber(): String? = suspendCancellableCoroutine { cont ->
         if (serialNumber != null) {
             cont.resume(serialNumber)
+            return@suspendCancellableCoroutine
         }
         mInstance?.getSerialNumber(
             createCompletionCallback { serialNumber, _ ->
@@ -218,6 +218,7 @@ object CameraManager {
         suspendCancellableCoroutine { cont ->
             if (cameraMode == mode) {
                 cont.resume(null)
+                return@suspendCancellableCoroutine
             }
 
             mInstance?.setMode(

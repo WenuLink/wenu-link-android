@@ -180,7 +180,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
         aircraft: AircraftHandler,
         cameraInfo: CameraMetadata
     ) {
-        val intervalTime: Float = commandLongMsg.param2 // seconds
+        val intervalTime: Long = (commandLongMsg.param2 * 1000).toLong() // milliseconds
         val initSequence: Int = commandLongMsg.param4.toInt()
         val totalPhotos: Int = commandLongMsg.param3.toInt()
 
@@ -193,7 +193,8 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
         aircraft.cameras.sequenceIndex = initSequence
 
         while (mustCapture()) {
-            if ((System.currentTimeMillis() - aircraft.cameras.captureTimestamp) < intervalTime) {
+            if (totalPhotos != 1 &&
+                (System.currentTimeMillis() - aircraft.cameras.captureTimestamp) < intervalTime) {
                 continue
             }
             if (!aircraft.cameras.captureIdle(cameraInfo.id)) {
@@ -351,12 +352,13 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
         msg_camera_information().apply {
             vendor_name = MessageUtils.toShortArray("DJI", 32)
             model_name = MessageUtils.toShortArray(cameraInfo.name, 32)
-            firmware_version = MessageUtils.packVersion(
-                4,
-                18,
-                23,
-                FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
-            ) // Match SDK version or if possible the Component's own FW version
+            // Parse DJI fw string "MM.mm.pppp" into major/minor/patch
+            val parts = cameraInfo.fwVersion.split(".").mapNotNull { it.toIntOrNull() }
+            firmware_version = if (parts.size >= 3) {
+                MessageUtils.packVersion(parts[0], parts[1], parts[2], FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_OFFICIAL)
+            } else {
+                MessageUtils.packVersion(0, 0, 0, FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV)
+            }
             // TODO: check if it can be obtained from SDK
             focal_length = Float.NaN
             sensor_size_h = Float.NaN
@@ -364,10 +366,8 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
             resolution_h = cameraInfo.width
             resolution_v = cameraInfo.height
             lens_id = 0
-            flags = CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_IMAGE.toLong() or
-                CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_CAPTURE_VIDEO.toLong() or
-                CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
-            cam_definition_version = cameraInfo.fwVersion.toInt()
+            flags = cameraInfo.capabilities
+            cam_definition_version = 0
             // TODO: Camera definition file, visit https://mavlink.io/en/services/camera_def.html
             cam_definition_uri = "".toByteArray()
             camera_device_id = cameraInfo.id.toShort()
@@ -435,7 +435,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
                 yawDeg = mavData.yaw.toDouble()
             ).toFloatArray()
             image_index = imageInfo.index
-            capture_result = imageInfo.captureOk.toString().toByte()
+            capture_result = (if (imageInfo.captureOk) 1 else 0).toByte()
             file_url = "".toByteArray()
         }
     }
