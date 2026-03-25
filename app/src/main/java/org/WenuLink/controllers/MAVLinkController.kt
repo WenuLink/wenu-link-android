@@ -101,9 +101,8 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestLong(commandMsg)
 
-            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL -> telemetryController.processMessageInterval(
-                commandMsg
-            )
+            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL ->
+                telemetryController.processMessageInterval(commandMsg)
 
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
@@ -187,14 +186,14 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
     }
 
     fun notifySystemReady() {
-        telemetryController.unlockRates()
+        telemetryController.unlockSend()
     }
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent
 
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
         // prevent to send data before initialization
-        telemetryController.lockRates()
+        telemetryController.lockSend()
         // Wait for GCS heartbeat
         logger.d { "Waiting for GCS." }
         AsyncUtils.waitTimeout(10, timeout, ::isStationConnected)

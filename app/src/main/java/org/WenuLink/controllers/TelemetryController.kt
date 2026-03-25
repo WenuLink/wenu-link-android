@@ -39,7 +39,7 @@ import org.WenuLink.mavlink.MAVLinkClient
 class TelemetryController(override val client: MAVLinkClient) : IController {
     private val logger by taggedLogger(TelemetryController::class.java.simpleName)
 
-    private var readOnlyMessageRate = true
+    private var setOnlyMessageRate = true
     private val messageRates: MutableList<MessageRate> = mutableListOf(
         MessageRate( // begin with Heartbeat at 1Hz
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT,
@@ -77,28 +77,23 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 //            msg_fence_status.MAVLINK_MSG_ID_FENCE_STATUS,
 //            msg_position_target_global_int.MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT
         ),
-
         MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS to listOf(
             msg_rc_channels_scaled.MAVLINK_MSG_ID_RC_CHANNELS_SCALED,
             msg_rc_channels_raw.MAVLINK_MSG_ID_RC_CHANNELS_RAW,
 //            msg_servo_output_raw.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW
             msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS
         ),
-
         MAV_DATA_STREAM.MAV_DATA_STREAM_POSITION to listOf(
             msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED,
             msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT
         ),
-
         MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA1 to listOf(
             msg_attitude.MAVLINK_MSG_ID_ATTITUDE,
             msg_sim_state.MAVLINK_MSG_ID_SIM_STATE
         ),
-
         MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA2 to listOf(
             msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD
         ),
-
         MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA3 to listOf(
             msg_onboard_computer_status.MAVLINK_MSG_ID_ONBOARD_COMPUTER_STATUS,
 //            msg_distance_sensor.MAVLINK_MSG_ID_DISTANCE_SENSOR,
@@ -112,20 +107,26 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
             msg_vibration.MAVLINK_MSG_ID_VIBRATION,
             msg_raw_rpm.MAVLINK_MSG_ID_RAW_RPM
         )
-
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_ALL -> {}
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
 
     fun sendMessages(controllers: List<IController>, aircraft: AircraftHandler) {
-        if (!(client.mustProcessMessages())) {
+        if (!client.mustProcessMessages()) {
             logger.w { "MAVLink client is not ready!" }
             return
         }
 
         val currentMicroTime = MessageUtils.getMicroTime()
         for (rate in messageRates) {
-            if (rate.microSecondsInterval == -1L) continue // skip if deactivated
+            if (setOnlyMessageRate && rate.messageID != 0) {
+                // skip if setOnly mode for no HEARTBEAT messages
+                continue
+            }
+            if (rate.microSecondsInterval == -1L) {
+                // skip if deactivated
+                continue
+            }
 
             // create the message from controllers definitions
             val message = controllers.asSequence()
@@ -133,7 +134,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
                 .firstOrNull()
 
             if (message == null) {
-                //                logger.w { "Unable to create message ID: ${rate.messageID}. Deactivating." }
+                // logger.w { "Unable to create message ID: ${rate.messageID}. Deactivating." }
                 // Silently deactivate the requested message if not implemented yet
                 rate.microSecondsInterval = -1L
                 continue
@@ -163,8 +164,6 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
     fun processDataStreamRequest(msg: MAVLinkMessage) {
         // https://ardupilot.org/dev/docs/mavlink-requesting-data.html
         // https://mavlink.io/en/messages/common.html#MAV_DATA_STREAM
-        if (readOnlyMessageRate) return
-
         val request = msg as msg_request_data_stream
 
         val dataList = availableDataList[request.req_stream_id.toInt()]
@@ -183,13 +182,13 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
             }
         }
 
-        dataList.forEach { setMessageRate(it, timeInterval.toLong()) }
+        dataList.forEach {
+            setMessageRate(it, timeInterval.toLong())
+        }
     }
 
     @Synchronized
     fun processMessageInterval(commandMsg: msg_command_long) {
-        if (readOnlyMessageRate) return
-
         logger.d { "processMessageInterval" }
         val mavlinkMsgID = commandMsg.param1.toInt()
         val interval = commandMsg.param2.toLong() // already in micro seconds
@@ -203,11 +202,11 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    fun lockRates() {
-        readOnlyMessageRate = true
+    fun lockSend() {
+        setOnlyMessageRate = true
     }
 
-    fun unlockRates() {
-        readOnlyMessageRate = false
+    fun unlockSend() {
+        setOnlyMessageRate = false
     }
 }
