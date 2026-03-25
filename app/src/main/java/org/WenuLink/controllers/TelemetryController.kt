@@ -39,7 +39,7 @@ import org.WenuLink.mavlink.MAVLinkClient
 class TelemetryController(override val client: MAVLinkClient) : IController {
     private val logger by taggedLogger(TelemetryController::class.java.simpleName)
 
-    private var setOnlyMessageRate = true
+    private var broadcastSuppressed = true
     private val messageRates: MutableList<MessageRate> = mutableListOf(
         MessageRate( // begin with Heartbeat at 1Hz
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT,
@@ -119,8 +119,8 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 
         val currentMicroTime = MessageUtils.getMicroTime()
         for (rate in messageRates) {
-            if (setOnlyMessageRate && rate.messageID != 0) {
-                // skip if setOnly mode for no HEARTBEAT messages
+            if (broadcastSuppressed && rate.messageID != 0) {
+                // skip non-HEARTBEAT messages if broadcast is suppressed
                 continue
             }
             if (rate.microSecondsInterval == -1L) {
@@ -202,11 +202,11 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    fun lockSend() {
-        setOnlyMessageRate = true
+    fun stopBroadcast() {
+        broadcastSuppressed = true
     }
 
-    fun unlockSend() {
-        setOnlyMessageRate = false
+    fun startBroadcast() {
+        broadcastSuppressed = false
     }
 }

@@ -186,14 +186,14 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
     }
 
     fun notifySystemReady() {
-        telemetryController.unlockSend()
+        telemetryController.startBroadcast()
     }
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent
 
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
         // prevent to send data before initialization
-        telemetryController.lockSend()
+        telemetryController.stopBroadcast()
         // Wait for GCS heartbeat
         logger.d { "Waiting for GCS." }
         AsyncUtils.waitTimeout(10, timeout, ::isStationConnected)
