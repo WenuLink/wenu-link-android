@@ -1,9 +1,11 @@
 package org.WenuLink.adapters.aircraft
 
-sealed interface AircraftCommand {
-    fun validate(ctx: AircraftHandler): String?
-    suspend fun execute(ctx: AircraftHandler): String?
-    suspend fun onStop(ctx: AircraftHandler)
+import org.WenuLink.adapters.commands.ICommand
+
+sealed interface AircraftCommand : ICommand<AircraftHandler> {
+    override fun validate(ctx: AircraftHandler): String?
+    override suspend fun execute(ctx: AircraftHandler): String?
+    override suspend fun onStop(ctx: AircraftHandler)
 }
 
 data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
