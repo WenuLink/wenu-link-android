@@ -49,12 +49,8 @@ class AircraftHandler : IHandler<AircraftHandler> {
     val mission = MissionHandler.getInstance()
     val telemetry = TelemetryHandler.getInstance()
     var isPowerOff = true
-    private val processor = CommandProcessor(this)
+    private val processor = CommandProcessor(this, logger)
     private var monitorJob: Job? = null
-
-    init {
-        dispatchCommand(BootCommand(5000)) { }
-    }
 
     override fun dispatchCommand(cmd: ICommand<AircraftHandler>, onResult: (String?) -> Unit) {
         processor.dispatch(cmd, onResult)
@@ -162,7 +158,7 @@ class AircraftHandler : IHandler<AircraftHandler> {
 
     private fun safetyChecks() {
         // --- Safety hooks ---
-        if (telemetry.hasRCInput()) {
+        if (telemetry.hasActiveJoystickInput()) {
             // stop everything to if any joystick is moved
             manualControl()
         }
@@ -252,9 +248,6 @@ class AircraftHandler : IHandler<AircraftHandler> {
         // Second wait to remove the existing data
         return telemetry.waitDataRemoving(delay)
     }
-
-    suspend fun waitBoot(timeout: Long = 5000L): Boolean =
-        AsyncUtils.waitTimeout(500, timeout) { !isPowerOff }
 
     suspend fun boot(timeout: Long = 5000L): String? {
         sensorsHealthy = false

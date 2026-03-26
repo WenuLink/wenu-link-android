@@ -7,6 +7,6 @@ import kotlinx.coroutines.CoroutineScope
  */
 interface IHandler<T : IHandler<T>> {
     fun registerScope(scope: CoroutineScope)
-    fun dispatchCommand(cmd: ICommand<T>, onResult: (String?) -> Unit)
+    fun dispatchCommand(cmd: ICommand<T>, onResult: (String?) -> Unit = {})
     fun stopCommand(): String?
 }

@@ -50,7 +50,7 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.dispatchCommand(DisarmCommand()) { }
+        ctx.dispatchCommand(DisarmCommand())
     }
 }
 
@@ -83,7 +83,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
         val isFlying = ctx.awaitFlightState(true)
 
         if (!isFlying) {
-            ctx.dispatchCommand(LandCommand(true)) { }
+            ctx.dispatchCommand(LandCommand(true))
             return "Unable to takeoff"
         }
 
@@ -91,7 +91,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.dispatchCommand(LandCommand(true)) { }
+        ctx.dispatchCommand(LandCommand(true))
     }
 }
 
@@ -107,7 +107,7 @@ data class LandCommand(val withLandingConfirmation: Boolean = true) : AircraftCo
 
         if (!onTheGround) return "Unable to land"
 
-        ctx.dispatchCommand(DisarmCommand()) { }
+        ctx.dispatchCommand(DisarmCommand())
 
         return null
     }

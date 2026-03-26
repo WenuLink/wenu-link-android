@@ -1,5 +1,6 @@
 package org.WenuLink.adapters.commands
 
+import io.getstream.log.TaggedLogger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -8,7 +9,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
-class CommandProcessor<T : IHandler<T>>(private val handler: T) {
+class CommandProcessor<T : IHandler<T>>(
+    private val handler: T,
+    private val logger: TaggedLogger
+) {
     private var requestJob: Job? = null
     private var commandJob: Deferred<String?>? = null
     private val commandChannel =
@@ -20,6 +24,8 @@ class CommandProcessor<T : IHandler<T>>(private val handler: T) {
 
         requestJob = scope.launch {
             for ((cmd, onResult) in commandChannel) {
+                logger.d { "Executing: ${cmd::class.simpleName}" }
+
                 try {
                     val validationError = cmd.validate(handler)
                     if (validationError != null) {
@@ -36,9 +42,11 @@ class CommandProcessor<T : IHandler<T>>(private val handler: T) {
                     val result = deferred.await()
                     onResult(result)
                 } catch (e: CancellationException) {
+                    logger.w { "Command cancelled: ${cmd::class.simpleName}" }
                     cmd.onStop(handler)
                     onResult(null)
                 } catch (e: Exception) {
+                    logger.d { "Command failed: ${cmd::class.simpleName}" }
                     onResult(e.message)
                 } finally {
                     commandJob = null
@@ -50,7 +58,7 @@ class CommandProcessor<T : IHandler<T>>(private val handler: T) {
     fun dispatch(cmd: ICommand<T>, onResult: (String?) -> Unit = {}) {
         val result = commandChannel.trySend(cmd to onResult)
         if (result.isFailure) {
-            onResult("Failed to enqueue command")
+            onResult("Failed to enqueue command: ${cmd::class.java.simpleName}")
         }
     }
 

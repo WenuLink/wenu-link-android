@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.BootCommand
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -111,13 +112,14 @@ class WenuLinkService : Service() {
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
 
-        // Wait basic Aircraft's state
-        serviceScope.launch {
-            val bootOk = aircraft.waitBoot(10000L)
-            // Prevent infinite waiting. Terminating all services if the Aircraft is not ready.
-            if (!bootOk) {
-                terminate()
-                onDestroy()
+        // Wait Aircraft to boot
+        aircraft.dispatchCommand(BootCommand(10000L)) { error ->
+            if (error != null) {
+            // No aircraft -> No service
+                serviceScope.launch {
+                    terminate()
+                    onDestroy()
+                }
             }
         }
 
@@ -182,15 +184,13 @@ class WenuLinkService : Service() {
 
         if (mavlink.isServiceRunning()) return null
 
-        logger.d { "Start MAVLinkService protocol." }
-        return serviceScope.launch {
-            if (!aircraft.waitBoot(5000L)) {
-                logger.w { "Unable to start service, no telemetry." }
-                stopMAVLinkService()
-                return@launch
-            }
-            mavlink.launchService(onResult)
+        if (!aircraft.telemetry.isActive()) {
+            logger.w { "Unable to start service, no telemetry." }
+            return null
         }
+
+        logger.d { "Start MAVLinkService protocol." }
+        return serviceScope.launch { mavlink.launchService(onResult) }
     }
 
     fun stopMAVLinkService(): Job? {
@@ -224,7 +224,7 @@ class WenuLinkService : Service() {
             aircraft.manualControl()
             stopWebRTCService()?.join()
             stopMAVLinkService()?.join()
-            aircraft.unload()
+            aircraft.unload() // aircraft.dispatch(PowerOffCommand())
         }
         AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
     }
