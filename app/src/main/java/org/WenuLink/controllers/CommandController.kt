@@ -54,8 +54,6 @@ class CommandController(override var client: MAVLinkClient) : IController {
             MAV_CMD.MAV_CMD_NAV_LAND ->
                 processLanding(commandLongMsg, aircraft)
 
-            // TODO: Unhandled command ID: 521.
-            // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> return false
         }
         return true

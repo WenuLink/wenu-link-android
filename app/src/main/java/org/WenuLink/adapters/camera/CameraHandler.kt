@@ -34,6 +34,7 @@ class CameraHandler {
         Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
     var sequenceIndex: Int = 0
     var captureTimestamp: Long = System.currentTimeMillis()
+    val lastCaptureMillis: Long get() = System.currentTimeMillis() - captureTimestamp
 
     private fun startCommandProcessor(scope: CoroutineScope) {
         commandJob?.cancel()

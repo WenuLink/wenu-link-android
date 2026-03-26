@@ -6,7 +6,6 @@ import com.MAVLink.common.msg_camera_information
 import com.MAVLink.common.msg_camera_settings
 import com.MAVLink.common.msg_command_long
 import com.MAVLink.common.msg_storage_information
-import com.MAVLink.enums.CAMERA_CAP_FLAGS
 import com.MAVLink.enums.CAMERA_MODE
 import com.MAVLink.enums.FIRMWARE_VERSION_TYPE
 import com.MAVLink.enums.MAV_CMD
@@ -35,8 +34,10 @@ import org.WenuLink.mavlink.MAVLinkClient
  * https://mavlink.io/en/services/camera.html
  *
  */
-class CameraController(override val client: MAVLinkClient, val mainController: MAVLinkController) :
-    IController {
+class CameraController(
+    override val client: MAVLinkClient,
+    private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit
+) : IController {
 
     private val logger by taggedLogger(CameraController::class.java.simpleName)
 
@@ -46,11 +47,19 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
     ): Boolean {
         var processed = true
         when (commandLongMsg.command) {
+            MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION ->
+                handleCameraInformation(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> requestStartCapture(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> requestStopCapture(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE -> requestStartRecording(commandLongMsg, aircraft)
+
             MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg, aircraft)
+
             else -> processed = false
         }
         return processed
@@ -67,13 +76,11 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
 
             msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS -> reportSettings(aircraft)
 
-            msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION -> sendStorageStatus(
-                aircraft
-            )
+            msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION ->
+                sendStorageStatus(aircraft)
 
-            msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS -> sendCaptureStatus(
-                aircraft
-            )
+            msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS ->
+                sendCaptureStatus(aircraft)
 
             else -> processed = false
         }
@@ -107,6 +114,15 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
             logger.d { "CameraReport: $msg" }
             client.sendMessage(msg)
         }
+    }
+
+    private fun handleCameraInformation(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ) {
+        if (commandLongMsg.param1 != 1f) return
+
+        reportCameras(aircraft)
     }
 
     private fun reportSettings(aircraft: AircraftHandler) {
@@ -180,7 +196,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
         aircraft: AircraftHandler,
         cameraInfo: CameraMetadata
     ) {
-        val intervalTime: Long = (commandLongMsg.param2 * 1000).toLong() // milliseconds
+        val intervalMillis: Long = (commandLongMsg.param2 * 1000).toLong() // milliseconds
         val initSequence: Int = commandLongMsg.param4.toInt()
         val totalPhotos: Int = commandLongMsg.param3.toInt()
 
@@ -193,8 +209,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
         aircraft.cameras.sequenceIndex = initSequence
 
         while (mustCapture()) {
-            if (totalPhotos != 1 &&
-                (System.currentTimeMillis() - aircraft.cameras.captureTimestamp) < intervalTime) {
+            if (totalPhotos != 1 && aircraft.cameras.lastCaptureMillis < intervalMillis) {
                 continue
             }
             if (!aircraft.cameras.captureIdle(cameraInfo.id)) {
@@ -301,7 +316,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
                     logger.w { "Error in requestStartRecording: $error" }
                 } else {
                     // setting messages frequency
-                    mainController.setMessageRate(
+                    onSetMessageRate(
                         msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
                         ((1f / statusFreq) * 1_000).roundToLong()
                     )
@@ -340,7 +355,7 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
                     logger.w { "Error in requestStopRecording: $error" }
                 } else {
                     // deactivating messages
-                    mainController.setMessageRate(
+                    onSetMessageRate(
                         msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
                         -1
                     )
@@ -355,7 +370,12 @@ class CameraController(override val client: MAVLinkClient, val mainController: M
             // Parse DJI fw string "MM.mm.pppp" into major/minor/patch
             val parts = cameraInfo.fwVersion.split(".").mapNotNull { it.toIntOrNull() }
             firmware_version = if (parts.size >= 3) {
-                MessageUtils.packVersion(parts[0], parts[1], parts[2], FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_OFFICIAL)
+                MessageUtils.packVersion(
+                    parts[0],
+                    parts[1],
+                    parts[2],
+                    FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_OFFICIAL
+                )
             } else {
                 MessageUtils.packVersion(0, 0, 0, FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV)
             }
