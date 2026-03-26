@@ -32,6 +32,8 @@ class CameraHandler {
     private var currentCommand: CameraCommand? = null
     private val commandChannel =
         Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
+    private var handlerScope: CoroutineScope? = null
+    private var activeCameraJob: Job? = null
     var sequenceIndex = 0
     var captureTimestamp = System.currentTimeMillis()
     val lastCaptureMillis
@@ -163,5 +165,23 @@ class CameraHandler {
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 
-    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(scope)
+    fun registerHandlerScope(scope: CoroutineScope) {
+        handlerScope = scope
+        startCommandProcessor(scope)
+    }
+
+    fun launchCameraJob(block: suspend () -> Unit): Job? {
+        activeCameraJob?.cancel()
+        return handlerScope
+            ?.launch { block() }
+            ?.also { job ->
+                activeCameraJob = job
+                job.invokeOnCompletion { activeCameraJob = null }
+            }
+    }
+
+    fun cancelCameraJob() {
+        activeCameraJob?.cancel()
+        activeCameraJob = null
+    }
 }

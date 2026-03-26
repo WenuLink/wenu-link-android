@@ -15,6 +15,7 @@ import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
@@ -182,7 +183,7 @@ class CameraController(
         return cameraInfo
     }
 
-    private fun requestShootPhoto(
+    private suspend fun requestShootPhoto(
         commandLongMsg: msg_command_long,
         aircraft: AircraftHandler,
         cameraInfo: CameraMetadata
@@ -201,9 +202,11 @@ class CameraController(
 
         while (mustCapture()) {
             if (totalPhotos != 1 && aircraft.cameras.lastCaptureMillis < intervalMillis) {
+                delay(100)
                 continue
             }
             if (!aircraft.cameras.captureIdle(cameraInfo.id)) {
+                delay(100)
                 continue
             }
 
@@ -214,13 +217,15 @@ class CameraController(
                 if (!captureOk) logger.w { "Error in shootPhoto: $error" }
 
                 val photoData = ImageMetadata(
-                    aircraft.cameras.sequenceIndex,
-                    captureOk,
-                    cameraInfo.id,
-                    aircraft.telemetry.getData()!!
+                    index = aircraft.cameras.sequenceIndex,
+                    captureOk = captureOk,
+                    cameraID = cameraInfo.id,
+                    telemetry = aircraft.telemetry.getData()!!
                 )
 
-                client.sendMessage(msgImageCaptured(photoData))
+                client.sendMessage(
+                    msgImageCaptured(photoData)
+                )
             }
         }
     }
@@ -245,7 +250,9 @@ class CameraController(
             )
         )
 
-        requestShootPhoto(commandLongMsg, aircraft, cameraInfo)
+        aircraft.cameras.launchCameraJob {
+            requestShootPhoto(commandLongMsg, aircraft, cameraInfo)
+        }
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
@@ -269,6 +276,7 @@ class CameraController(
         )
 
         aircraft.cameras.sequenceIndex = -1
+        aircraft.cameras.cancelCameraJob()
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
