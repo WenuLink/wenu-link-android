@@ -26,6 +26,7 @@ import com.MAVLink.common.msg_sim_state
 import com.MAVLink.common.msg_sys_status
 import com.MAVLink.common.msg_vfr_hud
 import com.MAVLink.common.msg_vibration
+import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_DATA_STREAM
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_heartbeat
@@ -110,6 +111,29 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_ALL -> {}
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
+
+    override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+        when (msg.msgid) {
+            msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM ->
+                processDataStreamRequest(msg)
+
+            else -> return false
+        }
+        return true
+    }
+
+    override fun processCommandLong(
+        commandLongMsg: msg_command_long,
+        aircraft: AircraftHandler
+    ): Boolean {
+        when (commandLongMsg.command) {
+            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL ->
+                processMessageInterval(commandLongMsg)
+
+            else -> return false
+        }
+        return true
+    }
 
     fun sendMessages(controllers: List<IController>, aircraft: AircraftHandler) {
         if (!client.mustProcessMessages()) {

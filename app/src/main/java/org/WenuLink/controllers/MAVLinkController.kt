@@ -4,7 +4,6 @@ import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
 import com.MAVLink.common.msg_home_position
-import com.MAVLink.common.msg_request_data_stream
 import com.MAVLink.enums.MAV_CMD
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AsyncUtils
@@ -70,9 +69,6 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
             msg_command_int.MAVLINK_MSG_ID_COMMAND_INT -> processCommandInt(msg)
 
-            msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM ->
-                telemetryController.processDataStreamRequest(msg)
-
             else -> {
                 // Notify if no message ID definition was found in any Controller
                 logger.w { "Unhandled message ${msg.name()}" }
@@ -100,9 +96,6 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestLong(commandMsg)
-
-            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL ->
-                telemetryController.processMessageInterval(commandMsg)
 
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
