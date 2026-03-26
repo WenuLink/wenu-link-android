@@ -10,6 +10,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MissionHandler
+import org.WenuLink.adapters.camera.CameraHandler
 import org.WenuLink.adapters.commands.CommandProcessor
 import org.WenuLink.adapters.commands.ICommand
 import org.WenuLink.adapters.commands.IHandler
@@ -48,6 +49,8 @@ class AircraftHandler : IHandler<AircraftHandler> {
         private set
     val mission = MissionHandler.getInstance()
     val telemetry = TelemetryHandler.getInstance()
+    val cameras = CameraHandler.getInstance()
+    var hasCameras: Boolean = false
     var isPowerOff = true
     private val processor = CommandProcessor(this, logger)
     private var monitorJob: Job? = null
@@ -260,6 +263,7 @@ class AircraftHandler : IHandler<AircraftHandler> {
         logger.d { "\tInit. telemetry: OK" }
 
         sensorsHealthy = sensorChecks(timeout)
+        hasCameras = cameras.initCameras()
         logger.d { "\tSensors healthy?: $sensorsHealthy" }
 
         // initial standby state is async, until then, manual control
@@ -294,6 +298,7 @@ class AircraftHandler : IHandler<AircraftHandler> {
 
     override fun registerScope(scope: CoroutineScope) {
         telemetry.registerHandlerScope(scope)
+        cameras.registerHandlerScope(scope)
         registerMissionListeners(scope)
         startMonitorJob(scope)
         processor.start(scope)

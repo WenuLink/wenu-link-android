@@ -50,6 +50,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         controllers += ParameterController(client)
         controllers += NavigationController(client)
         controllers += TelemetryController(client)
+        controllers += CameraController(client, telemetryController::setMessageRate)
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
@@ -146,10 +147,6 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
             // TODO: Unhandled request ID: 397
             // https://mavlink.io/en/messages/common.html#COMPONENT_METADATA
             // MAVLINK_MSG_ID_COMPONENT_METADATA -> {}// MAVLink WIP
-            // TODO: Unhandled request ID: 259
-            // MAVLINK_MSG_ID_CAMERA_INFORMATION // 259
-            // TODO: Unhandled request ID: 521
-            // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
             else -> {
                 logger.w { "Unhandled REQUEST_LONG ID: $requestID" }
                 client.sendMessage(MessageUtils.msgRequestAck())

@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.camera
 
 import android.content.Context
 import android.media.MediaFormat
@@ -13,8 +13,8 @@ import org.webrtc.VideoCapturer
 
 class CameraCapturer : VideoCapturer {
     data class MediaMetadata(
-        var MEDIA_STREAM_ID: String = "WenuLink-${CameraManager.cameraStreamID}",
-        var VIDEO_CAMERA_NAME: String = CameraManager.cameraName,
+        var MEDIA_STREAM_ID: String = "WenuLink-${CameraManager.cameraStreamID!!}",
+        var VIDEO_CAMERA_NAME: String = CameraManager.cameraName!!,
         var VIDEO_RESOLUTION_WIDTH: Int = CameraManager.frameWidth,
         var VIDEO_RESOLUTION_HEIGHT: Int = CameraManager.frameHeight,
         var FPS: Int = round(CameraManager.frameRate).toInt()
