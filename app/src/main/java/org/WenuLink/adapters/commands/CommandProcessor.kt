@@ -9,15 +9,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
-class CommandProcessor<T : IHandler<T>>(
-    private val handler: T,
-    private val logger: TaggedLogger
-) {
+class CommandProcessor<T : IHandler<T>>(private val handler: T, private val logger: TaggedLogger) {
     private var requestJob: Job? = null
     private var commandJob: Deferred<String?>? = null
     private val commandChannel =
         Channel<Pair<ICommand<T>, (String?) -> Unit>>(Channel.UNLIMITED)
-
 
     fun start(scope: CoroutineScope) {
         requestJob?.cancel()

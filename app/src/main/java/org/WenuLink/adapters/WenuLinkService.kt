@@ -115,7 +115,7 @@ class WenuLinkService : Service() {
         // Wait Aircraft to boot
         aircraft.dispatchCommand(BootCommand(10000L)) { error ->
             if (error != null) {
-            // No aircraft -> No service
+                // No aircraft -> No service
                 serviceScope.launch {
                     terminate()
                     onDestroy()
