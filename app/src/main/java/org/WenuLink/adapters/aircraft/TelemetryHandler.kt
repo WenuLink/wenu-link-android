@@ -289,4 +289,6 @@ class TelemetryHandler {
     } else {
         AircraftManager.getAirlinkData()
     }
+
+    fun hasActiveJoystickInput(): Boolean = getRCData()?.hasCenteredJoystick() == false
 }
