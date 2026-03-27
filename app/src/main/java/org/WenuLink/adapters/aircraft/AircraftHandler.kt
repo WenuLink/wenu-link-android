@@ -11,14 +11,11 @@ import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.camera.CameraHandler
-import org.WenuLink.adapters.commands.CommandProcessor
-import org.WenuLink.adapters.commands.ICommand
-import org.WenuLink.adapters.commands.IHandler
+import org.WenuLink.adapters.commands.CommandHandler
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.MissionActionManager
-import org.WenuLink.sdk.MissionManager
 
-class AircraftHandler : IHandler<AircraftHandler> {
+class AircraftHandler : CommandHandler<AircraftHandler>() {
     companion object {
         private var mInstance: AircraftHandler? = null
 
@@ -52,14 +49,7 @@ class AircraftHandler : IHandler<AircraftHandler> {
     val cameras = CameraHandler.getInstance()
     var hasCameras: Boolean = false
     var isPowerOff = true
-    private val processor = CommandProcessor(this, logger)
     private var monitorJob: Job? = null
-
-    override fun dispatchCommand(cmd: ICommand<AircraftHandler>, onResult: (String?) -> Unit) {
-        processor.dispatch(cmd, onResult)
-    }
-
-    override fun stopCommand(): String? = processor.cancel()
 
     private fun setMode(mode: ArduCopterFlightMode) {
         copterFlightMode = mode
@@ -157,6 +147,30 @@ class AircraftHandler : IHandler<AircraftHandler> {
 
         stateMachine.forceSet(fcState)
         enforceModeConsistency()
+    }
+
+    private fun modeHooks() {
+        if (copterFlightMode == ArduCopterFlightMode.BRAKE) {
+            when (state.controlAuthority) {
+                ControlAuthority.WAYPOINT_MISSION -> mission.pauseWaypoint()
+                ControlAuthority.TIMELINE_COMMAND -> mission.pauseCommand()
+                else -> {}
+            }
+        }
+
+        if (copterFlightMode == ArduCopterFlightMode.GUIDED) {
+            when (state.controlAuthority) {
+                ControlAuthority.WAYPOINT_MISSION -> mission.resumeWaypoint()
+                ControlAuthority.TIMELINE_COMMAND -> mission.resumeCommand()
+                else -> {}
+            }
+        }
+
+        if (copterFlightMode == ArduCopterFlightMode.LAND) {
+            if (state.isFlying() && !state.isLanding()) {
+                dispatchCommand(RequestLand(true))
+            }
+        }
     }
 
     private fun safetyChecks() {
@@ -281,11 +295,13 @@ class AircraftHandler : IHandler<AircraftHandler> {
             while (isActive) {
                 try {
                     // --- Sync real aircraft state ---
-                    syncState()
+                    launch { syncState() }
 
-                    safetyChecks()
+                    launch { mission.updateState() }
 
-                    // TODO: mission.updateState() -> syncMission()
+                    launch { safetyChecks() }
+
+                    launch { modeHooks() }
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -297,60 +313,15 @@ class AircraftHandler : IHandler<AircraftHandler> {
     }
 
     override fun registerScope(scope: CoroutineScope) {
-        telemetry.registerHandlerScope(scope)
-        cameras.registerHandlerScope(scope)
+        telemetry.registerScope(scope)
+        cameras.registerScope(scope)
         registerMissionListeners(scope)
         startMonitorJob(scope)
-        processor.start(scope)
+        startCommandProcessor(scope, this@AircraftHandler, logger)
     }
 
-    private fun registerMissionListeners(handlerScope: CoroutineScope) {
-        mission.startListenersWaypoint(
-            onStart = {
-                handlerScope.launch {
-                    logger.d { "Mission started" }
-                    controlTransition(ControlAuthority.WAYPOINT_MISSION)
-                    // Must validate to which state must transit, assumes that starts from the
-                    // ground
-                    // Possibly change to waitAltitude
-                    awaitFlightState(true)
-                    logger.d { "MissionManager state: ${MissionManager.currentState}" }
-                }
-            },
-            onWaypointReach = { index ->
-                handlerScope.launch {
-                    logger.d { "Waypoint reached" }
-
-                    if (index == 0 && stateMachine.isMissionWaypoint()) {
-                        // Call pause only for second element
-                        // assumes 0 = arm, 1 = takeoff/initial alt.
-                        mission.pauseWaypoint()
-                    }
-
-                    // Wait for AUTO mode transition
-                }
-            },
-            onFinish = { error ->
-                handlerScope.launch {
-                    logger.d { "Mission finish" }
-                    if (error != null) {
-                        logger.i { "Mission finished with error: $error" }
-                        return@launch
-                    }
-
-                    logger.d { "MissionManager state: ${MissionManager.currentState}" }
-                    controlTransition(ControlAuthority.NONE)
-                }
-            }
-        )
-
-        MissionActionManager.registerGoHomeFinished {
-            handlerScope.launch {
-                // This assumes RTL ends with landing confirmation
-                waitAndConfirmLanding()
-                awaitFlightState(false)
-            }
-        }
+    private fun registerMissionListeners(scope: CoroutineScope) {
+        mission.registerScope(scope)
 
         MissionActionManager.startListener {
             // onError
@@ -362,7 +333,7 @@ class AircraftHandler : IHandler<AircraftHandler> {
     fun cancelMission() {
         logger.d { "cancel mission" }
         if (stateMachine.isMissionWaypoint()) mission.stopWaypoint()
-        if (stateMachine.isTimelineCommand()) mission.cancelCommand()
+        if (stateMachine.isTimelineCommand()) mission.stopCommand()
     }
 
     fun controlTransition(authority: ControlAuthority) {
@@ -384,15 +355,19 @@ class AircraftHandler : IHandler<AircraftHandler> {
             }
     }
 
-    suspend fun unload() {
-        // Stop monitor
-        monitorJob?.cancel()
-        monitorJob = null
+    suspend fun shutdown(): String? {
         sensorsHealthy = false
         // Reverse boot sequence
         stopTelemetry(500L)
-        processor.stop()
         isPowerOff = true
+        return null
+    }
+
+    override fun unload() {
+        // Stop monitor
+        monitorJob?.cancel()
+        monitorJob = null
+        super.unload()
     }
 
     fun armMotors() {
@@ -437,16 +412,6 @@ class AircraftHandler : IHandler<AircraftHandler> {
         FCManager.startTakeoff()
     }
 
-    fun land() {
-        logger.d { "Aircraft landing" }
-
-        controlTransition(ControlAuthority.TIMELINE_COMMAND)
-        mission.doLand { error ->
-            logger.i { "Landed:$error" }
-            controlTransition(ControlAuthority.NONE)
-        }
-    }
-
     suspend fun awaitFlightState(takingOff: Boolean): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
         fun flyingMatchesTarget(): Boolean = takingOff == state.isFlying()
@@ -470,27 +435,6 @@ class AircraftHandler : IHandler<AircraftHandler> {
 
         FCManager.confirmLanding {
             logger.d { "\tLanding confirm" }
-        }
-    }
-
-    fun doMission() {
-        controlTransition(ControlAuthority.WAYPOINT_MISSION)
-        mission.startWaypoint()
-    }
-
-    fun doReposition(target: Coordinates3D, speed: Float?) {
-        controlTransition(ControlAuthority.TIMELINE_COMMAND)
-        mission.doReposition(target, speed ?: mission.flightSpeed) { error ->
-            logger.i { "Reposition completed: $error" }
-            controlTransition(ControlAuthority.NONE)
-        }
-    }
-
-    fun doGoHome() {
-        controlTransition(ControlAuthority.TIMELINE_COMMAND)
-        mission.doGoHome { error ->
-            logger.i { "RTL: $error" }
-            controlTransition(ControlAuthority.NONE)
         }
     }
 }

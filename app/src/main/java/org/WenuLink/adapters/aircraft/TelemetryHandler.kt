@@ -9,12 +9,13 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.commands.IHandler
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
 import org.WenuLink.sdk.SimManager
 
-class TelemetryHandler {
+class TelemetryHandler : IHandler<TelemetryHandler> {
     companion object {
         private var mInstance: TelemetryHandler? = null
 
@@ -212,14 +213,14 @@ class TelemetryHandler {
         isReadingData() &&
         hasData()
 
-    fun registerHandlerScope(handlerScope: CoroutineScope) {
+    override fun registerScope(scope: CoroutineScope) {
         isListeningRC.distinctUntilChangedBy { it }
             .onEach { listenRemoteController(it) }
-            .launchIn(handlerScope)
+            .launchIn(scope)
 
         isListeningAircraft.distinctUntilChangedBy { it }
             .onEach { listenVehicleState(it) }
-            .launchIn(handlerScope)
+            .launchIn(scope)
 
         isBroadcasting.distinctUntilChangedBy { it }
             .onEach {
@@ -230,7 +231,11 @@ class TelemetryHandler {
                     stopBroadcast()
                 }
             }
-            .launchIn(handlerScope)
+            .launchIn(scope)
+    }
+
+    override fun unload() {
+        stopBroadcast()
     }
 
     fun isReadingData(): Boolean {

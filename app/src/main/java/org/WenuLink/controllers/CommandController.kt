@@ -13,7 +13,7 @@ import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand
-import org.WenuLink.adapters.aircraft.LandCommand
+import org.WenuLink.adapters.aircraft.RequestLand
 import org.WenuLink.adapters.aircraft.TakeoffCommand
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -166,7 +166,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     fun processLanding(commandMsg: msg_command_long, aircraft: AircraftHandler) {
         logger.d { "processLanding: $commandMsg" }
-        aircraft.dispatchCommand(LandCommand()) { landError ->
+        aircraft.dispatchCommand(RequestLand()) { landError ->
             logger.d { "processLanding: $landError" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)

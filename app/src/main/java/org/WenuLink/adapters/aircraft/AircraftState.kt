@@ -26,6 +26,8 @@ data class AircraftState(
 
     fun isFlying() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
+    fun isLanding() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
+
     fun isOnTheGround() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
     fun isUninitialized() = mavlink == MAV_STATE.MAV_STATE_UNINIT

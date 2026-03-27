@@ -21,6 +21,7 @@ import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.BootCommand
+import org.WenuLink.adapters.aircraft.ShutdownCommand
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -220,11 +221,11 @@ class WenuLinkService : Service() {
 
     suspend fun terminate() {
         // TODO: perform RTL or LAND before: aircraft.unload()
-        serviceScope.launch {
-            aircraft.manualControl()
-            stopWebRTCService()?.join()
-            stopMAVLinkService()?.join()
-            aircraft.unload() // aircraft.dispatch(PowerOffCommand())
+        aircraft.manualControl()
+        stopWebRTCService()?.join()
+        stopMAVLinkService()?.join()
+        aircraft.dispatchCommand(ShutdownCommand(false)) {
+            aircraft.unload()
         }
         AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
     }

@@ -30,7 +30,8 @@ import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.aircraft.RepositionCommand
+import org.WenuLink.adapters.aircraft.RequestReposition
+import org.WenuLink.adapters.aircraft.RequestStartMission
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.mavlink.MAVLinkClient
@@ -194,7 +195,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun sendMissionClear(mission: MissionHandler) {
-        mission.reset()
+        mission.clear()
         sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, mission)
     }
 
@@ -282,7 +283,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     fun missionStart(msg: MAVLinkMessage, aircraft: AircraftHandler) {
         // TODO: Process init seq to custom first mission element
-        aircraft.doMission()
+        aircraft.dispatchCommand(RequestStartMission())
         client.sendMessage(
             MessageUtils.msgCommandAck(
                 MAV_CMD.MAV_CMD_MISSION_START,
@@ -297,7 +298,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
         aircraft.dispatchCommand(
-            RepositionCommand(
+            RequestReposition(
                 coordinate,
                 if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
             )

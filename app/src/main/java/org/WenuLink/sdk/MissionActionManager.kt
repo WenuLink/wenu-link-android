@@ -28,7 +28,7 @@ object MissionActionManager {
         val event: TimelineEvent
     )
 
-    private val logger by taggedLogger("MissionActionManager")
+    private val logger by taggedLogger(MissionActionManager::class.java.simpleName)
 
     private val missionControl: MissionControl
         get() = MissionControl.getInstance()
@@ -36,6 +36,8 @@ object MissionActionManager {
     private var listener: MissionControl.Listener? = null
     private val callbacks =
         mutableMapOf<ActionCallbackKey, MutableList<() -> Unit>>()
+
+    val isRunning get() = missionControl.isTimelineRunning
 
     // ---- Lifecycle ----
     fun clear() {
@@ -61,36 +63,11 @@ object MissionActionManager {
 
     // ---- Actions ----
 
-    fun scheduleTakeOff(): DJIError? = missionControl.scheduleElement(TakeOffAction())
-
-    fun scheduleGoTo(coordinates: Coordinates3D, speed: Float? = null): DJIError? {
-        val action = GoToAction(
-            LocationCoordinate2D(coordinates.lat, coordinates.long),
-            coordinates.alt
-        )
-
-        speed?.let { action.flightSpeed = it }
-
-        return missionControl.scheduleElement(action)
-    }
-
-    fun scheduleLand(autoConfirm: Boolean = true): DJIError? {
-        val land = LandAction().apply {
-            autoConfirmLandingEnabled = autoConfirm
-        }
-        return missionControl.scheduleElement(land)
-    }
-
-    fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? {
-        val goHome = GoHomeAction().apply {
-            autoConfirmLandingEnabled = autoConfirm
-        }
-        return missionControl.scheduleElement(goHome)
-    }
+    fun schedule(element: TimelineElement) = missionControl.scheduleElement(element)
 
     // ---- Listener and callbacks ----
 
-    private fun <T : TimelineElement> registerCallback(
+    fun <T : TimelineElement> registerCallback(
         actionClass: KClass<T>,
         event: TimelineEvent,
         callback: () -> Unit
@@ -101,28 +78,6 @@ object MissionActionManager {
 
     fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
         registerCallback(action, TimelineEvent.FINISHED, callback)
-
-    fun registerTakeOffFinished(callback: () -> Unit) = onFinish(TakeOffAction::class, callback)
-
-    fun registerGoToFinished(callback: () -> Unit) = onFinish(GoToAction::class, callback)
-
-    fun registerLandFinished(callback: () -> Unit) = onFinish(LandAction::class, callback)
-
-    fun registerAircraftYawFinished(callback: () -> Unit) =
-        onFinish(AircraftYawAction::class, callback)
-
-    fun registerGoHomeFinished(callback: () -> Unit) = onFinish(GoHomeAction::class, callback)
-
-    fun registerHotpointFinished(callback: () -> Unit) = onFinish(HotpointAction::class, callback)
-
-    fun registerGimbalAttitudeFinished(callback: () -> Unit) =
-        onFinish(GimbalAttitudeAction::class, callback)
-
-    fun registerRecordVideoFinished(callback: () -> Unit) =
-        onFinish(RecordVideoAction::class, callback)
-
-    fun registerShootPhotoFinished(callback: () -> Unit) =
-        onFinish(ShootPhotoAction::class, callback)
 
     fun startListener(onError: (String) -> Unit = {}) {
         stopListener()

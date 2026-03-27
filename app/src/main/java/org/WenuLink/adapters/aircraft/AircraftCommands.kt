@@ -1,6 +1,12 @@
 package org.WenuLink.adapters.aircraft
 
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.commands.ICommand
+import org.WenuLink.adapters.mission.LandCommand
+import org.WenuLink.adapters.mission.RepositionCommand
+import org.WenuLink.adapters.mission.ReturnToHomeCommand
+import org.WenuLink.adapters.mission.StartWaypointMission
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
     override fun validate(ctx: AircraftHandler): String?
@@ -83,7 +89,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
         val isFlying = ctx.awaitFlightState(true)
 
         if (!isFlying) {
-            ctx.dispatchCommand(LandCommand(true))
+            ctx.dispatchCommand(RequestLand(true))
             return "Unable to takeoff"
         }
 
@@ -91,62 +97,130 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.dispatchCommand(LandCommand(true))
+        ctx.dispatchCommand(RequestLand(true))
     }
 }
 
-data class LandCommand(val withLandingConfirmation: Boolean = true) : AircraftCommand {
+data class RequestLand(val withLandingConfirmation: Boolean = true) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(LandTransition)
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(LandTransition)
-        ctx.land() // ctx.land(forceConfirmation)
-        val onTheGround = ctx.awaitFlightState(false)
+    override suspend fun execute(ctx: AircraftHandler): String? =
+        suspendCancellableCoroutine { cont ->
+            ctx.stateMachine.dispatch(LandTransition)
+            ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
 
-        if (!onTheGround) return "Unable to land"
-
-        ctx.dispatchCommand(DisarmCommand())
-
-        return null
-    }
-
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
-    }
-}
-
-data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Float?) :
-    AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(FlyingTransition)
-
-    override suspend fun execute(ctx: AircraftHandler): String? {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(FlyingTransition)
-        ctx.doReposition(targetCoordinates, speed)
-        // TODO: wait for reaching location?
-        return null
-    }
+            ctx.mission.dispatchCommand(LandCommand(true)) { error ->
+                if (error != null) {
+                    ctx.dispatchCommand(DisarmCommand(), cont::resume)
+                } else {
+                    cont.resume(error)
+                }
+            }
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+                ctx.manualControl()
+            }
+        }
 
     override suspend fun onStop(ctx: AircraftHandler) {
         ctx.manualControl()
     }
 }
 
-object GoHomeCommand : AircraftCommand {
+data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): String? = when {
+        ctx.isPowerOff -> "Already power off"
+        !withTransitionCheck -> null
+        else -> ctx.stateMachine.canDispatch(PowerOffTransition)
+    }
+
+    override suspend fun execute(ctx: AircraftHandler): String? {
+        // TODO: check if compatible with CancellableCoroutine
+        if (withTransitionCheck) ctx.stateMachine.dispatch(PowerOffTransition)
+        return ctx.shutdown()
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.stateMachine.dispatch(InitialTransition)
+    }
+}
+
+interface FlyingRequestCommand : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(FlyingTransition)
+
+    override suspend fun execute(ctx: AircraftHandler): String?
+
+    override suspend fun onStop(ctx: AircraftHandler) = ctx.manualControl()
+}
+
+data class RequestReposition(val targetCoordinates: Coordinates3D, val speed: Float? = null) :
+    FlyingRequestCommand {
+
+    override suspend fun execute(ctx: AircraftHandler): String? =
+        suspendCancellableCoroutine { cont ->
+            ctx.stateMachine.dispatch(FlyingTransition)
+            ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
+
+            ctx.mission.dispatchCommand(
+                RepositionCommand(targetCoordinates, speed ?: ctx.mission.flightSpeed)
+            ) { error ->
+                cont.resume(error)
+            }
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+                ctx.manualControl()
+            }
+        }
+}
+
+data class RequestStartMission(private val startSequence: Int = 0) : FlyingRequestCommand {
 
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(FlyingTransition)
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(FlyingTransition)
-        ctx.doGoHome()
-        // TODO: wait for reaching location?
-        return null
+    override suspend fun execute(ctx: AircraftHandler): String? =
+        suspendCancellableCoroutine { cont ->
+            ctx.stateMachine.dispatch(FlyingTransition)
+            ctx.controlTransition(ControlAuthority.WAYPOINT_MISSION)
+
+            ctx.mission.setItemSequenceIndex(startSequence)
+            ctx.mission.dispatchCommand(StartWaypointMission) { error ->
+                cont.resume(error)
+            }
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+                ctx.manualControl()
+            }
+        }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.manualControl()
     }
+}
+
+object RequestGoHome : AircraftCommand {
+
+    override fun validate(ctx: AircraftHandler): String? =
+        ctx.stateMachine.canDispatch(FlyingTransition)
+
+    override suspend fun execute(ctx: AircraftHandler): String? =
+        suspendCancellableCoroutine { cont ->
+            ctx.stateMachine.dispatch(FlyingTransition)
+            ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
+
+            ctx.mission.dispatchCommand(ReturnToHomeCommand(true)) { error ->
+                cont.resume(error)
+            }
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+                ctx.manualControl()
+            }
+        }
 
     override suspend fun onStop(ctx: AircraftHandler) {
         ctx.manualControl()

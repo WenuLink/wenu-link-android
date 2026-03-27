@@ -162,45 +162,19 @@ object MissionManager {
             WaypointAction(WaypointActionType.STOP_RECORD, 0)
     }
 
-    fun startMission(onResult: (String?) -> Unit) {
-        if (canStartMission()) {
-            operator.startMission(
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            onResult("No mission to start.")
-        }
-    }
+    fun startMission(onResult: (String?) -> Unit) =
+        operator.startMission(SDKUtils.createCompletionCallback(onResult))
 
-    fun stopMission(onResult: (String?) -> Unit) {
-        if (isMissionStarted()) {
-            operator.stopMission(
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            onResult("Not executing mission.")
-        }
-    }
+    fun stopMission(onResult: (String?) -> Unit) =
+        operator.stopMission(SDKUtils.createCompletionCallback(onResult))
 
-    fun pauseMission(onResult: (String?) -> Unit) {
-        if (isMissionStarted()) {
-            operator.pauseMission(
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            onResult("Not executing mission.")
-        }
-    }
+    fun pauseMission(onResult: (String?) -> Unit) =
+        operator.pauseMission(SDKUtils.createCompletionCallback(onResult))
 
-    fun resumeMission(onResult: (String?) -> Unit) {
-        if (isMissionPaused()) {
-            operator.resumeMission(
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            onResult("No mission to resume.")
-        }
-    }
+    fun resumeMission(onResult: (String?) -> Unit) =
+        operator.resumeMission(SDKUtils.createCompletionCallback(onResult))
+
+    fun clearMission() = operator.clearMission()
 
     fun addListeners(
         onStart: () -> Unit,

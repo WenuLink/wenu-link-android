@@ -4,15 +4,23 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
-import kotlin.math.max
-import kotlin.math.min
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.adapters.commands.CommandHandler
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
+import org.WenuLink.adapters.mission.PauseActionCommand
+import org.WenuLink.adapters.mission.PauseWaypointMission
+import org.WenuLink.adapters.mission.ResumeActionCommand
+import org.WenuLink.adapters.mission.ResumeWaypointMission
+import org.WenuLink.adapters.mission.StartWaypointMission
+import org.WenuLink.adapters.mission.StopWaypointMission
+import org.WenuLink.adapters.mission.UploadMissionCommand
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
-class MissionHandler {
+class MissionHandler : CommandHandler<MissionHandler>() {
     companion object {
         private var mInstance: MissionHandler? = null
 
@@ -39,6 +47,34 @@ class MissionHandler {
         get() = assembler.size()
     val currentId: Long
         get() = 202512
+
+    override fun registerScope(scope: CoroutineScope) {
+        MissionManager.addListeners(
+            onStart = {
+                scope.launch {
+                    isMissionRunning = true
+                    updateState()
+                }
+            },
+            onWaypointReach = { index ->
+                scope.launch {
+                    currentSequence = index
+                    updateState()
+                }
+            },
+            onFinish = { error ->
+                scope.launch {
+                    isMissionRunning = false
+                    updateState()
+                }
+            }
+        )
+        startCommandProcessor(scope, this@MissionHandler, logger)
+    }
+
+//    override fun unload() {
+//        super.unload()
+//    }
 
     @Synchronized
     fun updateState() {
@@ -70,9 +106,11 @@ class MissionHandler {
 
     fun canCreateMission() = currentState == MISSION_STATE.MISSION_STATE_NO_MISSION
 
-    fun reset() {
+    fun clear() {
         stopWaypoint()
         assembler.reset()
+        stopCommand()
+        MissionActionManager.clear()
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
@@ -145,159 +183,53 @@ class MissionHandler {
         logger.d { "Waypoint: ($coordinates) (Yaw=$yaw deg) (Delay=$delay)" }
     }
 
-    fun uploadWaypoints(onResult: (String?) -> Unit) {
-        if (!MissionManager.isWaitingMission()) {
-            onResult("Unable to upload mission, another mission was already uploaded")
-            return
-        }
+    fun uploadWaypoints(onResult: (String?) -> Unit) =
+        dispatchCommand(UploadMissionCommand(assembler, flightSpeed), onResult)
 
-        val mission = assembler.build()
-        MissionManager.uploadMission(
-            mission,
-            autoSpeed = flightSpeed
-        ) { success, error ->
-            logger.i { "Mission accepted: $success $error" }
-            updateState()
-            onResult(error)
-        }
+    fun setItemSequenceIndex(sequence: Int) {
+        currentSequence = sequence
     }
 
     fun pauseWaypoint() {
-        if (!isMissionRunning) return
         logger.i { "Pause WP mission" }
-        MissionManager.pauseMission { error ->
-            if (error != null) {
+        dispatchCommand(PauseWaypointMission) { error ->
+            if (error !=
+                null
+            ) {
                 logger.i { "Unable to pause the mission at $currentSequence: $error" }
             }
-            updateState()
-        }
-    }
-
-    fun startWaypoint() {
-        if (isMissionRunning) return
-        currentSequence = 0
-        logger.i { "Start WP mission" }
-        MissionManager.startMission { error ->
-            if (error != null) logger.i { "Unable to start the mission: $error" }
-            updateState()
         }
     }
 
     fun resumeWaypoint() {
-        if (!isMissionRunning) return
         logger.i { "Resume WP mission" }
-        MissionManager.resumeMission { error ->
+        dispatchCommand(ResumeWaypointMission) { error ->
             if (error != null) logger.i { "Unable to resume the mission: $error" }
-            updateState()
         }
     }
 
     fun stopWaypoint() {
-        if (!isMissionRunning) return
-        currentSequence = 0
         logger.i { "Stop WP mission" }
-        MissionManager.stopMission { error ->
+        dispatchCommand(StopWaypointMission) { error ->
             if (error != null) logger.i { "Unable to stop the mission: $error" }
-            updateState()
         }
-    }
-
-    fun startListenersWaypoint(
-        onStart: () -> Unit,
-        onWaypointReach: (Int) -> Unit,
-        onFinish: (String?) -> Unit
-    ) {
-        updateState()
-        MissionManager.addListeners(
-            onStart = {
-                onStart()
-                isMissionRunning = true
-                updateState()
-            },
-            onWaypointReach = { index ->
-                currentSequence = index
-                updateState()
-                onWaypointReach(currentSequence)
-            },
-            onFinish = { error ->
-                onFinish(error)
-                isMissionRunning = false
-                updateState()
-            }
-        )
-    }
-
-    fun cancelCommand() {
-        logger.i { "Cancel command" }
-        MissionActionManager.stop()
-        MissionActionManager.clear() // <- not sure about this
-        updateState()
     }
 
     fun pauseCommand() {
-        logger.i { "Pause command" }
-        MissionActionManager.pause()
-        updateState()
+        logger.i { "Pause WP mission" }
+        dispatchCommand(PauseActionCommand) { error ->
+            if (error !=
+                null
+            ) {
+                logger.i { "Unable to pause the command: $error" }
+            }
+        }
     }
 
     fun resumeCommand() {
-        logger.i { "Resume command" }
-        MissionActionManager.stop()
-        updateState()
-    }
-    fun doReposition(target: Coordinates3D, speed: Float?, onResult: (String?) -> Unit) {
-        logger.i { "doReposition" }
-        MissionActionManager.clear()
-        val error = MissionActionManager.scheduleGoTo(
-            coordinates = target,
-            speed = speed
-        )
-
-        if (error != null) {
-            onResult("Error in reposition: ${error.description}")
-            return
+        logger.i { "Resume WP mission" }
+        dispatchCommand(ResumeActionCommand) { error ->
+            if (error != null) logger.i { "Unable to resume the command: $error" }
         }
-
-        MissionActionManager.registerGoToFinished {
-            onResult(null)
-        }
-
-        MissionActionManager.start()
-    }
-
-    fun doLand(onResult: (String?) -> Unit) {
-        MissionActionManager.clear()
-        val error = MissionActionManager.scheduleLand()
-
-        if (error != null) {
-            onResult("Error in Land: ${error.description}")
-            return
-        }
-
-        logger.i { "scheduleLand" }
-
-        MissionActionManager.registerLandFinished {
-            onResult(null)
-        }
-
-        MissionActionManager.start()
-    }
-
-    fun doGoHome(onResult: (String?) -> Unit) {
-        MissionActionManager.clear()
-        val error = MissionActionManager.scheduleGoHome()
-
-        if (error != null) {
-            onResult("Error in Land: ${error.description}")
-            return
-        }
-
-        logger.i { "scheduleGoHome" }
-
-        MissionActionManager.registerGoHomeFinished {
-            onResult(null)
-        }
-
-        MissionActionManager.start()
     }
 }
