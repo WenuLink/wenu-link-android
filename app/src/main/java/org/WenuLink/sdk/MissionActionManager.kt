@@ -1,22 +1,10 @@
 package org.WenuLink.sdk
 
-import dji.common.error.DJIError
-import dji.common.model.LocationCoordinate2D
 import dji.sdk.mission.MissionControl
 import dji.sdk.mission.timeline.TimelineElement
 import dji.sdk.mission.timeline.TimelineEvent
-import dji.sdk.mission.timeline.actions.AircraftYawAction
-import dji.sdk.mission.timeline.actions.GimbalAttitudeAction
-import dji.sdk.mission.timeline.actions.GoHomeAction
-import dji.sdk.mission.timeline.actions.GoToAction
-import dji.sdk.mission.timeline.actions.HotpointAction
-import dji.sdk.mission.timeline.actions.LandAction
-import dji.sdk.mission.timeline.actions.RecordVideoAction
-import dji.sdk.mission.timeline.actions.ShootPhotoAction
-import dji.sdk.mission.timeline.actions.TakeOffAction
 import io.getstream.log.taggedLogger
 import kotlin.reflect.KClass
-import org.WenuLink.adapters.aircraft.Coordinates3D
 
 /**
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html
@@ -71,12 +59,13 @@ object MissionActionManager {
         actionClass: KClass<T>,
         event: TimelineEvent,
         callback: () -> Unit
-    ) {
+    ): ActionCallbackKey {
         val key = ActionCallbackKey(actionClass, event)
         callbacks.getOrPut(key) { mutableListOf() }.add(callback)
+        return key
     }
 
-    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
+    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit): ActionCallbackKey =
         registerCallback(action, TimelineEvent.FINISHED, callback)
 
     fun startListener(onError: (String) -> Unit = {}) {

@@ -10,7 +10,6 @@ import dji.common.flightcontroller.virtualstick.VerticalControlMode
 import dji.common.flightcontroller.virtualstick.YawControlMode
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
-import org.WenuLink.sdk.FCManager
 
 abstract class DJIParameter(name: String, type: Int, semantic: SemanticType) :
     ParameterSpec(name, type, semantic) {
@@ -258,11 +257,7 @@ class DJIYawModeControlModeParameter(
  * DJI available provider class
  */
 
-object DJIParametersProvider : ParameterProvider {
-
-    private val fc: FlightController
-        get() = FCManager.fcInstance
-            ?: error("FlightController not available")
+class DJIParametersProvider(private val fc: FlightController) : ParameterProvider {
 
     override fun provide(): List<ParameterSpec> = listOf(
         DJIBooleanParameter(

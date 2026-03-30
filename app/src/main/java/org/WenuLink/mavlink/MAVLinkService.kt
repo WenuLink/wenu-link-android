@@ -121,10 +121,7 @@ class MAVLinkService(aircraft: AircraftHandler) {
                 "(sending=${sendingJob?.isActive})"
         }
 
-        // Wait for service's boot up
-        val hasParams = controller.loadParameters()
-        if (hasParams) logger.d { "Parameters loaded" }
-
+        // Wait for parameters and mission items request
         mavlinkScope?.launch {
             // TODO: move timeout to a UserPreference due to user's local network latency
             isReady = controller.waitServicesRequest(30000L)

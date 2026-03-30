@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 open class CommandHandler<T : IHandler<T>> : IHandler<T> {
     private var requestJob: Job? = null
     private var commandJob: Deferred<String?>? = null
+    var currentCommand: ICommand<T>? = null
+        private set
     private val commandChannel =
         Channel<Pair<ICommand<T>, (String?) -> Unit>>(Channel.UNLIMITED)
 
@@ -21,6 +23,7 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
         requestJob = scope.launch {
             for ((cmd, onResult) in commandChannel) {
                 logger.d { "Executing: ${cmd::class.simpleName}" }
+                currentCommand = cmd
 
                 try {
                     val validationError = cmd.validate(handler)
@@ -46,6 +49,7 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
                     onResult(e.message)
                 } finally {
                     commandJob = null
+                    currentCommand = null
                 }
             }
         }

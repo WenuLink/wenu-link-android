@@ -1,4 +1,4 @@
-package org.WenuLink.adapters
+package org.WenuLink.adapters.mission
 
 import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
@@ -6,17 +6,9 @@ import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.commands.CommandHandler
-import org.WenuLink.adapters.mission.MissionAction
-import org.WenuLink.adapters.mission.MissionAssembler
-import org.WenuLink.adapters.mission.PauseActionCommand
-import org.WenuLink.adapters.mission.PauseWaypointMission
-import org.WenuLink.adapters.mission.ResumeActionCommand
-import org.WenuLink.adapters.mission.ResumeWaypointMission
-import org.WenuLink.adapters.mission.StartWaypointMission
-import org.WenuLink.adapters.mission.StopWaypointMission
-import org.WenuLink.adapters.mission.UploadMissionCommand
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -39,8 +31,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         private set
     var currentSequence = 0
         private set
-    var isMissionRunning = false
-        private set
+    val isMissionActive: Boolean get() = currentState == MISSION_STATE.MISSION_STATE_ACTIVE
     var currentState = MISSION_STATE.MISSION_STATE_UNKNOWN
         private set
     val totalNodes: Int
@@ -49,32 +40,16 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         get() = 202512
 
     override fun registerScope(scope: CoroutineScope) {
-        MissionManager.addListeners(
-            onStart = {
-                scope.launch {
-                    isMissionRunning = true
-                    updateState()
-                }
-            },
-            onWaypointReach = { index ->
-                scope.launch {
-                    currentSequence = index
-                    updateState()
-                }
-            },
-            onFinish = { error ->
-                scope.launch {
-                    isMissionRunning = false
-                    updateState()
-                }
-            }
-        )
+        MissionManager.addListeners { index ->
+            scope.launch { setItemSequenceIndex(index) }
+        }
         startCommandProcessor(scope, this@MissionHandler, logger)
     }
 
-//    override fun unload() {
-//        super.unload()
-//    }
+    override fun unload() {
+        MissionManager.removeListener()
+        super.unload()
+    }
 
     @Synchronized
     fun updateState() {
@@ -105,6 +80,12 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun hasWaypointNodes() = assembler.hasNodes()
 
     fun canCreateMission() = currentState == MISSION_STATE.MISSION_STATE_NO_MISSION
+
+    fun canStartMission() = currentState == MISSION_STATE.MISSION_STATE_NOT_STARTED
+
+    fun canPauseMission() = currentState == MISSION_STATE.MISSION_STATE_ACTIVE
+
+    fun canResumeMission() = currentState == MISSION_STATE.MISSION_STATE_PAUSED
 
     fun clear() {
         stopWaypoint()
@@ -186,6 +167,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun uploadWaypoints(onResult: (String?) -> Unit) =
         dispatchCommand(UploadMissionCommand(assembler, flightSpeed), onResult)
 
+    @Synchronized
     fun setItemSequenceIndex(sequence: Int) {
         currentSequence = sequence
     }
@@ -193,9 +175,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun pauseWaypoint() {
         logger.i { "Pause WP mission" }
         dispatchCommand(PauseWaypointMission) { error ->
-            if (error !=
-                null
-            ) {
+            if (error != null) {
                 logger.i { "Unable to pause the mission at $currentSequence: $error" }
             }
         }
@@ -218,9 +198,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun pauseCommand() {
         logger.i { "Pause WP mission" }
         dispatchCommand(PauseActionCommand) { error ->
-            if (error !=
-                null
-            ) {
+            if (error != null) {
                 logger.i { "Unable to pause the command: $error" }
             }
         }

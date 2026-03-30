@@ -102,7 +102,9 @@ class ParameterRegistry(private val providers: List<ParameterProvider>) {
         return availableParams
     }
 
-    suspend fun loadParameters() {
+    fun isLoaded() = ::params.isInitialized && ::byName.isInitialized
+
+    suspend fun load() {
         params = filterAvailable(providers.flatMap { it.provide() })
 
         require(params.isNotEmpty()) { "ParameterRegistry cannot be empty" }

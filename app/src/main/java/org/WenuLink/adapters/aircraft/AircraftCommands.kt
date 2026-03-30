@@ -146,7 +146,7 @@ data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCo
     }
 }
 
-interface FlyingRequestCommand : AircraftCommand {
+interface RequestCommand : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(FlyingTransition)
 
@@ -156,7 +156,7 @@ interface FlyingRequestCommand : AircraftCommand {
 }
 
 data class RequestReposition(val targetCoordinates: Coordinates3D, val speed: Float? = null) :
-    FlyingRequestCommand {
+    RequestCommand {
 
     override suspend fun execute(ctx: AircraftHandler): String? =
         suspendCancellableCoroutine { cont ->
@@ -176,14 +176,19 @@ data class RequestReposition(val targetCoordinates: Coordinates3D, val speed: Fl
         }
 }
 
-data class RequestStartMission(private val startSequence: Int = 0) : FlyingRequestCommand {
+data class RequestStartMission(private val startSequence: Int = 0) : RequestCommand {
+    fun getTransition(ctx: AircraftHandler): StateTransition = if (!ctx.state.isArmed()) {
+        ArmTransition
+    } else {
+        FlyingTransition
+    }
 
     override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(FlyingTransition)
+        ctx.stateMachine.canDispatch(getTransition(ctx))
 
     override suspend fun execute(ctx: AircraftHandler): String? =
         suspendCancellableCoroutine { cont ->
-            ctx.stateMachine.dispatch(FlyingTransition)
+            ctx.stateMachine.dispatch(getTransition(ctx))
             ctx.controlTransition(ControlAuthority.WAYPOINT_MISSION)
 
             ctx.mission.setItemSequenceIndex(startSequence)
@@ -196,16 +201,9 @@ data class RequestStartMission(private val startSequence: Int = 0) : FlyingReque
                 ctx.manualControl()
             }
         }
-
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
-    }
 }
 
-object RequestGoHome : AircraftCommand {
-
-    override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(FlyingTransition)
+object RequestGoHome : RequestCommand {
 
     override suspend fun execute(ctx: AircraftHandler): String? =
         suspendCancellableCoroutine { cont ->
@@ -221,8 +219,4 @@ object RequestGoHome : AircraftCommand {
                 ctx.manualControl()
             }
         }
-
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
-    }
 }

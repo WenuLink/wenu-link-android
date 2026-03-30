@@ -73,8 +73,6 @@ object MissionManager {
 
     fun isMissionStarted() = currentState == WaypointMissionState.EXECUTING
 
-    fun canStartMission() = isMissionReady() || isMissionPaused()
-
     fun uploadWaypointMission(onResult: (Boolean, String?) -> Unit) {
         logger.i { "Uploading mission" }
         operator.uploadMission(
@@ -176,11 +174,7 @@ object MissionManager {
 
     fun clearMission() = operator.clearMission()
 
-    fun addListeners(
-        onStart: () -> Unit,
-        onWaypointReach: (Int) -> Unit,
-        onFinish: (String?) -> Unit
-    ) {
+    fun addListeners(onWaypointStart: (Int) -> Unit) {
         logger.d { "addListeners" }
         removeListener()
         listener = object : WaypointMissionOperatorListener {
@@ -191,23 +185,17 @@ object MissionManager {
             override fun onDownloadUpdate(p0: WaypointMissionDownloadEvent) {
             }
 
-            override fun onExecutionStart() {
-                logger.d { "onExecutionStart" }
-                onStart()
-            }
+            override fun onExecutionStart() = logger.d { "onExecutionStart" }
 
             override fun onExecutionUpdate(p0: WaypointMissionExecutionEvent) {
                 val progress = p0.progress ?: return
                 logger.d { "onExecutionUpdate progress: $progress" }
-                if (progress.executeState == WaypointMissionExecuteState.FINISHED_ACTION) {
-                    onWaypointReach(progress.targetWaypointIndex)
+                if (progress.executeState == WaypointMissionExecuteState.BEGIN_ACTION) {
+                    onWaypointStart(progress.targetWaypointIndex)
                 }
             }
 
-            override fun onExecutionFinish(p0: DJIError?) {
-                logger.d { "onExecutionFinish: $p0" }
-                onFinish(p0?.description)
-            }
+            override fun onExecutionFinish(p0: DJIError?) = logger.d { "onExecutionFinish: $p0" }
         }
 
         operator.addListener(listener!!)

@@ -7,7 +7,6 @@ import dji.sdk.mission.timeline.actions.LandAction
 import dji.sdk.mission.timeline.actions.MissionAction
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
-import org.WenuLink.adapters.MissionHandler
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.commands.ICommand
 import org.WenuLink.sdk.MissionActionManager
@@ -25,8 +24,8 @@ data class UploadMissionCommand(
 ) : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        !MissionManager.isWaitingMission() -> "Already uploading a mission!"
-        else -> null
+        ctx.canCreateMission() -> null
+        else -> "Upload not ready"
     }
 
     override suspend fun execute(ctx: MissionHandler): String? =
@@ -46,9 +45,10 @@ data class UploadMissionCommand(
 data object StartWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        MissionManager.isMissionStarted() -> "Already started"
-        !MissionManager.isMissionReady() -> "No mission"
-        else -> null
+        ctx.canCreateMission() -> "No mission found"
+        ctx.isMissionActive -> "Already started"
+        ctx.canStartMission() -> null
+        else -> "Not ready"
     }
 
     override suspend fun execute(ctx: MissionHandler): String? =
@@ -68,9 +68,8 @@ data object StartWaypointMission : MissionCommand {
 data object PauseWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        MissionManager.isMissionPaused() -> "Already paused"
-        !MissionManager.isMissionStarted() -> "Mission not started"
-        else -> null
+        ctx.canPauseMission() -> null
+        else -> "Not started"
     }
 
     override suspend fun execute(ctx: MissionHandler): String? =
@@ -90,9 +89,8 @@ data object PauseWaypointMission : MissionCommand {
 data object ResumeWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        MissionManager.isMissionStarted() -> "Already resumed"
-        !MissionManager.isMissionPaused() -> "Mission not paused"
-        else -> null
+        ctx.canResumeMission() -> null
+        else -> "Already in execution"
     }
 
     override suspend fun execute(ctx: MissionHandler): String? =
@@ -112,8 +110,8 @@ data object ResumeWaypointMission : MissionCommand {
 data object StopWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        MissionManager.isWaitingMission() -> "No mission"
-        else -> null
+        !ctx.canCreateMission() -> null
+        else -> "Nothing to stop"
     }
 
     override suspend fun execute(ctx: MissionHandler): String? =
@@ -181,6 +179,11 @@ open class ActionCommand(val action: MissionAction) : MissionCommand {
 
             MissionActionManager.onFinish(action::class) {
                 cont.resume(null)
+            }
+
+            MissionActionManager.startListener {
+                // onError
+                cont.resume("Action failed: $it")
             }
 
             MissionActionManager.start()

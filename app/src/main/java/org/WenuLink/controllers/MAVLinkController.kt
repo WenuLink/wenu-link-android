@@ -214,14 +214,6 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         return true
     }
 
-    suspend fun loadParameters(): Boolean {
-        // Load and wait parameters
-        logger.d { "Waiting for parameters" }
-        parameterController.load()
-        AsyncUtils.waitReady(1000L, parameterController::isLoaded)
-        return parameterController.isLoaded()
-    }
-
     suspend fun waitHomePosition(): Boolean {
         // Wait for home position to send GPS_GLOBAL_ORIGIN and periodic HOME_POSITION
         val isHomeSet = aircraft.waitHomeSet(360000) // 5min
