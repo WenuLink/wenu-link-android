@@ -2,11 +2,11 @@ package org.WenuLink.adapters.aircraft
 
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
-import org.WenuLink.adapters.commands.ICommand
 import org.WenuLink.adapters.mission.LandCommand
 import org.WenuLink.adapters.mission.RepositionCommand
 import org.WenuLink.adapters.mission.ReturnToHomeCommand
 import org.WenuLink.adapters.mission.StartWaypointMission
+import org.WenuLink.commands.ICommand
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
     override fun validate(ctx: AircraftHandler): String?

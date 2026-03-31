@@ -1,4 +1,4 @@
-package org.WenuLink.controllers
+package org.WenuLink.mavlink.controllers
 
 import com.MAVLink.common.msg_camera_capture_status
 import com.MAVLink.common.msg_camera_image_captured

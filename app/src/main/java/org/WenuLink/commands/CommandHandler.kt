@@ -1,4 +1,4 @@
-package org.WenuLink.adapters.commands
+package org.WenuLink.commands
 
 import io.getstream.log.TaggedLogger
 import kotlin.coroutines.cancellation.CancellationException

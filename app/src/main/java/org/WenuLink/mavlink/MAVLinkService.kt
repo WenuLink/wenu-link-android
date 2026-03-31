@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.controllers.MAVLinkController
+import org.WenuLink.mavlink.MAVLinkController
 
 data class Endpoint(val ip: String, val port: Int)
 

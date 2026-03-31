@@ -9,7 +9,6 @@ import dji.common.util.CommonCallbacks
 import dji.sdk.camera.Camera
 import dji.sdk.camera.VideoFeeder
 import dji.sdk.codec.DJICodecManager
-import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume

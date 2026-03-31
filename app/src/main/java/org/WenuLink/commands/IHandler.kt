@@ -1,4 +1,4 @@
-package org.WenuLink.adapters.commands
+package org.WenuLink.commands
 
 import kotlinx.coroutines.CoroutineScope
 

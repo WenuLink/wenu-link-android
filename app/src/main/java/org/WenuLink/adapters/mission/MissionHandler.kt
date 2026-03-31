@@ -8,7 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.commands.CommandHandler
+import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 

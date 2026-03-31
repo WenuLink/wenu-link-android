@@ -1,7 +1,7 @@
 package org.WenuLink.adapters.camera
 
 import com.MAVLink.enums.CAMERA_MODE
-import org.WenuLink.adapters.commands.ICommand
+import org.WenuLink.commands.ICommand
 import org.WenuLink.sdk.CameraManager
 
 sealed interface CameraCommand : ICommand<CameraHandler> {

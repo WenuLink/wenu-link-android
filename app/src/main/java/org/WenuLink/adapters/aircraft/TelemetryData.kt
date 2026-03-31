@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.aircraft
 
-import com.MAVLink.enums.CAMERA_MODE
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.Int
 import kotlin.math.roundToInt

@@ -6,7 +6,7 @@ import io.getstream.log.taggedLogger
 import kotlin.getValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
-import org.WenuLink.adapters.commands.CommandHandler
+import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.CameraManager
 
 class CameraHandler : CommandHandler<CameraHandler>() {

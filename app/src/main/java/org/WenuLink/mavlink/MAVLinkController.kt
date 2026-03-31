@@ -1,4 +1,4 @@
-package org.WenuLink.controllers
+package org.WenuLink.mavlink
 
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
@@ -6,10 +6,17 @@ import com.MAVLink.common.msg_command_long
 import com.MAVLink.common.msg_home_position
 import com.MAVLink.enums.MAV_CMD
 import io.getstream.log.taggedLogger
+import kotlin.collections.plusAssign
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.controllers.CameraController
+import org.WenuLink.mavlink.controllers.CommandController
+import org.WenuLink.mavlink.controllers.ConnectionController
+import org.WenuLink.mavlink.controllers.IController
+import org.WenuLink.mavlink.controllers.NavigationController
+import org.WenuLink.mavlink.controllers.ParameterController
+import org.WenuLink.mavlink.controllers.TelemetryController
 
 /**
  * Management class for different MAVLink's microservices message processing.
@@ -45,12 +52,12 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         this.client = client
         // Initialize controllers
         controllers.clear()
-        controllers += ConnectionController(client)
-        controllers += CommandController(client)
-        controllers += ParameterController(client)
-        controllers += NavigationController(client)
-        controllers += TelemetryController(client)
-        controllers += CameraController(client, telemetryController::setMessageRate)
+        controllers.plusAssign(ConnectionController(client))
+        controllers.plusAssign(CommandController(client))
+        controllers.plusAssign(ParameterController(client))
+        controllers.plusAssign(NavigationController(client))
+        controllers.plusAssign(TelemetryController(client))
+        controllers.plusAssign(CameraController(client, telemetryController::setMessageRate))
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html

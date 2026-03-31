@@ -1,4 +1,4 @@
-package org.WenuLink.adapters.commands
+package org.WenuLink.commands
 
 interface ICommand<T : IHandler<T>> {
     fun validate(ctx: T): String?

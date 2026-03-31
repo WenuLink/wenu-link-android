@@ -10,8 +10,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.camera.CameraHandler
-import org.WenuLink.adapters.commands.CommandHandler
 import org.WenuLink.adapters.mission.MissionHandler
+import org.WenuLink.commands.CommandHandler
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParameterRegistry

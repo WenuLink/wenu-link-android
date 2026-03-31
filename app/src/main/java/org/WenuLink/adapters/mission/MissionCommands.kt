@@ -8,7 +8,7 @@ import dji.sdk.mission.timeline.actions.MissionAction
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.commands.ICommand
+import org.WenuLink.commands.ICommand
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 

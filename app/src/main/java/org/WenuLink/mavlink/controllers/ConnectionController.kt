@@ -1,4 +1,4 @@
-package org.WenuLink.controllers
+package org.WenuLink.mavlink.controllers
 
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_altitude
