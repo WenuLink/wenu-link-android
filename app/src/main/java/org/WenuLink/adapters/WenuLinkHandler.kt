@@ -9,25 +9,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import org.WenuLink.adapters.aircraft.AircraftCommand
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.BootCommand
 import org.WenuLink.adapters.aircraft.ControlAuthority
 import org.WenuLink.adapters.aircraft.ShutdownCommand
-import org.WenuLink.adapters.camera.CameraCommand
 import org.WenuLink.adapters.camera.CameraHandler
 import org.WenuLink.adapters.camera.CameraMetadata
-import org.WenuLink.adapters.mission.MissionCommand
 import org.WenuLink.adapters.mission.MissionHandler
 import org.WenuLink.commands.CommandHandler
-
-sealed interface WenuLinkCommand {
-    data class Aircraft(val command: AircraftCommand) : WenuLinkCommand
-    data class Mission(val command: MissionCommand) : WenuLinkCommand
-    data class Camera(val command: CameraCommand) : WenuLinkCommand
-    data class Request(val command: RequestCommand) : WenuLinkCommand
-}
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     companion object {
@@ -100,7 +90,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
                     launch { safetyChecks() }
 
-                    modeHooks(aircraft.copterFlightMode)
+                    modeHooks(aircraft.state.flightMode)
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -137,11 +127,11 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     fun controlTransition(authority: ControlAuthority) {
         // Decide policy: reject or stop mission
-        if (!mission.isNewControlAuthority(authority)) return
+        if (!aircraft.stateMachine.isNewControlAuthority(authority)) return
         // Always stop everything
         cancelCommand()
-        logger.d { "Control transition: ${mission.controlAuthority}->$authority" }
-        mission.setControlAuthority(authority)
+        logger.d { "Control transition: ${aircraft.stateMachine.controlAuthority}->$authority" }
+        aircraft.stateMachine.setControlAuthority(authority)
     }
 
     fun manualControl() {
@@ -154,11 +144,11 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun pauseCommand() {
-        mission.pauseCommand()
+        mission.pauseCommand(aircraft.stateMachine)
     }
 
     fun resumeCommand() {
-        mission.resumeCommand()
+        mission.resumeCommand(aircraft.stateMachine)
     }
 
     fun cancelCommand() {

@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.aircraft
 
-import com.MAVLink.enums.MAV_MODE_FLAG
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
@@ -27,10 +26,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     private val logger by taggedLogger(AircraftHandler::class.java.simpleName)
     val startTimestamp: Long = System.currentTimeMillis()
     val systemBootTime: Long get() = System.currentTimeMillis() - startTimestamp
-    var baseMode: Int = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
-        private set
-    var copterFlightMode = ArduCopterFlightMode.STABILIZE
-        private set
     val stateMachine = AircraftStateMachine()
     val state: AircraftState get() = stateMachine.state
     var sensorsTimestamp: Long = startTimestamp
@@ -46,46 +41,24 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         )
     )
 
-    private fun setMode(mode: ArduCopterFlightMode) {
-        copterFlightMode = mode
-        syncBaseMode()
-    }
-
-    private fun syncBaseMode() {
-        baseMode = copterFlightMode.baseMode
-        if (state.isArmed()) {
-            baseMode = baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
-        }
-    }
-
-    private fun isModeAllowed(mode: ArduCopterFlightMode): Boolean = when (mode) {
-        ArduCopterFlightMode.GUIDED -> state.isFlying() || state.isStandBy()
-
-        ArduCopterFlightMode.LAND,
-        ArduCopterFlightMode.RTL ->
-            state.isFlying()
-
-        else -> true
-    }
-
     fun requestMode(mode: ArduCopterFlightMode): Result<Unit> {
-        if (mode == copterFlightMode) return Result.success(Unit)
+        if (mode == state.flightMode) return Result.success(Unit)
 
-        if (!isModeAllowed(mode)) {
+        if (!stateMachine.isModeAllowed(mode)) {
             return Result.failure(
-                IllegalStateException("Mode $mode not allowed from $copterFlightMode")
+                IllegalStateException("Mode $mode not allowed from ${state.flightMode}")
             )
         }
 
-        logger.d { "Mode change: $copterFlightMode -> $mode" }
+        logger.d { "Mode change: ${state.flightMode} -> $mode" }
 
-        setMode(mode)
+        stateMachine.updateFlightMode(mode)
 
         return Result.success(Unit)
     }
 
     private fun enforceModeConsistency() {
-        if (!isModeAllowed(copterFlightMode)) {
+        if (!stateMachine.isModeAllowed(state.flightMode)) {
             val fallbackMode = if (state.isFlying()) {
                 ArduCopterFlightMode.GUIDED
             } else {
@@ -93,12 +66,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
             }
 
             logger.w {
-                "Mode $copterFlightMode invalid for state ${state.mavlink}, fallback to $fallbackMode"
+                "Mode ${state.flightMode} invalid for state ${state.mavlink}, fallback to $fallbackMode"
             }
 
-            setMode(fallbackMode)
+            stateMachine.updateFlightMode(fallbackMode)
         } else {
-            syncBaseMode()
+            stateMachine.syncArmState()
         }
     }
 

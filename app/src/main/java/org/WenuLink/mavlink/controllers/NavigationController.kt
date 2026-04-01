@@ -70,7 +70,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
                 sendMissionItem(msg, handler.mission)
 
             msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL ->
-                sendMissionClear(handler.mission)
+                sendMissionClear(handler)
 
             msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
 
@@ -195,9 +195,10 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         }
     }
 
-    fun sendMissionClear(mission: MissionHandler) {
-        mission.clear()
-        sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, mission)
+    fun sendMissionClear(handler: WenuLinkHandler) {
+        handler.mission.cancelCommand(handler.aircraft.stateMachine)
+        handler.mission.clear()
+        sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, handler.mission)
     }
 
     fun requestMissionItem(seq: Int) {

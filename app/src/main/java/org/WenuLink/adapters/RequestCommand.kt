@@ -2,6 +2,7 @@ package org.WenuLink.adapters
 
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.WenuLink.adapters.aircraft.AircraftCommand
 import org.WenuLink.adapters.aircraft.ArmTransition
 import org.WenuLink.adapters.aircraft.ControlAuthority
 import org.WenuLink.adapters.aircraft.Coordinates3D
@@ -9,11 +10,20 @@ import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.FlyingTransition
 import org.WenuLink.adapters.aircraft.LandTransition
 import org.WenuLink.adapters.aircraft.StateTransition
+import org.WenuLink.adapters.camera.CameraCommand
 import org.WenuLink.adapters.mission.LandCommand
+import org.WenuLink.adapters.mission.MissionCommand
 import org.WenuLink.adapters.mission.RepositionCommand
 import org.WenuLink.adapters.mission.ReturnToHomeCommand
 import org.WenuLink.adapters.mission.StartWaypointMission
 import org.WenuLink.commands.ICommand
+
+sealed interface WenuLinkCommand {
+    data class Aircraft(val command: AircraftCommand) : WenuLinkCommand
+    data class Mission(val command: MissionCommand) : WenuLinkCommand
+    data class Camera(val command: CameraCommand) : WenuLinkCommand
+    data class Request(val command: RequestCommand) : WenuLinkCommand
+}
 
 sealed interface RequestCommand : ICommand<WenuLinkHandler> {
     override fun validate(ctx: WenuLinkHandler): String?
@@ -21,7 +31,7 @@ sealed interface RequestCommand : ICommand<WenuLinkHandler> {
     override suspend fun onStop(ctx: WenuLinkHandler)
 }
 
-open class RequestTransition(open val transition: StateTransition = FlyingTransition) :
+open class RequestTransition(open val transition: StateTransition) :
     RequestCommand {
 
     override fun validate(ctx: WenuLinkHandler): String? =

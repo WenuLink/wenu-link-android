@@ -142,8 +142,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         heartbeat.mavlink_version = 3
         // mode definition
         // For base mode logic, see Copter::sendHeartBeat() in ArduCopter/GCS_Mavlink.cpp
-        heartbeat.base_mode = aircraft.baseMode.toShort()
-        heartbeat.custom_mode = aircraft.copterFlightMode.mode
+        heartbeat.base_mode = aircraft.state.modeFlag.toShort()
+        heartbeat.custom_mode = aircraft.state.flightMode.mode
         return heartbeat
     }
 

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.ServiceAddress
 import org.WenuLink.adapters.camera.CameraCapturer
 import org.WenuLink.webrtc.peer.StreamPeerConnection
 import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
@@ -54,7 +55,7 @@ class WebRTCService {
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
 
     // Signaling configuration
-    private var signalingServer = "ws://192.168.1.220:8090"
+    private var signalingServer = ServiceAddress("192.168.1.220", 8090, "WS")
     var isServiceUp: Boolean = false
         private set
     var isStreaming: Boolean = false
@@ -87,7 +88,8 @@ class WebRTCService {
     private var offer: String? = null
 
     fun updateServerAddress(serverAddress: String) {
-        signalingServer = serverAddress
+        val (ip, port) = serverAddress.split(":")
+        signalingServer = ServiceAddress(ip, port.toInt(), "WS")
     }
 
     private val peerConnection: StreamPeerConnection by lazy {
@@ -114,7 +116,7 @@ class WebRTCService {
         logger.i { "Connecting WebRTC client to $signalingServer" }
         if (::webRTCClient.isInitialized) return
 
-        webRTCClient = WebRTCClient(signalingServer)
+        webRTCClient = WebRTCClient(signalingServer.toString())
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(
             "SurfaceTextureHelperThread",

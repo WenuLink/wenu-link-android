@@ -14,7 +14,9 @@ enum class ControlAuthority {
 data class AircraftState(
     val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
     val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
-    val homeCoordinates: Coordinates3D? = null
+    val homeCoordinates: Coordinates3D? = null,
+    val modeFlag: Int = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+    val flightMode: ArduCopterFlightMode = ArduCopterFlightMode.STABILIZE
 ) {
 
     fun isHomeSet() = homeCoordinates != null
@@ -195,6 +197,8 @@ class AircraftStateMachine {
 
     var state = AircraftState()
         private set
+    var controlAuthority: ControlAuthority = ControlAuthority.NONE
+        private set
 
     fun canDispatch(event: StateTransition): String? = event.canTransition(state)
 
@@ -213,6 +217,42 @@ class AircraftStateMachine {
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
         state = state.copy(homeCoordinates = homeCoordinates)
         return state
+    }
+
+    fun syncArmState(): AircraftState {
+        var modeFlag = state.flightMode.baseMode
+        if (state.isArmed()) {
+            modeFlag = modeFlag or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
+        }
+        state = state.copy(modeFlag = modeFlag)
+        return state
+    }
+
+    fun updateFlightMode(mode: ArduCopterFlightMode): AircraftState {
+        state = state.copy(flightMode = mode)
+        return syncArmState()
+    }
+
+    fun isModeAllowed(mode: ArduCopterFlightMode): Boolean = when (mode) {
+        ArduCopterFlightMode.GUIDED -> state.isFlying() || state.isStandBy()
+
+        ArduCopterFlightMode.LAND,
+        ArduCopterFlightMode.RTL ->
+            state.isFlying()
+
+        else -> true
+    }
+
+    fun isWaypointControl() = controlAuthority == ControlAuthority.WAYPOINT_MISSION
+
+    fun isCommandControl() = controlAuthority == ControlAuthority.TIMELINE_COMMAND
+
+    fun isRemoteControl() = controlAuthority == ControlAuthority.REMOTE_CONTROLLER
+
+    fun isNewControlAuthority(authority: ControlAuthority) = controlAuthority != authority
+
+    fun setControlAuthority(authority: ControlAuthority) {
+        controlAuthority = authority
     }
 }
 

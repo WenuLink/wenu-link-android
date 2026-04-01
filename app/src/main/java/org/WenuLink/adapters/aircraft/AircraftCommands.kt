@@ -37,7 +37,7 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
         ctx.dispatchTransition(ArmTransition)
         // TODO: update according to each mode
         // https://ardupilot.org/copter/docs/arming_the_motors.html
-        val armed = if (ctx.copterFlightMode == ArduCopterFlightMode.STABILIZE) {
+        val armed = if (ctx.state.flightMode == ArduCopterFlightMode.STABILIZE) {
             // Manual takeoff
             ctx.armMotors()
             ctx.waitArmTransition(true, timeout)

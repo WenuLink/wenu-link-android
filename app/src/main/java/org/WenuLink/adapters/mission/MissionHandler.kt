@@ -7,7 +7,7 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.aircraft.ControlAuthority
+import org.WenuLink.adapters.aircraft.AircraftStateMachine
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
@@ -39,8 +39,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         get() = assembler.size()
     val currentId: Long
         get() = 202512
-    var controlAuthority: ControlAuthority = ControlAuthority.NONE
-        private set
 
     override fun registerScope(scope: CoroutineScope) {
         MissionManager.addListeners { index ->
@@ -52,18 +50,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     override fun unload() {
         MissionManager.removeListener()
         super.unload()
-    }
-
-    fun isWaypointControl() = controlAuthority == ControlAuthority.WAYPOINT_MISSION
-
-    fun isCommandControl() = controlAuthority == ControlAuthority.TIMELINE_COMMAND
-
-    fun isRemoteControl() = controlAuthority == ControlAuthority.REMOTE_CONTROLLER
-
-    fun isNewControlAuthority(authority: ControlAuthority) = controlAuthority != authority
-
-    fun setControlAuthority(authority: ControlAuthority) {
-        controlAuthority = authority
     }
 
     @Synchronized
@@ -104,7 +90,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     fun clear() {
         assembler.reset()
-        cancelCommand()
         MissionActionManager.clear()
     }
 
@@ -186,16 +171,16 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         currentSequence = sequence
     }
 
-    fun pauseCommand() {
+    fun pauseCommand(aircraftState: AircraftStateMachine) {
         logger.i { "Pause mission" }
         when {
-            isWaypointControl() -> dispatchCommand(PauseWaypointMission) { error ->
+            aircraftState.isWaypointControl() -> dispatchCommand(PauseWaypointMission) { error ->
                 if (error != null) {
                     logger.i { "Unable to pause the mission at $currentSequence: $error" }
                 }
             }
 
-            isCommandControl() -> dispatchCommand(PauseActionCommand) { error ->
+            aircraftState.isCommandControl() -> dispatchCommand(PauseActionCommand) { error ->
                 if (error != null) {
                     logger.i { "Unable to pause the command: $error" }
                 }
@@ -203,28 +188,28 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         }
     }
 
-    fun resumeCommand() {
+    fun resumeCommand(aircraftState: AircraftStateMachine) {
         logger.i { "Resume mission" }
         when {
-            isWaypointControl() ->
+            aircraftState.isWaypointControl() ->
                 dispatchCommand(ResumeWaypointMission) { error ->
                     if (error != null) logger.i { "Unable to resume the mission: $error" }
                 }
 
-            isCommandControl() -> dispatchCommand(ResumeActionCommand) { error ->
+            aircraftState.isCommandControl() -> dispatchCommand(ResumeActionCommand) { error ->
                 if (error != null) logger.i { "Unable to resume the command: $error" }
             }
         }
     }
 
-    fun cancelCommand() {
+    fun cancelCommand(aircraftState: AircraftStateMachine) {
         logger.d { "Stop mission" }
         when {
-            isWaypointControl() -> dispatchCommand(StopWaypointMission) { error ->
+            aircraftState.isWaypointControl() -> dispatchCommand(StopWaypointMission) { error ->
                 if (error != null) logger.i { "Unable to stop the mission: $error" }
             }
 
-            isCommandControl() -> stopCommand()
+            aircraftState.isCommandControl() -> stopCommand()
         }
     }
 }

@@ -11,9 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.ServiceAddress
 import org.WenuLink.adapters.WenuLinkHandler
-
-data class Endpoint(val ip: String, val port: Int)
 
 class MAVLinkService(handler: WenuLinkHandler) {
     companion object {
@@ -24,8 +23,8 @@ class MAVLinkService(handler: WenuLinkHandler) {
 
     private var client: MAVLinkClient? = null
     private var controller: MAVLinkController = MAVLinkController(handler)
-    private var endpoint = Endpoint("192.168.1.220", 14550)
-    private var mavlinkScope: CoroutineScope? = null
+    private var groundControlStation = ServiceAddress("192.168.1.220", 14550, "UDP")
+    private var messagesScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
     var isReady: Boolean = false
@@ -36,9 +35,9 @@ class MAVLinkService(handler: WenuLinkHandler) {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun updateServerAddress(serverAddress: String) {
+    fun updateGCSAddress(serverAddress: String) {
         val (ip, port) = serverAddress.split(":")
-        endpoint = Endpoint(ip, port.toInt())
+        groundControlStation = ServiceAddress(ip, port.toInt(), "UDP")
     }
 
     fun clientExists(): Boolean = client != null
@@ -52,12 +51,12 @@ class MAVLinkService(handler: WenuLinkHandler) {
 
     fun createClient() {
         if (clientExists()) {
-            logger.d { "MAVLinkClient already created for udp://$endpoint." }
+            logger.d { "MAVLinkClient already created for $groundControlStation." }
             return
         }
-        logger.d { "Creating MAVLinkClient for udp://$endpoint." }
+        logger.d { "Creating MAVLinkClient for $groundControlStation." }
 
-        client = MAVLinkClient(endpoint.ip, endpoint.port)
+        client = MAVLinkClient(groundControlStation.ip, groundControlStation.port)
     }
 
     fun destroyClient() {
@@ -69,14 +68,14 @@ class MAVLinkService(handler: WenuLinkHandler) {
 
     fun launchListeningJob(): Job {
         // Start listening for messages
-        return mavlinkScope!!.launch {
+        return messagesScope!!.launch {
             client?.startListening(controller::processMessage)
         }
     }
 
     fun launchSendingJob(): Job {
         // Start sending messages
-        return mavlinkScope!!.launch {
+        return messagesScope!!.launch {
             client?.startSending(controller::sendMessages)
         }
     }
@@ -94,7 +93,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         // Initialize controllers
         controller.attachClient(client!!)
         // IO jobs and scope
-        mavlinkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        messagesScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         listeningJob = launchListeningJob()
         sendingJob = launchSendingJob()
 
@@ -121,7 +120,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         }
 
         // Wait for parameters and mission items request
-        mavlinkScope?.launch {
+        messagesScope?.launch {
             // TODO: move timeout to a UserPreference due to user's local network latency
             isReady = controller.waitServicesRequest(30000L)
 
@@ -142,12 +141,12 @@ class MAVLinkService(handler: WenuLinkHandler) {
     suspend fun stopClient() {
         if (isServiceStop()) return // nothing to stop
 
-        mavlinkScope?.launch {
+        messagesScope?.launch {
             logger.d { "Stop client listening" }
             client?.stopListening()
             listeningJob?.join()
         }
-        mavlinkScope?.launch {
+        messagesScope?.launch {
             logger.d { "Stop client sending" }
             client?.stopSending()
             sendingJob?.join()
@@ -155,7 +154,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         logger.d { "Waiting 5s for client to stop" }
         val hasStop = AsyncUtils.waitTimeout(500L, 5000L, ::clientCanStart)
         if (!hasStop) logger.i { "Forcing stop client" }
-        mavlinkScope?.cancel()
+        messagesScope?.cancel()
         sendingJob = null
         listeningJob = null
     }
