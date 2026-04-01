@@ -83,7 +83,7 @@ class WebRTCService {
 
     // getting front camera
     private val videoCapturer: VideoCapturer by lazy { CameraCapturer() }
-    val mediaOptions = CameraCapturer.MediaMetadata()
+    lateinit var mediaOptions: CameraCapturer.MediaMetadata
     private var offer: String? = null
 
     fun updateServerAddress(serverAddress: String) {
@@ -109,6 +109,12 @@ class WebRTCService {
             logger.i { "Unable to start client, WebRTC not enabled." }
             return
         }
+
+        mediaOptions = CameraCapturer.MediaMetadata.fromCameraManager() ?: run {
+            logger.e { "CameraManager not ready, cannot start WebRTC" }
+            return
+        }
+
         this.serviceScope = serviceScope
 
         logger.i { "Connecting WebRTC client to $signalingServer" }
@@ -138,21 +144,23 @@ class WebRTCService {
             return
         }
         runningJob = serviceScope.launch {
-            webRTCClient.signalingCommandFlow.collect { commandToValue ->
-                logger.d { "signalingCommandFlow ${commandToValue.first}" }
-                when (commandToValue.first) {
-                    WebRTCClient.CommandType.OFFER -> {
-                        createVideoTrack(context)
-                        handleOffer(commandToValue.second)
-                    }
-
-                    WebRTCClient.CommandType.ANSWER -> handleAnswer(commandToValue.second)
-
-                    WebRTCClient.CommandType.ICE -> handleIce(commandToValue.second)
-
-                    else -> Unit
-                }
+            webRTCClient.signalingCommandFlow.collect { (command, value) ->
+                handleSignalingCommand(command, value, context)
             }
+        }
+    }
+
+    private suspend fun handleSignalingCommand(
+        command: WebRTCClient.CommandType,
+        value: String,
+        context: Context
+    ) {
+        logger.d { "signalingCommandFlow $command" }
+        when (command) {
+            WebRTCClient.CommandType.OFFER -> handleOffer(value, context)
+            WebRTCClient.CommandType.ANSWER -> handleAnswer(value)
+            WebRTCClient.CommandType.ICE -> handleIce(value)
+            else -> Unit
         }
     }
 
@@ -162,9 +170,9 @@ class WebRTCService {
             peerConnectionFactory.makeVideoSource(videoCapturer.isScreencast).apply {
                 videoCapturer.initialize(surfaceTextureHelper, context, this.capturerObserver)
                 videoCapturer.startCapture(
-                    mediaOptions.VIDEO_RESOLUTION_WIDTH,
-                    mediaOptions.VIDEO_RESOLUTION_HEIGHT,
-                    mediaOptions.FPS
+                    mediaOptions.videoResolutionWidth,
+                    mediaOptions.videoResolutionHeight,
+                    mediaOptions.fps
                 )
                 isStreaming = true
             }
@@ -177,7 +185,7 @@ class WebRTCService {
     }
 
     fun onAnswerReady() {
-        peerConnection.connection.addTrack(localVideoTrack, listOf(mediaOptions.MEDIA_STREAM_ID))
+        peerConnection.connection.addTrack(localVideoTrack, listOf(mediaOptions.mediaStreamId))
         serviceScope.launch {
             // sending local video track to show local video from start
             _localVideoTrackFlow.emit(localVideoTrack)
@@ -192,9 +200,9 @@ class WebRTCService {
         if (enabled && !isStreaming) {
             isStreaming = true
             videoCapturer.startCapture(
-                mediaOptions.VIDEO_RESOLUTION_WIDTH,
-                mediaOptions.VIDEO_RESOLUTION_HEIGHT,
-                mediaOptions.FPS
+                mediaOptions.videoResolutionWidth,
+                mediaOptions.videoResolutionHeight,
+                mediaOptions.fps
             )
         } else {
             isStreaming = false
@@ -252,8 +260,9 @@ class WebRTCService {
         logger.d { "[SDP] send answer: ${answer.stringify()}" }
     }
 
-    private fun handleOffer(sdp: String) {
+    private fun handleOffer(sdp: String, context: Context) {
         logger.d { "[SDP] handle offer: $sdp" }
+        createVideoTrack(context)
         offer = webRTCClient.valueFromKey(sdp, "sdp")!!
         onAnswerReady()
     }

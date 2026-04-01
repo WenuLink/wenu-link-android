@@ -85,7 +85,7 @@ class WenuLinkService : Service() {
             contentText = "Sending periodic heartbeats to GCS\n"
         }
         if (::webRTC.isInitialized) {
-            contentText += "WebRTC streaming: ${webRTC.mediaOptions.VIDEO_CAMERA_NAME}"
+            contentText += "WebRTC streaming: ${webRTC.mediaOptions.videoCameraName}"
         }
         // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
         // TODO: update according to each present service
