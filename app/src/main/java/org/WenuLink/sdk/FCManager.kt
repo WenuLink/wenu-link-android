@@ -70,14 +70,15 @@ object FCManager {
     @Synchronized
     fun isConnected(): Boolean = fcInstance != null
 
-    override fun toString(): String = if (!isConnected()) {
-        if (serialNumber != null && fwVersion != null) {
-            "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
-        } else {
+    override fun toString(): String {
+        val isConnected = isConnected()
+        return if (isConnected && serialNumber != null && fwVersion != null) {
+            "FlightController SN: $serialNumber - FW: $fwVersion"
+        } else if (isConnected) {
             "Reading FlightController"
+        } else {
+            "No FlightController"
         }
-    } else {
-        "No FlightController"
     }
 
     fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
