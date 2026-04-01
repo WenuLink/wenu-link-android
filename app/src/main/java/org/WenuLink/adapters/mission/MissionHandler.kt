@@ -7,7 +7,6 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.aircraft.AircraftStateMachine
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
@@ -169,47 +168,5 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     @Synchronized
     fun setItemSequenceIndex(sequence: Int) {
         currentSequence = sequence
-    }
-
-    fun pauseCommand(aircraftState: AircraftStateMachine) {
-        logger.i { "Pause mission" }
-        when {
-            aircraftState.isWaypointControl() -> dispatchCommand(PauseWaypointMission) { error ->
-                if (error != null) {
-                    logger.i { "Unable to pause the mission at $currentSequence: $error" }
-                }
-            }
-
-            aircraftState.isCommandControl() -> dispatchCommand(PauseActionCommand) { error ->
-                if (error != null) {
-                    logger.i { "Unable to pause the command: $error" }
-                }
-            }
-        }
-    }
-
-    fun resumeCommand(aircraftState: AircraftStateMachine) {
-        logger.i { "Resume mission" }
-        when {
-            aircraftState.isWaypointControl() ->
-                dispatchCommand(ResumeWaypointMission) { error ->
-                    if (error != null) logger.i { "Unable to resume the mission: $error" }
-                }
-
-            aircraftState.isCommandControl() -> dispatchCommand(ResumeActionCommand) { error ->
-                if (error != null) logger.i { "Unable to resume the command: $error" }
-            }
-        }
-    }
-
-    fun cancelCommand(aircraftState: AircraftStateMachine) {
-        logger.d { "Stop mission" }
-        when {
-            aircraftState.isWaypointControl() -> dispatchCommand(StopWaypointMission) { error ->
-                if (error != null) logger.i { "Unable to stop the mission: $error" }
-            }
-
-            aircraftState.isCommandControl() -> stopCommand()
-        }
     }
 }

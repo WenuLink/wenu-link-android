@@ -13,10 +13,16 @@ import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.BootCommand
 import org.WenuLink.adapters.aircraft.ControlAuthority
+import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.ShutdownCommand
 import org.WenuLink.adapters.camera.CameraHandler
 import org.WenuLink.adapters.camera.CameraMetadata
 import org.WenuLink.adapters.mission.MissionHandler
+import org.WenuLink.adapters.mission.PauseActionCommand
+import org.WenuLink.adapters.mission.PauseWaypointMission
+import org.WenuLink.adapters.mission.ResumeActionCommand
+import org.WenuLink.adapters.mission.ResumeWaypointMission
+import org.WenuLink.adapters.mission.StopWaypointMission
 import org.WenuLink.commands.CommandHandler
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
@@ -42,6 +48,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         get() = aircraft.telemetry.getRCData()?.hasCenteredJoystick() == false
     val isAircraftPowerOn: Boolean get() = !aircraft.isPowerOff && monitorJob != null
     val availableCameras: List<CameraMetadata> get() = camera.availableCameras.toList()
+    var controlAuthority = ControlAuthority(ControlAuthorityType.NONE)
+        private set
 
     override fun registerScope(scope: CoroutineScope) {
         aircraft.registerScope(scope)
@@ -90,7 +98,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
                     launch { safetyChecks() }
 
-                    modeHooks(aircraft.state.flightMode)
+                    modeHooks()
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -125,17 +133,22 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         return bootError
     }
 
-    fun controlTransition(authority: ControlAuthority) {
+    fun setAuthority(authority: ControlAuthorityType): ControlAuthority {
+        controlAuthority = controlAuthority.copy(authorityType = authority)
+        return controlAuthority
+    }
+
+    fun dispatchControlAuthority(authority: ControlAuthorityType) {
         // Decide policy: reject or stop mission
-        if (!aircraft.stateMachine.isNewControlAuthority(authority)) return
+        if (!controlAuthority.isNewAuthority(authority)) return
         // Always stop everything
-        cancelCommand()
-        logger.d { "Control transition: ${aircraft.stateMachine.controlAuthority}->$authority" }
-        aircraft.stateMachine.setControlAuthority(authority)
+        stopAllCommands()
+        logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }
+        setAuthority(authority)
     }
 
     fun manualControl() {
-        controlTransition(ControlAuthority.REMOTE_CONTROLLER)
+        dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
 
         aircraft.requestMode(ArduCopterFlightMode.STABILIZE)
             .onFailure {
@@ -143,31 +156,75 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             }
     }
 
-    fun pauseCommand() {
-        mission.pauseCommand(aircraft.stateMachine)
+    fun missionPause() {
+        logger.i { "Pause mission" }
+        when {
+            controlAuthority.isWaypoint() ->
+                mission.dispatchCommand(PauseWaypointMission) { error ->
+                    if (error != null) {
+                        logger.i {
+                            "Unable to pause the mission at ${mission.currentSequence}: $error"
+                        }
+                    }
+                }
+
+            controlAuthority.isCommand() ->
+                mission.dispatchCommand(PauseActionCommand) { error ->
+                    if (error != null) {
+                        logger.i { "Unable to pause the command: $error" }
+                    }
+                }
+        }
     }
 
-    fun resumeCommand() {
-        mission.resumeCommand(aircraft.stateMachine)
+    fun missionResume() {
+        logger.i { "Resume mission" }
+        when {
+            controlAuthority.isWaypoint() ->
+                mission.dispatchCommand(ResumeWaypointMission) { error ->
+                    if (error != null) logger.i { "Unable to resume the mission: $error" }
+                }
+
+            controlAuthority.isCommand() ->
+                mission.dispatchCommand(ResumeActionCommand) { error ->
+                    if (error != null) logger.i { "Unable to resume the command: $error" }
+                }
+        }
     }
 
-    fun cancelCommand() {
+    fun missionStop() {
+        logger.d { "Stop mission" }
+        when {
+            controlAuthority.isWaypoint() -> mission.dispatchCommand(StopWaypointMission) { error ->
+                if (error != null) logger.i { "Unable to stop the mission: $error" }
+            }
+
+            controlAuthority.isCommand() -> mission.stopCommand()
+        }
+    }
+
+    fun missionClear() {
+        missionStop()
+        mission.clear()
+    }
+
+    fun stopAllCommands() {
         logger.d { "Attempting to cancel active command" }
-        stopCommand()
         aircraft.stopCommand()
-        mission.stopCommand()
+        missionStop()
         camera.stopCommand()
+        this.stopCommand()
     }
 
     fun stopAndDispatch(command: RequestCommand, onResult: (String?) -> Unit = {}) {
         if (currentCommand == command) return
-        cancelCommand()
+        missionStop()
         dispatchCommand(command, onResult)
     }
 
-    private fun modeHooks(copterFlightMode: ArduCopterFlightMode) = when (copterFlightMode) {
-        ArduCopterFlightMode.BRAKE -> pauseCommand()
-        ArduCopterFlightMode.AUTO -> resumeCommand()
+    private fun modeHooks() = when (aircraft.state.flightMode) {
+        ArduCopterFlightMode.BRAKE -> missionPause()
+        ArduCopterFlightMode.AUTO -> missionResume()
         ArduCopterFlightMode.LAND -> stopAndDispatch(RequestLand(true))
         ArduCopterFlightMode.RTL -> stopAndDispatch(RequestGoHome)
         else -> {}

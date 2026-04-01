@@ -4,7 +4,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.AircraftCommand
 import org.WenuLink.adapters.aircraft.ArmTransition
-import org.WenuLink.adapters.aircraft.ControlAuthority
+import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.FlyingTransition
@@ -31,8 +31,7 @@ sealed interface RequestCommand : ICommand<WenuLinkHandler> {
     override suspend fun onStop(ctx: WenuLinkHandler)
 }
 
-open class RequestTransition(open val transition: StateTransition) :
-    RequestCommand {
+open class RequestTransition(open val transition: StateTransition) : RequestCommand {
 
     override fun validate(ctx: WenuLinkHandler): String? =
         ctx.aircraft.canDispatchTransition(transition)
@@ -64,7 +63,7 @@ data class RequestLand(val withLandingConfirmation: Boolean = true) :
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError
 
-        ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
+        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
             ctx.dispatchCommand(WenuLinkCommand.Mission(LandCommand(true))) { error ->
@@ -92,7 +91,7 @@ data class RequestReposition(val targetCoordinates: Coordinates3D, val speed: Fl
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError
 
-        ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
+        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
 
@@ -117,7 +116,7 @@ object RequestGoHome : RequestTransition(FlyingTransition) {
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError
 
-        ctx.controlTransition(ControlAuthority.TIMELINE_COMMAND)
+        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
             ctx.dispatchCommand(
@@ -147,7 +146,7 @@ data class RequestStartMission(
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError
 
-        ctx.controlTransition(ControlAuthority.WAYPOINT_MISSION)
+        ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
         return suspendCancellableCoroutine { cont ->
 

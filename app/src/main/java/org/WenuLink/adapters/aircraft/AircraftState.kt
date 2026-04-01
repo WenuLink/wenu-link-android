@@ -4,11 +4,21 @@ import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_MODE_FLAG
 import com.MAVLink.enums.MAV_STATE
 
-enum class ControlAuthority {
+enum class ControlAuthorityType {
     NONE,
     WAYPOINT_MISSION,
     TIMELINE_COMMAND,
     REMOTE_CONTROLLER
+}
+
+data class ControlAuthority(val authorityType: ControlAuthorityType) {
+    fun isWaypoint() = authorityType == ControlAuthorityType.WAYPOINT_MISSION
+
+    fun isCommand() = authorityType == ControlAuthorityType.TIMELINE_COMMAND
+
+    fun isRemote() = authorityType == ControlAuthorityType.REMOTE_CONTROLLER
+
+    fun isNewAuthority(authority: ControlAuthorityType) = authorityType != authority
 }
 
 data class AircraftState(
@@ -197,8 +207,6 @@ class AircraftStateMachine {
 
     var state = AircraftState()
         private set
-    var controlAuthority: ControlAuthority = ControlAuthority.NONE
-        private set
 
     fun canDispatch(event: StateTransition): String? = event.canTransition(state)
 
@@ -241,18 +249,6 @@ class AircraftStateMachine {
             state.isFlying()
 
         else -> true
-    }
-
-    fun isWaypointControl() = controlAuthority == ControlAuthority.WAYPOINT_MISSION
-
-    fun isCommandControl() = controlAuthority == ControlAuthority.TIMELINE_COMMAND
-
-    fun isRemoteControl() = controlAuthority == ControlAuthority.REMOTE_CONTROLLER
-
-    fun isNewControlAuthority(authority: ControlAuthority) = controlAuthority != authority
-
-    fun setControlAuthority(authority: ControlAuthority) {
-        controlAuthority = authority
     }
 }
 

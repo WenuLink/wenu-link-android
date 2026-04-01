@@ -196,8 +196,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun sendMissionClear(handler: WenuLinkHandler) {
-        handler.mission.cancelCommand(handler.aircraft.stateMachine)
-        handler.mission.clear()
+        handler.missionClear()
         sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, handler.mission)
     }
 

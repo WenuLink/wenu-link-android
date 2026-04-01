@@ -135,7 +135,7 @@ class WenuLinkService : Service() {
 
     fun stopCommands() {
         // mission's logic already stop according to the mission kind
-        serviceScope.launch { handler.cancelCommand() }
+        serviceScope.launch { handler.stopAllCommands() }
         // TODO: add RTL/LAND according to settings
     }
 
