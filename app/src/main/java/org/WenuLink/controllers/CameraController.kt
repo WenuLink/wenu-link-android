@@ -272,7 +272,7 @@ class CameraController(
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo= getCamera(commandLongMsg.param3.toInt(), aircraft)
+        val cameraInfo = getCamera(commandLongMsg.param3.toInt(), aircraft)
 
         if (cameraInfo == null) {
             client.sendMessage(
