@@ -190,57 +190,52 @@ object FCManager {
     fun registerIMUState(onSensor: (AppIMUState) -> Unit) {
         val nSensors = fcInstance?.imuCount ?: 0
         logger.d { "Listening sensor: $nSensors IMU(s)" }
-        val state = AppIMUState()
-        if (nSensors > 0) {
-            fcInstance?.setIMUStateCallback { p0 ->
-                // The callback is executed one time per sensor, with -1 indicating the list's end
-                if (p0.index != -1) {
-                    // assumes same number gyros and accel
-                    if (state.gyroscope.getOrNull(p0.index) == null) {
-                        state.gyroscope.add(sensorState(p0.gyroscopeState))
-                    } else {
-                        state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
-                    }
 
-                    if (state.accelerometer.getOrNull(p0.index) == null) {
-                        state.accelerometer.add(sensorState(p0.accelerometerState))
-                    } else {
-                        state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
-                    }
-                } else {
-                    // Publish a copy after receiving the entire list
-                    onSensor(
-                        AppIMUState().copy(
-                            gyroscope = state.gyroscope,
-                            accelerometer = state.accelerometer
-                        )
-                    )
-                }
-            }
-        } else {
+        if (nSensors <= 0) {
             logger.i { "No IMU sensor found!" }
+            return
+        }
+
+        val state = AppIMUState(
+            MutableList(nSensors) { AppSensorState.BOOT },
+            MutableList(nSensors) { AppSensorState.BOOT }
+        )
+
+        fcInstance?.setIMUStateCallback { p0 ->
+            // The callback is executed one time per sensor, with -1 indicating the list's end
+            if (p0.index == -1) {
+                // Publish a copy after receiving the entire list
+                onSensor(
+                    AppIMUState().copy(
+                        gyroscope = state.gyroscope,
+                        accelerometer = state.accelerometer
+                    )
+                )
+                return@setIMUStateCallback
+            }
+
+            // assumes same number gyros and accel
+            state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
+            state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
         }
     }
 
     fun unregisterIMUState() {
         logger.d { "Stop listening sensor: ${fcInstance?.imuCount} IMU(s)" }
-        if ((fcInstance?.imuCount ?: 0) > 0) {
-            fcInstance?.setIMUStateCallback(null)
-        }
+        fcInstance?.setIMUStateCallback(null)
     }
 
     fun compassOk(): Boolean {
         val nSensors = fcInstance?.compassCount ?: 0
-        var compassOk = false
         logger.d { "Reading sensor: $nSensors compasses" }
-        if (nSensors > 0) {
-            val hasError = fcInstance?.compass?.hasError() ?: true
-            val calState = fcInstance?.compass?.calibrationState
-            compassOk = !hasError && calState == CompassCalibrationState.NOT_CALIBRATING
-        } else {
+
+        if (nSensors <= 0) {
             logger.i { "No Compass sensor found!" }
+            return false
         }
 
-        return compassOk
+        val compass = fcInstance?.compass
+        return compass?.hasError() != true &&
+            compass?.calibrationState == CompassCalibrationState.NOT_CALIBRATING
     }
 }
