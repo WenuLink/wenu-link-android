@@ -77,7 +77,7 @@ object RCManager {
 
     private fun stopHardwareListener() {
         logger.d { "Stoping RC HardwareListener" }
-        rcInstance?.setHardwareStateCallback { null }
+        rcInstance?.setHardwareStateCallback { }
         updateData(null)
     }
 

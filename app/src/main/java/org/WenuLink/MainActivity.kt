@@ -76,11 +76,11 @@ class MainActivity : ComponentActivity() {
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            permissionsList += arrayOf(Manifest.permission.FOREGROUND_SERVICE)
+            permissionsList += Manifest.permission.FOREGROUND_SERVICE
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsList += arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+            permissionsList += Manifest.permission.POST_NOTIFICATIONS
         }
 
         val missingPermissions = permissionsList.filter {
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
         if (!servicesViewModel.isServiceRunning.value) {
             homeViewModel.stopSDK(applicationContext)
         }
-        // TODO: mostrar aviso para forzar salida
+        // TODO: display warning to force exit
     }
 
     @Composable

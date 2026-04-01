@@ -22,13 +22,12 @@ import org.WenuLink.adapters.aircraft.Coordinates3D
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html
  */
 object MissionActionManager {
-
     data class ActionCallbackKey(
         val actionClass: KClass<out TimelineElement>,
         val event: TimelineEvent
     )
 
-    private val logger by taggedLogger("MissionActionManager")
+    private val logger by taggedLogger(MissionActionManager::class.java.simpleName)
 
     private val missionControl: MissionControl
         get() = MissionControl.getInstance()
@@ -43,21 +42,13 @@ object MissionActionManager {
         stopListener()
     }
 
-    fun start() {
-        missionControl.startTimeline()
-    }
+    fun start() = missionControl.startTimeline()
 
-    fun stop() {
-        missionControl.stopTimeline()
-    }
+    fun stop() = missionControl.stopTimeline()
 
-    fun pause() {
-        missionControl.pauseTimeline()
-    }
+    fun pause() = missionControl.pauseTimeline()
 
-    fun resume() {
-        missionControl.resumeTimeline()
-    }
+    fun resume() = missionControl.resumeTimeline()
 
     // ---- Actions ----
 
@@ -74,19 +65,17 @@ object MissionActionManager {
         return missionControl.scheduleElement(action)
     }
 
-    fun scheduleLand(autoConfirm: Boolean = true): DJIError? {
-        val land = LandAction().apply {
+    fun scheduleLand(autoConfirm: Boolean = true): DJIError? = missionControl.scheduleElement(
+        LandAction().apply {
             autoConfirmLandingEnabled = autoConfirm
         }
-        return missionControl.scheduleElement(land)
-    }
+    )
 
-    fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? {
-        val goHome = GoHomeAction().apply {
+    fun scheduleGoHome(autoConfirm: Boolean = true): DJIError? = missionControl.scheduleElement(
+        GoHomeAction().apply {
             autoConfirmLandingEnabled = autoConfirm
         }
-        return missionControl.scheduleElement(goHome)
-    }
+    )
 
     // ---- Listener and callbacks ----
 
@@ -94,10 +83,7 @@ object MissionActionManager {
         actionClass: KClass<T>,
         event: TimelineEvent,
         callback: () -> Unit
-    ) {
-        val key = ActionCallbackKey(actionClass, event)
-        callbacks.getOrPut(key) { mutableListOf() }.add(callback)
-    }
+    ) = callbacks.getOrPut(ActionCallbackKey(actionClass, event)) { mutableListOf() }.add(callback)
 
     fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
         registerCallback(action, TimelineEvent.FINISHED, callback)

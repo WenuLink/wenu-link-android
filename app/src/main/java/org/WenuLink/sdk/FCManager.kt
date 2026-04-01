@@ -102,19 +102,14 @@ object FCManager {
         gpsLevel = SDKUtils.gpsSignalLevelFlags(state.gpsSignalLevel)
     )
 
-    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
+    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
         fcInstance?.setStateCallback(stateCallback)
-    }
 
-    fun unregisterStateCallback() {
-        fcInstance?.setStateCallback(null)
-    }
+    fun unregisterStateCallback() = fcInstance?.setStateCallback(null)
 
     fun getHomePosition(): Coordinates3D? {
         val flightState = fcInstance!!.state
-        if (!flightState.isHomeLocationSet) {
-            return null
-        }
+        if (!flightState.isHomeLocationSet) return null
 
         val homeLocation = flightState.homeLocation
         return Coordinates3D(
@@ -145,14 +140,11 @@ object FCManager {
 
     fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
 
-    fun startTakeoff() {
-        fcInstance?.startTakeoff { }
-    }
+    fun startTakeoff() = fcInstance?.startTakeoff { }
 
-    fun confirmLanding(onResult: (String?) -> Unit) {
+    fun confirmLanding(onResult: (String?) -> Unit) =
         // for somehow these kind of actions does not return anything, possibly is a thread issue.
         fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
-    }
 
     fun areMotorsArmed(): Boolean = fcInstance?.state?.areMotorsOn() == true
 

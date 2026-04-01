@@ -32,9 +32,10 @@ class CameraHandler {
     private var currentCommand: CameraCommand? = null
     private val commandChannel =
         Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
-    var sequenceIndex: Int = 0
-    var captureTimestamp: Long = System.currentTimeMillis()
-    val lastCaptureMillis: Long get() = System.currentTimeMillis() - captureTimestamp
+    var sequenceIndex = 0
+    var captureTimestamp = System.currentTimeMillis()
+    val lastCaptureMillis
+        get() = System.currentTimeMillis() - captureTimestamp
 
     private fun startCommandProcessor(scope: CoroutineScope) {
         commandJob?.cancel()
@@ -71,9 +72,8 @@ class CameraHandler {
     }
 
     suspend fun initCameras(): Boolean {
-        if (!CameraManager.isConnected()) {
-            return false
-        }
+        if (!CameraManager.isConnected()) return false
+
         logger.d { "initCamera" }
         CameraManager.retrieveMetadata()
 
@@ -111,10 +111,10 @@ class CameraHandler {
         }
 
         val newState = CameraState(
-            mavlinkMode = newMode,
-            captureType = captureType,
-            captureStatus = CameraCaptureStatus.IDLE,
-            captureTime = 0
+            newMode,
+            captureType,
+            CameraCaptureStatus.IDLE,
+            0
         )
 
         getCamera(cameraIdx)?.let {
@@ -148,15 +148,20 @@ class CameraHandler {
         cameraIdx
     )
 
-    fun isPhotoMode(cameraIdx: Int = 0): Boolean =
-        getCamera(cameraIdx)?.state?.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE
+    fun checkCameraMode(mode: Int, cameraIdx: Int = 0): Boolean =
+        getCamera(cameraIdx)?.state?.mavlinkMode == mode
 
-    fun isVideoMode(cameraIdx: Int = 0): Boolean =
-        getCamera(cameraIdx)?.state?.mavlinkMode == CAMERA_MODE.CAMERA_MODE_VIDEO
+    fun isPhotoMode(cameraIdx: Int = 0): Boolean = checkCameraMode(
+        CAMERA_MODE.CAMERA_MODE_IMAGE,
+        cameraIdx
+    )
+
+    fun isVideoMode(cameraIdx: Int = 0): Boolean = checkCameraMode(
+        CAMERA_MODE.CAMERA_MODE_VIDEO,
+        cameraIdx
+    )
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 
-    fun registerHandlerScope(scope: CoroutineScope) {
-        startCommandProcessor(scope)
-    }
+    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(scope)
 }

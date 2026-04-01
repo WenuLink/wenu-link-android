@@ -14,15 +14,9 @@ import org.WenuLink.sdk.FCManager
 
 abstract class DJIParameter(name: String, type: Int, semantic: SemanticType) :
     ParameterSpec(name, type, semantic) {
-
     /* ---------- Shared helpers ---------- */
-    protected fun completionResult(error: DJIError?, onResult: (String?) -> Unit) {
-        if (error == null) {
-            onResult(null)
-        } else {
-            onResult(error.description)
-        }
-    }
+    protected fun completionResult(error: DJIError?, onResult: (String?) -> Unit) =
+        onResult(error?.description)
 }
 
 class DJIBooleanParameter(
@@ -34,7 +28,6 @@ class DJIBooleanParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
     SemanticType.BOOL
 ) {
-
     override fun read(onResult: (ParamValue?) -> Unit) {
         getter(object : CommonCallbacks.CompletionCallbackWith<Boolean> {
             override fun onSuccess(value: Boolean?) {
@@ -46,19 +39,12 @@ class DJIBooleanParameter(
         })
     }
 
-    override fun write(value: ParamValue, onResult: (String?) -> Unit) {
-        val v = (value as ParamValue.BoolVal).v
-        setter(
-            v,
-            CommonCallbacks.CompletionCallback { err ->
-                if (err == null) {
-                    onResult(null)
-                } else {
-                    onResult(err.description)
-                }
-            }
-        )
-    }
+    override fun write(value: ParamValue, onResult: (String?) -> Unit) = setter(
+        (value as ParamValue.BoolVal).v,
+        CommonCallbacks.CompletionCallback { error ->
+            onResult(error?.description)
+        }
+    )
 }
 
 class DJIIntParameter(
@@ -102,7 +88,6 @@ class DJIFailSafeParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
-
     private fun enumToInt(v: ConnectionFailSafeBehavior): Int = when (v) {
         ConnectionFailSafeBehavior.HOVER -> 0
         ConnectionFailSafeBehavior.LANDING -> 1
@@ -141,7 +126,6 @@ class DJIControlModeParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
-
     private fun enumToInt(v: ControlMode): Int = when (v) {
         ControlMode.MANUAL -> 0
         ControlMode.SMART -> 2
@@ -182,7 +166,6 @@ class DJIRollPitchControlModeParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
-
     fun intToEnum(value: Int): RollPitchControlMode {
         val mode = RollPitchControlMode.entries.find { it.ordinal == value }
         return mode ?: RollPitchControlMode.ANGLE
@@ -209,7 +192,6 @@ class DJIVerticalControlModeParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
-
     fun intToEnum(value: Int): VerticalControlMode {
         val mode = VerticalControlMode.entries.find { it.ordinal == value }
         return mode ?: VerticalControlMode.VELOCITY
@@ -236,7 +218,6 @@ class DJIYawModeControlModeParameter(
     MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
     SemanticType.ENUM
 ) {
-
     fun intToEnum(value: Int): YawControlMode {
         val mode = YawControlMode.entries.find { it.ordinal == value }
         return mode ?: YawControlMode.ANGLE
@@ -259,86 +240,85 @@ class DJIYawModeControlModeParameter(
  */
 
 object DJIParametersProvider : ParameterProvider {
-
     private val fc: FlightController
         get() = FCManager.fcInstance
             ?: error("FlightController not available")
 
     override fun provide(): List<ParameterSpec> = listOf(
         DJIBooleanParameter(
-            name = "DJI_SPIN_ENABLED",
-            getter = { cb -> fc.getQuickSpinEnabled(cb) },
-            setter = { v, cb -> fc.setAutoQuickSpinEnabled(v, cb) }
+            "DJI_SPIN_ENABLED",
+            { cb -> fc.getQuickSpinEnabled(cb) },
+            { v, cb -> fc.setAutoQuickSpinEnabled(v, cb) }
         ),
         DJIBooleanParameter(
-            name = "DJI_RADIUS_ENABLED",
-            getter = { cb -> fc.getMaxFlightRadiusLimitationEnabled(cb) },
-            setter = { v, cb -> fc.setMaxFlightRadiusLimitationEnabled(v, cb) }
+            "DJI_RADIUS_ENABLED",
+            { cb -> fc.getMaxFlightRadiusLimitationEnabled(cb) },
+            { v, cb -> fc.setMaxFlightRadiusLimitationEnabled(v, cb) }
         ),
         DJIBooleanParameter(
-            name = "DJI_FOLLOW_ENABLED",
-            getter = { cb -> fc.getTerrainFollowModeEnabled(cb) },
-            setter = { v, cb -> fc.setTerrainFollowModeEnabled(v, cb) }
+            "DJI_FOLLOW_ENABLED",
+            { cb -> fc.getTerrainFollowModeEnabled(cb) },
+            { v, cb -> fc.setTerrainFollowModeEnabled(v, cb) }
         ),
         DJIBooleanParameter(
-            name = "DJI_TRIPOD_ENABLED",
-            getter = { cb -> fc.getTripodModeEnabled(cb) },
-            setter = { v, cb -> fc.setTripodModeEnabled(v, cb) }
+            "DJI_TRIPOD_ENABLED",
+            { cb -> fc.getTripodModeEnabled(cb) },
+            { v, cb -> fc.setTripodModeEnabled(v, cb) }
         ),
         DJIBooleanParameter(
-            name = "DJI_SMART_RTL_ENABLED",
-            getter = { cb -> fc.getSmartReturnToHomeEnabled(cb) },
-            setter = { v, cb -> fc.setSmartReturnToHomeEnabled(v, cb) }
+            "DJI_SMART_RTL_ENABLED",
+            { cb -> fc.getSmartReturnToHomeEnabled(cb) },
+            { v, cb -> fc.setSmartReturnToHomeEnabled(v, cb) }
         ),
         DJIIntParameter(
-            name = "DJI_RTL_HEIGHT",
-            getter = { cb -> fc.getGoHomeHeightInMeters(cb) },
-            setter = { v, cb -> fc.setGoHomeHeightInMeters(v, cb) }
+            "DJI_RTL_HEIGHT",
+            { cb -> fc.getGoHomeHeightInMeters(cb) },
+            { v, cb -> fc.setGoHomeHeightInMeters(v, cb) }
         ),
         DJIIntParameter(
-            name = "DJI_MAX_HEIGHT",
-            getter = { cb -> fc.getMaxFlightHeight(cb) },
-            setter = { v, cb -> fc.setMaxFlightHeight(v, cb) }
+            "DJI_MAX_HEIGHT",
+            { cb -> fc.getMaxFlightHeight(cb) },
+            { v, cb -> fc.setMaxFlightHeight(v, cb) }
         ),
         DJIIntParameter(
-            name = "DJI_MAX_RADIUS",
-            getter = { cb -> fc.getMaxFlightRadius(cb) },
-            setter = { v, cb -> fc.setMaxFlightRadius(v, cb) }
+            "DJI_MAX_RADIUS",
+            { cb -> fc.getMaxFlightRadius(cb) },
+            { v, cb -> fc.setMaxFlightRadius(v, cb) }
         ),
         DJIIntParameter(
-            name = "DJI_BAT_LOW",
-            getter = { cb -> fc.getLowBatteryWarningThreshold(cb) },
-            setter = { v, cb -> fc.setLowBatteryWarningThreshold(v, cb) }
+            "DJI_BAT_LOW",
+            { cb -> fc.getLowBatteryWarningThreshold(cb) },
+            { v, cb -> fc.setLowBatteryWarningThreshold(v, cb) }
         ),
         DJIIntParameter(
-            name = "DJI_BAT_CRITIC",
-            getter = { cb -> fc.getSeriousLowBatteryWarningThreshold(cb) },
-            setter = { v, cb -> fc.setSeriousLowBatteryWarningThreshold(v, cb) }
+            "DJI_BAT_CRITIC",
+            { cb -> fc.getSeriousLowBatteryWarningThreshold(cb) },
+            { v, cb -> fc.setSeriousLowBatteryWarningThreshold(v, cb) }
         ),
         DJIFailSafeParameter(
-            name = "DJI_FAILSAFE",
-            getter = { cb -> fc.getConnectionFailSafeBehavior(cb) },
-            setter = { v, cb -> fc.setConnectionFailSafeBehavior(v, cb) }
+            "DJI_FAILSAFE",
+            { cb -> fc.getConnectionFailSafeBehavior(cb) },
+            { v, cb -> fc.setConnectionFailSafeBehavior(v, cb) }
         ),
         DJIControlModeParameter(
-            name = "DJI_CTRL_MODE",
-            getter = { cb -> fc.getControlMode(cb) },
-            setter = { v, cb -> fc.setControlMode(v, cb) }
+            "DJI_CTRL_MODE",
+            { cb -> fc.getControlMode(cb) },
+            { v, cb -> fc.setControlMode(v, cb) }
         ),
         DJIRollPitchControlModeParameter(
-            name = "DJI_ROLL_PITCH_MODE",
-            getter = { cb -> cb(fc.rollPitchControlMode.ordinal) },
-            setter = { v, cb -> fc.setRollPitchControlMode(v) }
+            "DJI_ROLL_PITCH_MODE",
+            { cb -> cb(fc.rollPitchControlMode.ordinal) },
+            { v, cb -> fc.setRollPitchControlMode(v) }
         ),
         DJIVerticalControlModeParameter(
-            name = "DJI_VERT_MODE",
-            getter = { cb -> cb(fc.verticalControlMode.ordinal) },
-            setter = { v, cb -> fc.setVerticalControlMode(v) }
+            "DJI_VERT_MODE",
+            { cb -> cb(fc.verticalControlMode.ordinal) },
+            { v, cb -> fc.setVerticalControlMode(v) }
         ),
         DJIYawModeControlModeParameter(
-            name = "DJI_YAW_MODE",
-            getter = { cb -> cb(fc.yawControlMode.ordinal) },
-            setter = { v, cb -> fc.setYawControlMode(v) }
+            "DJI_YAW_MODE",
+            { cb -> cb(fc.yawControlMode.ordinal) },
+            { v, cb -> fc.setYawControlMode(v) }
         )
     )
 }

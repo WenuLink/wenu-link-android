@@ -20,12 +20,12 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     private var thisApp = (getApplication() as WenuLinkApp)
 
-    private val aircraft: AircraftHandler = AircraftHandler.getInstance()
+    private val aircraft = AircraftHandler.getInstance()
 
     private val _isServiceRunning = MutableStateFlow(false)
     val isServiceRunning: StateFlow<Boolean> = _isServiceRunning
 
-    val isDataFlowing: StateFlow<Boolean> = aircraft.telemetry.isBroadcasting
+    val isDataFlowing = aircraft.telemetry.isBroadcasting
 
     private val _telemetryData = MutableLiveData<TelemetryData?>()
     val telemetryData: LiveData<TelemetryData?> = _telemetryData
@@ -54,7 +54,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     fun isSimulationReady(): Boolean = aircraft.telemetry.isSimulationAvailable
 
-    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
+    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() == true
 
     fun startService() {
         thisApp.launchWenulinkService()

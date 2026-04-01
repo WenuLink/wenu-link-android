@@ -51,7 +51,7 @@ class WebRTCClient(serverAddress: String) {
         ICE // to send and receive ice candidates
     }
 
-    private val logger by taggedLogger("SignalingClient")
+    private val logger by taggedLogger(WebRTCClient::class.java.simpleName)
     private val signalingScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val client = OkHttpClient()
     private val request = Request

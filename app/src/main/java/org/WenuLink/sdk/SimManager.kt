@@ -12,14 +12,14 @@ import org.WenuLink.adapters.aircraft.TelemetryData
 object SimManager {
     private val logger by taggedLogger(SimManager::class.java.simpleName)
 
-    private var hasCallback: Boolean = false
+    private var hasCallback = false
     var simInstance: Simulator? = null
         private set
-    private var satelliteCount: Int = -1
-    private var takeOffAltitude: Float = 0F
-    private var initStamp: Long = 0L
-    private var takeOffStamp: Long = 0L
-    private var landStamp: Long = 0L
+    private var satelliteCount = -1
+    private var takeOffAltitude = 0f
+    private var initStamp = 0L
+    private var takeOffStamp = 0L
+    private var landStamp = 0L
 
     @Synchronized
     fun init(flightController: FlightController) {
@@ -53,9 +53,9 @@ object SimManager {
             positionX = state.positionX,
             positionY = state.positionY,
             positionZ = state.positionZ,
-            velocityX = 0F,
-            velocityY = 0F,
-            velocityZ = 0F,
+            velocityX = 0f,
+            velocityY = 0f,
+            velocityZ = 0f,
             flightTime = 0,
             takeOffAltitude = takeOffAltitude,
             relativeAltitude = state.positionZ,
@@ -68,13 +68,14 @@ object SimManager {
         if (previousData == null) return data
 
         // perform updates comparing previous and current state
-        if (data.isFlying) {
-            if (!previousData.isFlying) takeOffStamp = data.timestamp
+        if (data.isFlying && !previousData.isFlying) {
+            takeOffStamp = data.timestamp
+        } else if (data.isFlying) {
             landStamp = data.timestamp
         }
 
         // compute velocities
-        val dT = (data.timestamp - previousData.timestamp).toFloat() / 1000F // to seconds
+        val dT = (data.timestamp - previousData.timestamp).toFloat() / 1000f // to seconds
         return data.copy(
             flightTime = (landStamp - takeOffStamp).toInt(),
             velocityX = (data.positionX - previousData.positionX) / dT,
@@ -86,7 +87,7 @@ object SimManager {
     fun run(
         lat: Double = -8.066478642777481,
         long: Double = -34.98744367551871,
-        alt: Float = 24.0F,
+        alt: Float = 24.0f,
         updateFrequency: Int = 10,
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit

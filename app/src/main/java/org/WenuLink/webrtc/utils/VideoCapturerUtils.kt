@@ -7,7 +7,6 @@ import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import org.webrtc.JavaI420Buffer
 import org.webrtc.NV12Buffer
-import org.webrtc.VideoCapturer
 import org.webrtc.VideoFrame
 
 fun getBufferNV12(
@@ -68,7 +67,7 @@ fun getBufferI420(
     )
 }
 
-fun VideoCapturer.videoBuffer2VideoFrame(
+fun videoBuffer2VideoFrame(
     mediaFormat: MediaFormat,
     videoBuffer: ByteBuffer,
     width: Int,

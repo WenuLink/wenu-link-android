@@ -25,7 +25,6 @@ suspend inline fun createValue(
     crossinline call: (SdpObserver) -> Unit
 ): Result<SessionDescription> = suspendCoroutine {
     val observer = object : SdpObserver {
-
         /**
          * Handling of create values.
          */

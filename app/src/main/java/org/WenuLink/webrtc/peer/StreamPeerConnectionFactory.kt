@@ -37,7 +37,7 @@ import org.webrtc.SoftwareVideoEncoderFactory
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
 
-class StreamPeerConnectionFactory constructor(private val context: Context) {
+class StreamPeerConnectionFactory(private val context: Context) {
     private val webRtcLogger by taggedLogger("Call:WebRTC")
 
     val eglBaseContext: EglBase.Context by lazy {
@@ -81,27 +81,22 @@ class StreamPeerConnectionFactory constructor(private val context: Context) {
             PeerConnectionFactory.InitializationOptions.builder(context)
                 .setInjectableLogger({ message, severity, label ->
                     when (severity) {
-                        Logging.Severity.LS_VERBOSE -> {
+                        Logging.Severity.LS_VERBOSE ->
                             webRtcLogger.v { "[onLogMessage] label: $label, message: $message" }
-                        }
 
-                        Logging.Severity.LS_INFO -> {
+                        Logging.Severity.LS_INFO ->
                             webRtcLogger.i { "[onLogMessage] label: $label, message: $message" }
-                        }
 
-                        Logging.Severity.LS_WARNING -> {
+                        Logging.Severity.LS_WARNING ->
                             webRtcLogger.w { "[onLogMessage] label: $label, message: $message" }
-                        }
 
-                        Logging.Severity.LS_ERROR -> {
+                        Logging.Severity.LS_ERROR ->
                             webRtcLogger.e { "[onLogMessage] label: $label, message: $message" }
-                        }
 
-                        Logging.Severity.LS_NONE -> {
+                        Logging.Severity.LS_NONE ->
                             webRtcLogger.d { "[onLogMessage] label: $label, message: $message" }
-                        }
 
-                        else -> {}
+                        else -> { }
                     }
                 }, Logging.Severity.LS_VERBOSE)
                 .createInitializationOptions()
@@ -138,17 +133,17 @@ class StreamPeerConnectionFactory constructor(private val context: Context) {
         onVideoTrack: ((RtpTransceiver?) -> Unit)? = null
     ): StreamPeerConnection {
         val peerConnection = StreamPeerConnection(
-            coroutineScope = coroutineScope,
-            type = type,
-            mediaConstraints = mediaConstraints,
-            onStreamAdded = onStreamAdded,
-            onNegotiationNeeded = onNegotiationNeeded,
-            onIceCandidate = onIceCandidateRequest,
-            onVideoTrack = onVideoTrack
+            coroutineScope,
+            type,
+            mediaConstraints,
+            onStreamAdded,
+            onNegotiationNeeded,
+            onIceCandidateRequest,
+            onVideoTrack
         )
         val connection = makePeerConnectionInternal(
-            configuration = configuration,
-            observer = peerConnection
+            configuration,
+            peerConnection
         )
         return peerConnection.apply { initialize(connection) }
     }

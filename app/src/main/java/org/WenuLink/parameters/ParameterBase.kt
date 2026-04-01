@@ -22,7 +22,6 @@ sealed class ParameterSpec(
     val semantic: SemanticType,
     var index: Int = -1
 ) {
-
     init {
         require(name.isNotBlank()) { "Parameter name cannot be blank" }
     }
@@ -31,7 +30,8 @@ sealed class ParameterSpec(
     abstract fun write(value: ParamValue, onResult: (String?) -> Unit)
 
     fun toMavlink(value: ParamValue): Int = when (value) {
-        is ParamValue.BoolVal -> if (value.v) 1 else 0
+        is ParamValue.BoolVal if value.v -> 1
+        is ParamValue.BoolVal -> 0
         is ParamValue.IntVal -> value.v
         is ParamValue.EnumVal -> value.v
         is ParamValue.FloatVal -> value.v.toInt()
@@ -58,7 +58,6 @@ open class SimpleParameter(
     private val reader: ((ParamValue?) -> Unit) -> Unit,
     private val writer: (ParamValue, (String?) -> Unit) -> Unit = { _, cb -> cb(null) }
 ) : ParameterSpec(name, type, semantic) {
-
     override fun read(onResult: (ParamValue?) -> Unit) {
         reader(onResult)
     }
@@ -87,8 +86,8 @@ class ParameterRegistry(private val providers: List<ParameterProvider>) {
                     spec.index = index
                     index += 1
                     availableParams += WenuLinkParameter(
-                        spec = spec,
-                        value = value
+                        spec,
+                        value
                     )
                 }
                 counter += 1

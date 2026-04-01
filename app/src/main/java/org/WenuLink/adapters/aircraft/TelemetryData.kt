@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.aircraft
 
-import com.MAVLink.enums.CAMERA_MODE
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.Int
 import kotlin.math.roundToInt
@@ -54,7 +53,6 @@ data class MAVLinkTelemetryData(
 )
 
 object TelemetryMapper {
-
     fun toMavlink(source: TelemetryData): MAVLinkTelemetryData = MAVLinkTelemetryData(
         timestamp = source.timestamp,
         roll = source.roll.toFloat(),
@@ -91,21 +89,20 @@ data class RCData(
         // transform from DJI range [-660, 660] => [1000, 2000]
         ((value.toFloat() / 660) * 500).roundToInt() + 1500
 
-    fun toMAVLink(): RCData {
-        val currRC = this.copy(
-            throttleSetting = stickValue2percent(this.throttleSetting),
-            leftStickVertical = stickValue2rcValue(this.leftStickVertical),
-            leftStickHorizontal = stickValue2rcValue(this.leftStickHorizontal),
-            rightStickVertical = stickValue2rcValue(this.rightStickVertical),
-            rightStickHorizontal = stickValue2rcValue(this.rightStickHorizontal)
-        )
-        return currRC
-    }
+    fun toMAVLink(): RCData = this.copy(
+        throttleSetting = stickValue2Percent(this.throttleSetting),
+        leftStickVertical = stickValue2RcValue(this.leftStickVertical),
+        leftStickHorizontal = stickValue2RcValue(this.leftStickHorizontal),
+        rightStickVertical = stickValue2RcValue(this.rightStickVertical),
+        rightStickHorizontal = stickValue2RcValue(this.rightStickHorizontal)
+    )
 
-    fun hasCenteredJoystick(): Boolean = this.leftStickVertical == 0 &&
-        this.leftStickHorizontal == 0 &&
-        this.rightStickVertical == 0 &&
-        this.rightStickHorizontal == 0
+    fun hasCenteredJoystick(): Boolean = listOf(
+        this.leftStickVertical,
+        this.leftStickHorizontal,
+        this.rightStickVertical,
+        this.rightStickHorizontal
+    ).all { it == 0 }
 }
 
 data class BatteryData(
@@ -137,10 +134,10 @@ data class BatteryData(
 
     override fun toString(): String = "BatteryData(" +
         "percentCharge=$percentCharge%, " +
-        "voltage=$voltage V, " +
-        "current=$current A, " +
-        "fullChargeCapacity=$fullChargeCapacity A, " +
-        "fullChargeCapacity=$chargeRemaining A, " +
+        "voltage=$voltage mV, " +
+        "current=$current mA, " +
+        "fullChargeCapacity=$fullChargeCapacity mAh, " +
+        "chargeRemaining=$chargeRemaining mAh, " +
         "temperature=$temperature °C, " +
         "voltageCells=${voltageCells?.joinToString()})"
 }

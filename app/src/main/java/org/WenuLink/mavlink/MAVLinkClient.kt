@@ -22,11 +22,11 @@ class MAVLinkClient(
     private val localPort: Int = 14550
 ) {
     private val logger by taggedLogger(MAVLinkClient::class.java.simpleName)
-    private var socket: DatagramSocket = DatagramSocket(localPort)
+    private var socket = DatagramSocket(localPort)
     private val mavlinkParser = Parser()
     private val clientScope = CoroutineScope(Dispatchers.IO) // TODO: Use mavlinkScope
-    val mustReceiveMessages: AtomicBoolean = AtomicBoolean(false)
-    val mustSendMessages: AtomicBoolean = AtomicBoolean(false)
+    val mustReceiveMessages = AtomicBoolean(false)
+    val mustSendMessages = AtomicBoolean(false)
     var systemID = 1
         private set
 
@@ -93,7 +93,7 @@ class MAVLinkClient(
             return
         }
         clientScope.launch {
-            val packet: MAVLinkPacket = msg.pack()
+            val packet = msg.pack()
             packet.sysid = systemID
             packet.compid = MAV_COMP_ID_AUTOPILOT1
             packet.isMavlink2 = true // force mavlink2 protocol

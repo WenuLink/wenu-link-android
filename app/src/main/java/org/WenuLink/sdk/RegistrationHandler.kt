@@ -20,14 +20,13 @@ import io.getstream.log.taggedLogger
 object RegistrationHandler {
     private val logger by taggedLogger(RegistrationHandler::class.java.simpleName)
     private val loggerC by taggedLogger(DJISDKManager.SDKManagerCallback::class.java.simpleName)
-    private var registrationInProgress: Boolean = false
-    private var registered: Boolean = false
+    private var registrationInProgress = false
+    var registered = false
+        private set
     private var successCallback: ((Boolean, String?) -> Unit)? = null
     private var productCallback: ((Boolean) -> Unit)? = null
     private var activationStateListener: AppActivationStateListener? = null
     private var bindingStateListener: AircraftBindingStateListener? = null
-
-    fun isRegistered(): Boolean = registered
 
     fun setSuccessCallback(callback: (Boolean, String?) -> Unit) {
         successCallback = callback
@@ -67,16 +66,12 @@ object RegistrationHandler {
     }
 
     fun tearDownListener() {
-        if (activationStateListener != null) {
+        activationStateListener?.let {
             // Example of removing listeners
-            SDKUtils.getAppActivationManager()?.removeAppActivationStateListener(
-                activationStateListener as AppActivationStateListener
-            )
+            SDKUtils.getAppActivationManager()?.removeAppActivationStateListener(it)
         }
-        if (bindingStateListener != null) {
-            SDKUtils.getAppActivationManager()?.removeAircraftBindingStateListener(
-                bindingStateListener as AircraftBindingStateListener
-            )
+        bindingStateListener?.let {
+            SDKUtils.getAppActivationManager()?.removeAircraftBindingStateListener(it)
         }
     }
 
@@ -88,8 +83,7 @@ object RegistrationHandler {
         DJISDKManager.getInstance().destroy()
     }
 
-    private val sdkManagerCallback: DJISDKManager.SDKManagerCallback = object :
-        DJISDKManager.SDKManagerCallback {
+    private val sdkManagerCallback = object : DJISDKManager.SDKManagerCallback {
         override fun onRegister(djiError: DJIError) {
             if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                 DJISDKManager.getInstance().startConnectionToProduct()
@@ -132,22 +126,26 @@ object RegistrationHandler {
             newComponent?.setComponentListener { isConnected ->
                 loggerC.d { "onComponentConnectivityChanged: $isConnected" }
             }
+
             loggerC.d {
                 "onComponentChange key: $componentKey, " +
                     "oldComponent: $oldComponent, " +
                     "newComponent: $newComponent"
             }
-            if (componentKey == BaseProduct.ComponentKey.REMOTE_CONTROLLER) {
-                RCManager.init(newComponent as RemoteController)
-            }
-            if (componentKey == BaseProduct.ComponentKey.AIR_LINK) {
-                AircraftManager.initAirLink(newComponent as AirLink)
-            }
-            if (componentKey == BaseProduct.ComponentKey.FLIGHT_CONTROLLER) {
-                FCManager.init(newComponent as FlightController)
-            }
-            if (componentKey == BaseProduct.ComponentKey.CAMERA) {
-                CameraManager.init(newComponent as Camera)
+
+            when (componentKey) {
+                BaseProduct.ComponentKey.REMOTE_CONTROLLER ->
+                    RCManager.init(newComponent as RemoteController)
+
+                BaseProduct.ComponentKey.AIR_LINK ->
+                    AircraftManager.initAirLink(newComponent as AirLink)
+
+                BaseProduct.ComponentKey.FLIGHT_CONTROLLER ->
+                    FCManager.init(newComponent as FlightController)
+
+                BaseProduct.ComponentKey.CAMERA -> CameraManager.init(newComponent as Camera)
+
+                else -> loggerC.d { "Unknown component key: $componentKey" }
             }
         }
 

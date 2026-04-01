@@ -34,7 +34,7 @@ data class SignalingEndpoint(val host: String, val port: Int, val protocol: Stri
 class WebRTCService {
     companion object {
         private var mInstance: WebRTCService? = null
-        var isEnabled: Boolean = true
+        var isEnabled = true
             private set
 
         fun getInstance(): WebRTCService {
@@ -58,10 +58,10 @@ class WebRTCService {
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
 
     // Signaling configuration
-    var isServiceUp: Boolean = false
     private var signalingEndpoint = SignalingEndpoint("192.168.1.220", 8090)
+    var isServiceUp = false
         private set
-    var isStreaming: Boolean = false
+    var isStreaming = false
         private set
 
     private val _isRunning = MutableStateFlow(false)
@@ -133,20 +133,15 @@ class WebRTCService {
 
         isRunning.distinctUntilChangedBy { it }
             .onEach {
-                if (it) {
-                    run(context)
-                } else {
-                    disconnect()
-                }
+                if (it) run(context) else disconnect()
                 logger.d { "isRunning: $it" }
             }
             .launchIn(this.serviceScope)
     }
 
     fun run(context: Context) {
-        if (isServiceUp) {
-            return
-        }
+        if (isServiceUp) return
+
         runningJob = serviceScope.launch {
             webRTCClient.signalingCommandFlow.collect { (command, value) ->
                 handleSignalingCommand(command, value, context)
@@ -170,8 +165,8 @@ class WebRTCService {
 
     fun createVideoTrack(context: Context) {
         logger.d { "mediaOptions: $mediaOptions" }
-        videoSource =
-            peerConnectionFactory.makeVideoSource(videoCapturer.isScreencast).apply {
+        videoSource = peerConnectionFactory.makeVideoSource(videoCapturer.isScreencast)
+            .apply {
                 videoCapturer.initialize(surfaceTextureHelper, context, this.capturerObserver)
                 videoCapturer.startCapture(
                     mediaOptions.videoResolutionWidth,
@@ -181,11 +176,10 @@ class WebRTCService {
                 isStreaming = true
             }
 
-        localVideoTrack =
-            peerConnectionFactory.makeVideoTrack(
-                source = videoSource,
-                trackId = "Video${UUID.randomUUID()}"
-            )
+        localVideoTrack = peerConnectionFactory.makeVideoTrack(
+            source = videoSource,
+            trackId = "Video${UUID.randomUUID()}"
+        )
     }
 
     fun onAnswerReady() {
@@ -194,9 +188,7 @@ class WebRTCService {
             // sending local video track to show local video from start
             _localVideoTrackFlow.emit(localVideoTrack)
 
-            if (offer != null) {
-                sendAnswer()
-            }
+            if (offer != null) sendAnswer()
         }
     }
 
@@ -215,18 +207,14 @@ class WebRTCService {
     }
 
     fun disconnect() {
-        if (!isServiceUp) {
-            return
-        }
+        if (!isServiceUp) return
 
         try {
             runningJob?.cancel()
             runningJob = null
             // dispose video tracks
             localVideoTrackFlow.replayCache.forEach { it.dispose() }
-            if (::localVideoTrack.isInitialized) {
-                localVideoTrack.dispose()
-            }
+            if (::localVideoTrack.isInitialized) localVideoTrack.dispose()
 
             // stop capturer
             try {
@@ -237,9 +225,7 @@ class WebRTCService {
             videoCapturer.dispose()
 
             // release surfaceTextureHelper
-            if (::surfaceTextureHelper.isInitialized) {
-                surfaceTextureHelper.dispose()
-            }
+            if (::surfaceTextureHelper.isInitialized) surfaceTextureHelper.dispose()
 
             // close peer connection
             peerConnection.connection.close()

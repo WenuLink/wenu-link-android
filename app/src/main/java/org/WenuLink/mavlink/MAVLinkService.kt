@@ -20,20 +20,20 @@ data class Endpoint(val ip: String, val port: Int) {
 
 class MAVLinkService(aircraft: AircraftHandler) {
     companion object {
-        var isEnabled: Boolean = true
+        var isEnabled = true
             private set
     }
     private val logger by taggedLogger(MAVLinkService::class.java.simpleName)
 
     private var client: MAVLinkClient? = null
-    private var controller: MAVLinkController = MAVLinkController(aircraft)
+    private var controller = MAVLinkController(aircraft)
     private var endpoint = Endpoint("192.168.1.220", 14550)
     private var mavlinkScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
-    var isReady: Boolean = false
+    var isReady = false
         private set
-    val hasStationConnected: Boolean
+    val hasStationConnected
         get() = controller.isStationConnected()
 
     private val _isRunning = MutableStateFlow(false)
@@ -69,19 +69,15 @@ class MAVLinkService(aircraft: AircraftHandler) {
         logger.d { "MAVLinkClient ended." }
     }
 
-    fun launchListeningJob(): Job {
-        // Start listening for messages
-        return mavlinkScope!!.launch {
+    fun launchListeningJob(): Job = // Start listening for messages
+        mavlinkScope!!.launch {
             client?.startListening(controller::processMessage)
         }
-    }
 
-    fun launchSendingJob(): Job {
-        // Start sending messages
-        return mavlinkScope!!.launch {
+    fun launchSendingJob(): Job = // Start sending messages
+        mavlinkScope!!.launch {
             client?.startSending(controller::sendMessages)
         }
-    }
 
     suspend fun launchService(onResult: (String?) -> Unit) {
         logger.d { "Requesting to launch MAVLinkService." }

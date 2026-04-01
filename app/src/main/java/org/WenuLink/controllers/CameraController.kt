@@ -38,14 +38,12 @@ class CameraController(
     override val client: MAVLinkClient,
     private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit
 ) : IController {
-
     private val logger by taggedLogger(CameraController::class.java.simpleName)
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
         aircraft: AircraftHandler
     ): Boolean {
-        var processed = true
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION ->
                 handleCameraInformation(commandLongMsg, aircraft)
@@ -60,16 +58,15 @@ class CameraController(
 
             MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg, aircraft)
 
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
     override fun processRequestLong(
         commandLongMsg: msg_command_long,
         aircraft: AircraftHandler
     ): Boolean {
-        var processed = true
         val requestID = commandLongMsg.param1.toInt()
         when (requestID) {
             msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION -> reportCameras(aircraft)
@@ -82,29 +79,27 @@ class CameraController(
             msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS ->
                 sendCaptureStatus(aircraft)
 
-            else -> processed = false
+            else -> return false
         }
-        return processed
+        return true
     }
 
-    private fun sendRequestAck(result: Int) {
-        client.sendMessage(
-            MessageUtils.msgRequestAck(result)
-        )
-    }
+    private fun sendRequestAck(result: Int) = client.sendMessage(
+        MessageUtils.msgRequestAck(result)
+    )
 
-    private fun sendCommandAck(messageID: Int, result: Int, progress: Int = -1) {
+    private fun sendCommandAck(messageID: Int, result: Int, progress: Int = -1) =
         client.sendMessage(
             MessageUtils.msgCommandAck(messageID, result, progress)
         )
-    }
 
     private fun reportCameras(aircraft: AircraftHandler) {
         if (!aircraft.hasCameras) {
-            sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             logger.d { "Unsupported: No cameras were detected" }
+            sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             return
         }
+
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
         aircraft.cameras.list.forEach {
             // Append boot time before send
@@ -127,10 +122,11 @@ class CameraController(
 
     private fun reportSettings(aircraft: AircraftHandler) {
         if (!aircraft.hasCameras) {
-            sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             logger.d { "Unsupported: No cameras were detected" }
+            sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             return
         }
+
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
         aircraft.cameras.list.forEach {
             // Append boot time before send
@@ -146,10 +142,10 @@ class CameraController(
         sendCommandAck(
             commandLongMsg.command,
             MAV_RESULT.MAV_RESULT_IN_PROGRESS,
-            progress = 0
+            0
         )
-        val index: Int = commandLongMsg.param1.toInt()
-        val mode: Int = commandLongMsg.param2.toInt()
+        val index = commandLongMsg.param1.toInt()
+        val mode = commandLongMsg.param2.toInt()
 
         aircraft.cameras.dispatchCommand(
             SetModeCommand(mode, index)
@@ -161,27 +157,22 @@ class CameraController(
                 } else {
                     MAV_RESULT.MAV_RESULT_FAILED
                 },
-                progress = 100
+                100
             )
         }
     }
 
-    private fun sendStorageStatus(aircraft: AircraftHandler) {
-        client.sendMessage(
-            msgStorageInformation().apply {
-                time_boot_ms = aircraft.systemBootTime
-            }
-        )
-    }
+    private fun sendStorageStatus(aircraft: AircraftHandler) = client.sendMessage(
+        msgStorageInformation().apply {
+            time_boot_ms = aircraft.systemBootTime
+        }
+    )
 
-    private fun sendCaptureStatus(aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata = aircraft.cameras.list.first()
-        client.sendMessage(
-            msgCaptureStatus(cameraInfo).apply {
-                time_boot_ms = aircraft.systemBootTime
-            }
-        )
-    }
+    private fun sendCaptureStatus(aircraft: AircraftHandler) = client.sendMessage(
+        msgCaptureStatus(aircraft.cameras.list.first()).apply {
+            time_boot_ms = aircraft.systemBootTime
+        }
+    )
 
     private fun getCamera(targetCamera: Int, aircraft: AircraftHandler): CameraMetadata? {
         val cameraInfo = aircraft.cameras.getCamera(targetCamera)
@@ -196,9 +187,9 @@ class CameraController(
         aircraft: AircraftHandler,
         cameraInfo: CameraMetadata
     ) {
-        val intervalMillis: Long = (commandLongMsg.param2 * 1000).toLong() // milliseconds
-        val initSequence: Int = commandLongMsg.param4.toInt()
-        val totalPhotos: Int = commandLongMsg.param3.toInt()
+        val intervalMillis = (commandLongMsg.param2 * 1000).toLong() // milliseconds
+        val totalPhotos = commandLongMsg.param3.toInt()
+        val initSequence = commandLongMsg.param4.toInt()
 
         fun mustCapture() = if (totalPhotos == 0) {
             aircraft.cameras.sequenceIndex != -1
@@ -218,28 +209,24 @@ class CameraController(
 
             aircraft.cameras.dispatchCommand(
                 TakePhotoCommand(cameraInfo.id)
-            )
-                { error ->
-                    val captureOk = error == null
-                    if (!captureOk) {
-                        logger.w { "Error in shootPhoto: $error" }
-                    }
-                    val photoData = ImageMetadata(
-                        index = aircraft.cameras.sequenceIndex,
-                        captureOk = captureOk,
-                        cameraID = cameraInfo.id,
-                        telemetry = aircraft.telemetry.getData()!!
-                    )
+            ) { error ->
+                val captureOk = error == null
+                if (!captureOk) logger.w { "Error in shootPhoto: $error" }
 
-                    client.sendMessage(
-                        msgImageCaptured(photoData)
-                    )
-                }
+                val photoData = ImageMetadata(
+                    aircraft.cameras.sequenceIndex,
+                    captureOk,
+                    cameraInfo.id,
+                    aircraft.telemetry.getData()!!
+                )
+
+                client.sendMessage(msgImageCaptured(photoData))
+            }
         }
     }
 
     private fun requestStartCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+        val cameraInfo = getCamera(commandLongMsg.param1.toInt(), aircraft)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -262,7 +249,7 @@ class CameraController(
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+        val cameraInfo = getCamera(commandLongMsg.param1.toInt(), aircraft)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -285,7 +272,7 @@ class CameraController(
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt(), aircraft)
+        val cameraInfo= getCamera(commandLongMsg.param3.toInt(), aircraft)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -309,23 +296,22 @@ class CameraController(
 
         aircraft.cameras.dispatchCommand(
             StartRecordCommand(cameraInfo.id)
-        )
-            { error ->
-                val captureOk = error == null
-                if (!captureOk) {
-                    logger.w { "Error in requestStartRecording: $error" }
-                } else {
-                    // setting messages frequency
-                    onSetMessageRate(
-                        msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
-                        ((1f / statusFreq) * 1_000).roundToLong()
-                    )
-                }
+        ) { error ->
+            val captureOk = error == null
+            if (!captureOk) {
+                logger.w { "Error in requestStartRecording: $error" }
+            } else {
+                // setting messages frequency
+                onSetMessageRate(
+                    msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
+                    ((1f / statusFreq) * 1_000).roundToLong()
+                )
             }
+        }
     }
 
     private fun requestStopRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt(), aircraft)
+        val cameraInfo = getCamera(commandLongMsg.param2.toInt(), aircraft)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -348,19 +334,17 @@ class CameraController(
 
         aircraft.cameras.dispatchCommand(
             StopRecordCommand(cameraInfo.id)
-        )
-            { error ->
-                val captureOk = error == null
-                if (!captureOk) {
-                    logger.w { "Error in requestStopRecording: $error" }
-                } else {
-                    // deactivating messages
-                    onSetMessageRate(
-                        msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
-                        -1
-                    )
-                }
+        ) { error ->
+            if (error != null) {
+                logger.w { "Error in requestStopRecording: $error" }
+                return@dispatchCommand
             }
+            // deactivating messages
+            onSetMessageRate(
+                msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
+                -1
+            )
+        }
     }
 
     fun msgCameraInformation(cameraInfo: CameraMetadata): msg_camera_information =
@@ -400,9 +384,9 @@ class CameraController(
         camera_device_id = cameraInfo.id.toShort()
     }
 
-    fun msgStorageInformation(): msg_storage_information {
+    fun msgStorageInformation(): msg_storage_information =
         // TODO: get from https://developer.dji.com/api-reference/android-api/Components/Camera/DJICamera_DJICameraSDCardState.html
-        return msg_storage_information().apply {
+        msg_storage_information().apply {
             storage_id = 1
             storage_count = 1
             status = STORAGE_STATUS.STORAGE_STATUS_READY.toShort()
@@ -414,14 +398,13 @@ class CameraController(
             name = "FakeSDCard".toByteArray()
             storage_usage = STORAGE_USAGE_FLAG.STORAGE_USAGE_FLAG_PHOTO.toShort()
         }
-    }
 
     fun msgCaptureStatus(cameraInfo: CameraMetadata): msg_camera_capture_status {
         // TODO: add proper updates
         var imageStatus = CameraCaptureStatus.IDLE
-        var imageInterval: Float = 0f
+        var imageInterval = 0f
         var videoStatus = CameraCaptureStatus.IDLE
-        var videoTime: Long = 0
+        var videoTime = 0L
         if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE) {
             imageStatus = cameraInfo.state.captureStatus
             imageInterval = cameraInfo.state.captureTime.toFloat()
@@ -450,9 +433,9 @@ class CameraController(
             alt = mavData.altitude
             relative_alt = mavData.relativeAltitude
             q = OrientationUtils.eulerDegToQuaternion(
-                rollDeg = mavData.roll.toDouble(),
-                pitchDeg = mavData.pitch.toDouble(),
-                yawDeg = mavData.yaw.toDouble()
+                mavData.roll.toDouble(),
+                mavData.pitch.toDouble(),
+                mavData.yaw.toDouble()
             ).toFloatArray()
             image_index = imageInfo.index
             capture_result = (if (imageInfo.captureOk) 1 else 0).toByte()

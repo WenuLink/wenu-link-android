@@ -78,9 +78,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
         messageID: Int,
         result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
         progress: Int = -1
-    ) {
-        client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
-    }
+    ) = client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
 
     fun sendAutopilotAck() = sendCommandAck(
         MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
@@ -118,15 +116,15 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
         if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-        } else {
-            aircraft.requestMode(customMode)
-                .onSuccess {
-                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-                }
-                .onFailure {
-                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-                }
+            return
         }
+        aircraft.requestMode(customMode)
+            .onSuccess {
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+            }
+            .onFailure {
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            }
     }
 
     fun processArmDisarm(commandMsg: msg_command_long, aircraft: AircraftHandler) {
@@ -144,11 +142,8 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
         logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
 
-        val command = if (action) {
-            ArmCommand()
-        } else {
-            DisarmCommand()
-        }
+        val command = if (action) ArmCommand() else DisarmCommand()
+
         aircraft.dispatchCommand(command) { error ->
             logger.d { "processTakeoff: $error" }
         }

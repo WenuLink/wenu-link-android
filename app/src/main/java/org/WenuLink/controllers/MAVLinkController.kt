@@ -25,7 +25,6 @@ import org.WenuLink.mavlink.MAVLinkClient
  * - TelemetryController: Message Protocol
  */
 class MAVLinkController(private val aircraft: AircraftHandler) {
-
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private val controllers: MutableList<IController> = mutableListOf()
     private lateinit var client: MAVLinkClient

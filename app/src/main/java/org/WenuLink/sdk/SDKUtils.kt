@@ -39,11 +39,9 @@ object SDKUtils {
         onResult: (String?) -> Unit
     ): CommonCallbacks.CompletionCallback<DJIError> =
         CommonCallbacks.CompletionCallback<DJIError> { error ->
-            if (error == null) {
-                onResult(null)
-            } else {
+            if (error != null) {
                 logger.e { "CompletionCallback onFailure $error" }
-                onResult(error.description)
             }
+            onResult(error?.description)
         }
 }

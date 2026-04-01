@@ -20,7 +20,6 @@ import com.MAVLink.enums.MAV_SYS_STATUS_SENSOR
 import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
-import io.getstream.log.taggedLogger
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -37,8 +36,7 @@ import org.WenuLink.mavlink.MAVLinkClient
  * https://mavlink.io/en/services/heartbeat.html
  */
 class ConnectionController(override val client: MAVLinkClient) : IController {
-    private val logger by taggedLogger(ConnectionController::class.java.simpleName)
-    private var gcsLastTimestamp: Long = 0
+    private var gcsLastTimestamp = 0L
     val isGCSPresent: Boolean
         get() {
             val hasGCS = gcsLastTimestamp > 0
@@ -91,29 +89,18 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
     }
 
     override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? =
+        // msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
         when (messageID) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(aircraft)
-
             msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(aircraft.telemetry)
-
             msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(aircraft.telemetry)
-
             msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(aircraft.telemetry)
-
             msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
-
             msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(aircraft.telemetry)
-
             msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(aircraft.telemetry)
-
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
-
-            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS ->
-                msgBatteryStatus(aircraft.telemetry)
-
+            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus(aircraft.telemetry)
             msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
-
-            //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null
         }
 
