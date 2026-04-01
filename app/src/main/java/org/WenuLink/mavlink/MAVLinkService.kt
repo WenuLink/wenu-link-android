@@ -14,7 +14,9 @@ import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.controllers.MAVLinkController
 
-data class Endpoint(val ip: String, val port: Int)
+data class Endpoint(val ip: String, val port: Int) {
+    fun toUrl(): String = "udp://$ip:$port"
+}
 
 class MAVLinkService(aircraft: AircraftHandler) {
     companion object {
@@ -37,9 +39,8 @@ class MAVLinkService(aircraft: AircraftHandler) {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun updateServerAddress(serverAddress: String) {
-        val (ip, port) = serverAddress.split(":")
-        endpoint = Endpoint(ip, port.toInt())
+    fun updateServerAddress(endpoint: Endpoint) {
+        this.endpoint = endpoint
     }
 
     fun clientExists(): Boolean = client != null
@@ -53,10 +54,10 @@ class MAVLinkService(aircraft: AircraftHandler) {
 
     fun createClient() {
         if (clientExists()) {
-            logger.d { "MAVLinkClient already created for udp://$endpoint." }
+            logger.d { "MAVLinkClient already created for udp://${endpoint.toUrl()}." }
             return
         }
-        logger.d { "Creating MAVLinkClient for udp://$endpoint." }
+        logger.d { "Creating MAVLinkClient for udp://${endpoint.toUrl()}." }
 
         client = MAVLinkClient(endpoint.ip, endpoint.port)
     }

@@ -27,6 +27,10 @@ import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
 
+data class SignalingEndpoint(val host: String, val port: Int, val protocol: String = "ws") {
+    fun toUrl(): String = "$protocol://$host:$port"
+}
+
 class WebRTCService {
     companion object {
         private var mInstance: WebRTCService? = null
@@ -54,8 +58,8 @@ class WebRTCService {
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
 
     // Signaling configuration
-    private var signalingServer = "ws://192.168.1.220:8090"
     var isServiceUp: Boolean = false
+    private var signalingEndpoint = SignalingEndpoint("192.168.1.220", 8090)
         private set
     var isStreaming: Boolean = false
         private set
@@ -86,8 +90,8 @@ class WebRTCService {
     lateinit var mediaOptions: CameraCapturer.MediaMetadata
     private var offer: String? = null
 
-    fun updateServerAddress(serverAddress: String) {
-        signalingServer = serverAddress
+    fun updateServerAddress(endpoint: SignalingEndpoint) {
+        signalingEndpoint = endpoint
     }
 
     private val peerConnection: StreamPeerConnection by lazy {
@@ -117,10 +121,10 @@ class WebRTCService {
 
         this.serviceScope = serviceScope
 
-        logger.i { "Connecting WebRTC client to $signalingServer" }
+        logger.i { "Connecting WebRTC client to ${signalingEndpoint.toUrl()}" }
         if (::webRTCClient.isInitialized) return
 
-        webRTCClient = WebRTCClient(signalingServer)
+        webRTCClient = WebRTCClient(signalingEndpoint.toUrl())
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(
             "SurfaceTextureHelperThread",
