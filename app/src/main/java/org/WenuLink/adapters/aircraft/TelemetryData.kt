@@ -143,13 +143,19 @@ data class BatteryData(
 }
 
 data class MAVLinkBatteryData(
-    val currentConsumed: Int, mAh, -1 = unknown
-    val temperature: Short, cdegC, INT16_MAX = unknown
-    val voltages: List<Int>, mV
-    val currentBattery: Short, cA, -1 = unknown
-    val batteryRemaining: Byte, %, -1 = unknown
-    val voltagesBattery: Int, mV, -1 = unknown
-    // 10mA, -1 = unknown
+    // mAh, -1 = unknown
+    val currentConsumed: Int,
+    // cdegC, INT16_MAX = unknown
+    val temperature: Short,
+    // mV
+    val voltages: List<Int>,
+    // cA, -1 = unknown
+    val currentBattery: Short,
+    // %, -1 = unknown
+    val batteryRemaining: Byte,
+    // mV, -1 = unknown
+    val voltagesBattery: Int,
+    /* 10mA, -1 = unknown */
     val currentBatteryRaw: Short
 )
 
