@@ -32,17 +32,8 @@ object SDKUtils {
     fun getAppActivationManager(): AppActivationManager? =
         DJISDKManager.getInstance().appActivationManager
 
-    fun getGPSSignalLevelArray(inputLevel: GPSSignalLevel): BooleanArray {
-        // Create a boolean array with the same size as the number of enum constants
-        val result = BooleanArray(GPSSignalLevel.entries.size)
-
-        // Iterate through the enum constants and set the corresponding index to true if it matches the input level
-        for (i in GPSSignalLevel.entries.indices) {
-            result[i] = GPSSignalLevel.entries[i] == inputLevel
-        }
-
-        return result
-    }
+    fun gpsSignalLevelFlags(inputLevel: GPSSignalLevel): List<Boolean> =
+        GPSSignalLevel.entries.map { it == inputLevel }
 
     fun createCompletionCallback(
         onResult: (String?) -> Unit

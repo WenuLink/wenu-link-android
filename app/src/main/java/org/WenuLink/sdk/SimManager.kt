@@ -43,7 +43,7 @@ object SimManager {
     }
 
     @Synchronized
-    fun state2telemetry(state: SimulatorState, previousData: TelemetryData? = null): TelemetryData {
+    fun state2Telemetry(state: SimulatorState, previousData: TelemetryData? = null): TelemetryData {
         val data = TelemetryData(
             roll = state.roll.toDouble(),
             pitch = state.pitch.toDouble(),
@@ -62,7 +62,7 @@ object SimManager {
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
             satelliteCount = satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(GPSSignalLevel.LEVEL_7)
+            gpsLevel = SDKUtils.gpsSignalLevelFlags(GPSSignalLevel.LEVEL_7)
         )
         // complete data from previous one
         if (previousData == null) return data

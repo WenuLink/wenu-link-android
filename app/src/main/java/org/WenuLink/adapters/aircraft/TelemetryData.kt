@@ -32,7 +32,7 @@ data class TelemetryData(
     val satelliteCount: Int,
     // DJI reports signal quality on a scale of 1-11
     // Mavlink has separate codes for fix type.
-    val gpsLevel: BooleanArray,
+    val gpsLevel: List<Boolean>,
     val gpsFixType: Int = 0
 )
 
@@ -83,15 +83,13 @@ data class RCData(
     val buttonC3: Boolean,
     val mode: FlightModeSwitch?
 ) {
-    private fun stickValue2percent(value: Int): Int {
+    private fun stickValue2Percent(value: Int): Int =
         // transform from DJI range [-660, 660] => [0, 100]
-        return (((value + 660).toFloat() / 1320f) * 100).roundToInt()
-    }
+        (((value + 660).toFloat() / 1320f) * 100).roundToInt()
 
-    private fun stickValue2rcValue(value: Int): Int {
+    private fun stickValue2RcValue(value: Int): Int =
         // transform from DJI range [-660, 660] => [1000, 2000]
-        return ((value.toFloat() / 660) * 500).roundToInt() + 1500
-    }
+        ((value.toFloat() / 660) * 500).roundToInt() + 1500
 
     fun toMAVLink(): RCData {
         val currRC = this.copy(

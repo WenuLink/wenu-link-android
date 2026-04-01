@@ -12,6 +12,7 @@ import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
+import org.WenuLink.sdk.SignalQuality
 import org.WenuLink.sdk.SimManager
 
 class TelemetryHandler {
@@ -92,7 +93,7 @@ class TelemetryHandler {
         if (register) {
             FCManager.registerStateCallback { state ->
                 // TODO: positionX,Y,Z values must be updated
-                updateTelemetryData(FCManager.state2telemetry(state))
+                updateTelemetryData(FCManager.state2Telemetry(state))
             }
         }
     }

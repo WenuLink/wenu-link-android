@@ -81,7 +81,7 @@ object FCManager {
         }
     }
 
-    fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+    fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
         roll = state.attitude.roll,
         pitch = state.attitude.pitch,
         yaw = state.attitude.yaw,
@@ -99,7 +99,7 @@ object FCManager {
         isFlying = state.isFlying,
         motorsOn = state.areMotorsOn(),
         satelliteCount = state.satelliteCount,
-        gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+        gpsLevel = SDKUtils.gpsSignalLevelFlags(state.gpsSignalLevel)
     )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
