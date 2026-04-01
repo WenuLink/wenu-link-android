@@ -243,9 +243,11 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         // quality. MAVLink uses [0, 254] as uint8_t
 
         // AirLink's DownLinkSignalQuality
-        msg.rssi = ((airlinkSignal[0] / 100f) * 255f).roundToInt().toShort()
+        msg.rssi = airlinkSignal.downlink?.let { ((it / 100f) * 255f).roundToInt().toShort() }
+            ?: Short.MAX_VALUE
         // AirLink's UpLinkSignalQuality
-        msg.remrssi = ((airlinkSignal[1] / 100f) * 255f).roundToInt().toShort()
+        msg.remrssi = airlinkSignal.uplink?.let { ((it / 100f) * 255f).roundToInt().toShort() }
+            ?: Short.MAX_VALUE
         return msg
     }
 

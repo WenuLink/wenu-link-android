@@ -284,8 +284,8 @@ class TelemetryHandler {
         }
     }
 
-    fun getAirlinkSignal(): IntArray = if (mustRunSimulation) {
-        intArrayOf(98, 95)
+    fun getAirlinkSignal(): SignalQuality = if (mustRunSimulation) {
+        SignalQuality(98, 95)
     } else {
         AircraftManager.getAirlinkData()
     }
