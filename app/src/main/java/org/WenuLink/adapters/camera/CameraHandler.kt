@@ -6,6 +6,7 @@ import io.getstream.log.taggedLogger
 import kotlin.getValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.CameraManager
 
@@ -23,15 +24,21 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     }
 
     private val logger by taggedLogger(CameraHandler::class.java.simpleName)
-    private val availableCameras: MutableList<CameraMetadata> = mutableListOf()
-    val list: List<CameraMetadata>
-        get() = availableCameras.toList()
-    var sequenceIndex: Int = 0
+    val availableCameras: MutableList<CameraMetadata> = mutableListOf()
+    var photoSeqIndex: Int = 0
     var captureTimestamp: Long = System.currentTimeMillis()
     val lastCaptureMillis: Long get() = System.currentTimeMillis() - captureTimestamp
 
-    override fun registerScope(scope: CoroutineScope) =
+    override fun registerScope(scope: CoroutineScope) {
         startCommandProcessor(scope, this@CameraHandler, logger)
+        scope.launch { initCameras() }
+    }
+
+    override fun unload() {
+        availableCameras.clear()
+        photoSeqIndex = 0
+        super.unload()
+    }
 
     suspend fun initCameras(): Boolean {
         if (!CameraManager.isConnected()) {

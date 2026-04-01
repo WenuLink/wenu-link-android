@@ -7,6 +7,7 @@ import com.MAVLink.common.msg_param_set
 import com.MAVLink.common.msg_param_value
 import io.getstream.log.taggedLogger
 import kotlin.math.round
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.parameters.ParamValue
@@ -21,11 +22,16 @@ class ParameterController(override val client: MAVLinkClient) : IController {
     var wasRequested = false
         private set
 
-    override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         when (msg.msgid) {
-            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList(aircraft)
-            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg, aircraft)
-            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg, aircraft)
+            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST ->
+                requestList(handler.aircraft)
+
+            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ ->
+                requestRead(msg, handler.aircraft)
+
+            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg, handler.aircraft)
+
             else -> return false
         }
         return true

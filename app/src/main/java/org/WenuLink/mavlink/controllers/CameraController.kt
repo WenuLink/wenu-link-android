@@ -17,7 +17,8 @@ import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.WenuLinkCommand
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.TelemetryMapper
 import org.WenuLink.adapters.camera.CameraCaptureStatus
 import org.WenuLink.adapters.camera.CameraMetadata
@@ -43,22 +44,22 @@ class CameraController(
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ): Boolean {
         var processed = true
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION ->
-                handleCameraInformation(commandLongMsg, aircraft)
+                handleCameraInformation(commandLongMsg, handler)
 
-            MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg, handler)
 
-            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> requestStartCapture(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> requestStartCapture(commandLongMsg, handler)
 
-            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> requestStopCapture(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> requestStopCapture(commandLongMsg, handler)
 
-            MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE -> requestStartRecording(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE -> requestStartRecording(commandLongMsg, handler)
 
-            MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg, handler)
 
             else -> processed = false
         }
@@ -67,20 +68,20 @@ class CameraController(
 
     override fun processRequestLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ): Boolean {
         var processed = true
         val requestID = commandLongMsg.param1.toInt()
         when (requestID) {
-            msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION -> reportCameras(aircraft)
+            msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION -> reportCameras(handler)
 
-            msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS -> reportSettings(aircraft)
+            msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS -> reportSettings(handler)
 
             msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION ->
-                sendStorageStatus(aircraft)
+                sendStorageStatus(handler)
 
             msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS ->
-                sendCaptureStatus(aircraft)
+                sendCaptureStatus(handler)
 
             else -> processed = false
         }
@@ -99,17 +100,17 @@ class CameraController(
         )
     }
 
-    private fun reportCameras(aircraft: AircraftHandler) {
-        if (!aircraft.hasCameras) {
+    private fun reportCameras(handler: WenuLinkHandler) {
+        if (handler.availableCameras.isEmpty()) {
             sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             logger.d { "Unsupported: No cameras were detected" }
             return
         }
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
-        aircraft.cameras.list.forEach {
+        handler.availableCameras.forEach {
             // Append boot time before send
             val msg = msgCameraInformation(it).apply {
-                time_boot_ms = aircraft.systemBootTime
+                time_boot_ms = handler.aircraft.systemBootTime
             }
             logger.d { "CameraReport: $msg" }
             client.sendMessage(msg)
@@ -118,31 +119,31 @@ class CameraController(
 
     private fun handleCameraInformation(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ) {
         if (commandLongMsg.param1 != 1f) return
 
-        reportCameras(aircraft)
+        reportCameras(handler)
     }
 
-    private fun reportSettings(aircraft: AircraftHandler) {
-        if (!aircraft.hasCameras) {
+    private fun reportSettings(handler: WenuLinkHandler) {
+        if (handler.availableCameras.isEmpty()) {
             sendRequestAck(MAV_RESULT.MAV_RESULT_UNSUPPORTED)
             logger.d { "Unsupported: No cameras were detected" }
             return
         }
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
-        aircraft.cameras.list.forEach {
+        handler.availableCameras.forEach {
             // Append boot time before send
             client.sendMessage(
                 msgSettings(it).apply {
-                    time_boot_ms = aircraft.systemBootTime
+                    time_boot_ms = handler.aircraft.systemBootTime
                 }
             )
         }
     }
 
-    private fun handleSetCameraMode(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
+    private fun handleSetCameraMode(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
         sendCommandAck(
             commandLongMsg.command,
             MAV_RESULT.MAV_RESULT_IN_PROGRESS,
@@ -151,9 +152,7 @@ class CameraController(
         val index: Int = commandLongMsg.param1.toInt()
         val mode: Int = commandLongMsg.param2.toInt()
 
-        aircraft.cameras.dispatchCommand(
-            SetModeCommand(mode, index)
-        ) { error ->
+        handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { error ->
             sendCommandAck(
                 commandLongMsg.command,
                 if (error == null) {
@@ -166,25 +165,25 @@ class CameraController(
         }
     }
 
-    private fun sendStorageStatus(aircraft: AircraftHandler) {
+    private fun sendStorageStatus(handler: WenuLinkHandler) {
         client.sendMessage(
             msgStorageInformation().apply {
-                time_boot_ms = aircraft.systemBootTime
+                time_boot_ms = handler.aircraft.systemBootTime
             }
         )
     }
 
-    private fun sendCaptureStatus(aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata = aircraft.cameras.list.first()
+    private fun sendCaptureStatus(handler: WenuLinkHandler) {
+        val cameraInfo: CameraMetadata = handler.availableCameras.first()
         client.sendMessage(
             msgCaptureStatus(cameraInfo).apply {
-                time_boot_ms = aircraft.systemBootTime
+                time_boot_ms = handler.aircraft.systemBootTime
             }
         )
     }
 
-    private fun getCamera(targetCamera: Int, aircraft: AircraftHandler): CameraMetadata? {
-        val cameraInfo = aircraft.cameras.getCamera(targetCamera)
+    private fun getCamera(targetCamera: Int, handler: WenuLinkHandler): CameraMetadata? {
+        val cameraInfo = handler.camera.getCamera(targetCamera)
         if (cameraInfo == null) {
             logger.d { "Camera index $targetCamera not found" }
         }
@@ -193,7 +192,7 @@ class CameraController(
 
     private fun requestShootPhoto(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler,
+        handler: WenuLinkHandler,
         cameraInfo: CameraMetadata
     ) {
         val intervalMillis: Long = (commandLongMsg.param2 * 1000).toLong() // milliseconds
@@ -201,45 +200,46 @@ class CameraController(
         val totalPhotos: Int = commandLongMsg.param3.toInt()
 
         fun mustCapture() = if (totalPhotos == 0) {
-            aircraft.cameras.sequenceIndex != -1
+            handler.camera.photoSeqIndex != -1
         } else {
-            aircraft.cameras.sequenceIndex <= totalPhotos
+            handler.camera.photoSeqIndex <= totalPhotos
         }
 
-        aircraft.cameras.sequenceIndex = initSequence
+        handler.camera.photoSeqIndex = initSequence
 
         while (mustCapture()) {
-            if (totalPhotos != 1 && aircraft.cameras.lastCaptureMillis < intervalMillis) {
+            if (totalPhotos != 1 && handler.camera.lastCaptureMillis < intervalMillis) {
                 continue
             }
-            if (!aircraft.cameras.captureIdle(cameraInfo.id)) {
+            if (!handler.camera.captureIdle(cameraInfo.id)) {
                 continue
             }
 
-            aircraft.cameras.dispatchCommand(
-                TakePhotoCommand(cameraInfo.id)
-            )
-                { error ->
-                    val captureOk = error == null
-                    if (!captureOk) {
-                        logger.w { "Error in shootPhoto: $error" }
-                    }
-                    val photoData = ImageMetadata(
-                        index = aircraft.cameras.sequenceIndex,
-                        captureOk = captureOk,
-                        cameraID = cameraInfo.id,
-                        telemetry = aircraft.telemetry.getData()!!
-                    )
-
-                    client.sendMessage(
-                        msgImageCaptured(photoData)
-                    )
+            handler.dispatchCommand(
+                WenuLinkCommand.Camera(
+                    TakePhotoCommand(cameraInfo.id)
+                )
+            ) { error ->
+                val captureOk = error == null
+                if (!captureOk) {
+                    logger.w { "Error in shootPhoto: $error" }
                 }
+                val photoData = ImageMetadata(
+                    index = handler.camera.photoSeqIndex,
+                    captureOk = captureOk,
+                    cameraID = cameraInfo.id,
+                    telemetry = handler.aircraft.telemetry.getData()!!
+                )
+
+                client.sendMessage(
+                    msgImageCaptured(photoData)
+                )
+            }
         }
     }
 
-    private fun requestStartCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+    private fun requestStartCapture(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), handler)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -258,11 +258,11 @@ class CameraController(
             )
         )
 
-        requestShootPhoto(commandLongMsg, aircraft, cameraInfo)
+        requestShootPhoto(commandLongMsg, handler, cameraInfo)
     }
 
-    private fun requestStopCapture(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), aircraft)
+    private fun requestStopCapture(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), handler)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -281,11 +281,11 @@ class CameraController(
             )
         )
 
-        aircraft.cameras.sequenceIndex = -1
+        handler.camera.photoSeqIndex = -1
     }
 
-    private fun requestStartRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt(), aircraft)
+    private fun requestStartRecording(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt(), handler)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -307,8 +307,8 @@ class CameraController(
         val streamID = commandLongMsg.param1.toInt()
         val statusFreq = commandLongMsg.param2 // Hz
 
-        aircraft.cameras.dispatchCommand(
-            StartRecordCommand(cameraInfo.id)
+        handler.dispatchCommand(
+            WenuLinkCommand.Camera(StartRecordCommand(cameraInfo.id))
         )
             { error ->
                 val captureOk = error == null
@@ -324,8 +324,8 @@ class CameraController(
             }
     }
 
-    private fun requestStopRecording(commandLongMsg: msg_command_long, aircraft: AircraftHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt(), aircraft)
+    private fun requestStopRecording(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
+        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt(), handler)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -346,8 +346,8 @@ class CameraController(
 
         val streamID = commandLongMsg.param1.toInt()
 
-        aircraft.cameras.dispatchCommand(
-            StopRecordCommand(cameraInfo.id)
+        handler.dispatchCommand(
+            WenuLinkCommand.Camera(StopRecordCommand(cameraInfo.id))
         )
             { error ->
                 val captureOk = error == null

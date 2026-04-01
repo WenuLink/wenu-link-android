@@ -19,9 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.adapters.aircraft.BootCommand
-import org.WenuLink.adapters.aircraft.ShutdownCommand
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -30,7 +27,7 @@ class WenuLinkService : Service() {
     private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
-    private lateinit var aircraft: AircraftHandler
+    private lateinit var handler: WenuLinkHandler
     val mavlinkStateFlow: StateFlow<Boolean>?
         get() = if (isMAVLinkReady()) mavlink.isRunning else null
     val webRTCStateFlow: StateFlow<Boolean>?
@@ -41,7 +38,8 @@ class WenuLinkService : Service() {
         (application as WenuLinkApp).wenuLinkService = this // Store the service reference
 
         // create the aircraft instance
-        aircraft = AircraftHandler.getInstance(serviceScope)
+        handler = WenuLinkHandler.getInstance()
+        handler.registerScope(serviceScope)
 
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady()) {
@@ -49,7 +47,7 @@ class WenuLinkService : Service() {
         }
         // create MAVLink instance
         if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
-            mavlink = MAVLinkService(aircraft)
+            mavlink = MAVLinkService(handler)
         }
 
         logger.i { "WenuLinkService created." }
@@ -114,13 +112,12 @@ class WenuLinkService : Service() {
         startForegroundServiceWithNotification()
 
         // Wait Aircraft to boot
-        aircraft.dispatchCommand(BootCommand(10000L)) { error ->
-            if (error != null) {
+        serviceScope.launch {
+            val bootError = handler.bootAircraft()
+            if (bootError != null) {
                 // No aircraft -> No service
-                serviceScope.launch {
-                    terminate()
-                    onDestroy()
-                }
+                terminate()
+                onDestroy()
             }
         }
 
@@ -138,7 +135,7 @@ class WenuLinkService : Service() {
 
     fun stopCommands() {
         // mission's logic already stop according to the mission kind
-        serviceScope.launch { aircraft.manualControl() }
+        serviceScope.launch { handler.cancelCommand() }
         // TODO: add RTL/LAND according to settings
     }
 
@@ -185,7 +182,7 @@ class WenuLinkService : Service() {
 
         if (mavlink.isServiceRunning()) return null
 
-        if (!aircraft.telemetry.isActive()) {
+        if (!handler.isTelemetryActive) {
             logger.w { "Unable to start service, no telemetry." }
             return null
         }
@@ -206,9 +203,9 @@ class WenuLinkService : Service() {
 
     fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
 
-    fun isReady(): Boolean = ::aircraft.isInitialized && !aircraft.isPowerOff
+    fun isReady(): Boolean = ::handler.isInitialized && handler.isAircraftPowerOn
 
-    fun isPowerOff(): Boolean = aircraft.isPowerOff
+    fun isPowerOff(): Boolean = !handler.isAircraftPowerOn
 
     fun runServices(
         onMAVLinkResult: (String?) -> Unit
@@ -221,12 +218,12 @@ class WenuLinkService : Service() {
 
     suspend fun terminate() {
         // TODO: perform RTL or LAND before: aircraft.unload()
-        aircraft.manualControl()
-        stopWebRTCService()?.join()
-        stopMAVLinkService()?.join()
-        aircraft.dispatchCommand(ShutdownCommand(false)) {
-            aircraft.unload()
-        }
+        handler.manualControl()
+        val webRTCStopJob = stopWebRTCService()
+        val mavlinkStopJob = stopMAVLinkService()
+        webRTCStopJob?.join()
+        mavlinkStopJob?.join()
+        handler.unload()
         AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
     }
 }

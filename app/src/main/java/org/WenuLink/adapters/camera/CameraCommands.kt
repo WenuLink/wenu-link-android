@@ -69,7 +69,7 @@ data class TakePhotoCommand(val cameraIdx: Int) : CameraCommand {
         val error = CameraManager.requestPhotoShoot()
         if (error == null) {
             ctx.captureTimestamp = System.currentTimeMillis()
-            ctx.sequenceIndex += 1
+            ctx.photoSeqIndex += 1
         }
         // mark IDLE back
         ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)

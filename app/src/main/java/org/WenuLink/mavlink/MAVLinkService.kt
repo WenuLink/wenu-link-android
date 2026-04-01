@@ -11,12 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.mavlink.MAVLinkController
+import org.WenuLink.adapters.WenuLinkHandler
 
 data class Endpoint(val ip: String, val port: Int)
 
-class MAVLinkService(aircraft: AircraftHandler) {
+class MAVLinkService(handler: WenuLinkHandler) {
     companion object {
         var isEnabled: Boolean = true
             private set
@@ -24,7 +23,7 @@ class MAVLinkService(aircraft: AircraftHandler) {
     private val logger by taggedLogger(MAVLinkService::class.java.simpleName)
 
     private var client: MAVLinkClient? = null
-    private var controller: MAVLinkController = MAVLinkController(aircraft)
+    private var controller: MAVLinkController = MAVLinkController(handler)
     private var endpoint = Endpoint("192.168.1.220", 14550)
     private var mavlinkScope: CoroutineScope? = null
     private var listeningJob: Job? = null

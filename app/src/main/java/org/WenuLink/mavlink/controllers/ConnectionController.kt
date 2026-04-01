@@ -25,6 +25,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
@@ -64,38 +65,40 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
 
-    override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         when (msg.msgid) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> processHeartbeatGCS()
-            msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg, aircraft)
+            msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg, handler.aircraft)
             msg_timesync.MAVLINK_MSG_ID_TIMESYNC -> processTimeSync(msg)
             else -> return false
         }
         return true
     }
 
-    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? =
+    override fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? =
         when (messageID) {
-            msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(aircraft)
+            msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(handler.aircraft)
 
-            msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(aircraft.telemetry)
+            msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(handler.aircraft.telemetry)
 
-            msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(aircraft.telemetry)
+            msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(handler.aircraft.telemetry)
 
-            msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(aircraft.telemetry)
+            msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(handler.aircraft.telemetry)
 
             msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
 
-            msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(aircraft.telemetry)
+            msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(handler.aircraft.telemetry)
 
-            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus(aircraft.telemetry)
+            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS ->
+                msgRadioStatus(handler.aircraft.telemetry)
 
             msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
 
             msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS ->
-                msgBatteryStatus(aircraft.telemetry)
+                msgBatteryStatus(handler.aircraft.telemetry)
 
-            msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(aircraft)
+            msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE ->
+                msgExtendedSys(handler.aircraft)
 
             //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
             else -> null

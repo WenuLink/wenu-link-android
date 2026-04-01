@@ -3,7 +3,7 @@ package org.WenuLink.mavlink.controllers
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
 import com.MAVLink.common.msg_command_long
-import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -16,22 +16,20 @@ import org.WenuLink.mavlink.MAVLinkClient
 interface IController {
     val client: MAVLinkClient
 
-    fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+    fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         // TODO: centralize client sending answer messages
         return false
     }
 
-    fun processCommandLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
+    fun processCommandLong(commandLongMsg: msg_command_long, handler: WenuLinkHandler): Boolean =
         false
 
-    fun processCommandInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
+    fun processCommandInt(commandIntMsg: msg_command_int, handler: WenuLinkHandler): Boolean = false
+
+    fun processRequestInt(commandIntMsg: msg_command_int, handler: WenuLinkHandler): Boolean = false
+
+    fun processRequestLong(commandLongMsg: msg_command_long, handler: WenuLinkHandler): Boolean =
         false
 
-    fun processRequestInt(commandIntMsg: msg_command_int, aircraft: AircraftHandler): Boolean =
-        false
-
-    fun processRequestLong(commandLongMsg: msg_command_long, aircraft: AircraftHandler): Boolean =
-        false
-
-    fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? = null
+    fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? = null
 }

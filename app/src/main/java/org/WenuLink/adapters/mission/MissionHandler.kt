@@ -7,6 +7,7 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.aircraft.ControlAuthority
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
@@ -38,6 +39,8 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         get() = assembler.size()
     val currentId: Long
         get() = 202512
+    var controlAuthority: ControlAuthority = ControlAuthority.NONE
+        private set
 
     override fun registerScope(scope: CoroutineScope) {
         MissionManager.addListeners { index ->
@@ -51,8 +54,20 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         super.unload()
     }
 
+    fun isWaypointControl() = controlAuthority == ControlAuthority.WAYPOINT_MISSION
+
+    fun isCommandControl() = controlAuthority == ControlAuthority.TIMELINE_COMMAND
+
+    fun isRemoteControl() = controlAuthority == ControlAuthority.REMOTE_CONTROLLER
+
+    fun isNewControlAuthority(authority: ControlAuthority) = controlAuthority != authority
+
+    fun setControlAuthority(authority: ControlAuthority) {
+        controlAuthority = authority
+    }
+
     @Synchronized
-    fun updateState() {
+    fun syncState() {
         logger.d { "updateMissionState: ${MissionManager.currentState}" }
         currentState = when {
             MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
@@ -88,9 +103,8 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun canResumeMission() = currentState == MISSION_STATE.MISSION_STATE_PAUSED
 
     fun clear() {
-        stopWaypoint()
         assembler.reset()
-        stopCommand()
+        cancelCommand()
         MissionActionManager.clear()
     }
 
@@ -172,42 +186,45 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         currentSequence = sequence
     }
 
-    fun pauseWaypoint() {
-        logger.i { "Pause WP mission" }
-        dispatchCommand(PauseWaypointMission) { error ->
-            if (error != null) {
-                logger.i { "Unable to pause the mission at $currentSequence: $error" }
-            }
-        }
-    }
-
-    fun resumeWaypoint() {
-        logger.i { "Resume WP mission" }
-        dispatchCommand(ResumeWaypointMission) { error ->
-            if (error != null) logger.i { "Unable to resume the mission: $error" }
-        }
-    }
-
-    fun stopWaypoint() {
-        logger.i { "Stop WP mission" }
-        dispatchCommand(StopWaypointMission) { error ->
-            if (error != null) logger.i { "Unable to stop the mission: $error" }
-        }
-    }
-
     fun pauseCommand() {
-        logger.i { "Pause WP mission" }
-        dispatchCommand(PauseActionCommand) { error ->
-            if (error != null) {
-                logger.i { "Unable to pause the command: $error" }
+        logger.i { "Pause mission" }
+        when {
+            isWaypointControl() -> dispatchCommand(PauseWaypointMission) { error ->
+                if (error != null) {
+                    logger.i { "Unable to pause the mission at $currentSequence: $error" }
+                }
+            }
+
+            isCommandControl() -> dispatchCommand(PauseActionCommand) { error ->
+                if (error != null) {
+                    logger.i { "Unable to pause the command: $error" }
+                }
             }
         }
     }
 
     fun resumeCommand() {
-        logger.i { "Resume WP mission" }
-        dispatchCommand(ResumeActionCommand) { error ->
-            if (error != null) logger.i { "Unable to resume the command: $error" }
+        logger.i { "Resume mission" }
+        when {
+            isWaypointControl() ->
+                dispatchCommand(ResumeWaypointMission) { error ->
+                    if (error != null) logger.i { "Unable to resume the mission: $error" }
+                }
+
+            isCommandControl() -> dispatchCommand(ResumeActionCommand) { error ->
+                if (error != null) logger.i { "Unable to resume the command: $error" }
+            }
+        }
+    }
+
+    fun cancelCommand() {
+        logger.d { "Stop mission" }
+        when {
+            isWaypointControl() -> dispatchCommand(StopWaypointMission) { error ->
+                if (error != null) logger.i { "Unable to stop the mission: $error" }
+            }
+
+            isCommandControl() -> stopCommand()
         }
     }
 }

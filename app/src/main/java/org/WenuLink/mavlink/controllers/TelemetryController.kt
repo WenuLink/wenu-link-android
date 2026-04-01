@@ -33,7 +33,7 @@ import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.MessageRate
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -112,7 +112,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
 
-    override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         when (msg.msgid) {
             msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM ->
                 processDataStreamRequest(msg)
@@ -124,7 +124,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ): Boolean {
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL ->
@@ -135,7 +135,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         return true
     }
 
-    fun sendMessages(controllers: List<IController>, aircraft: AircraftHandler) {
+    fun sendMessages(controllers: List<IController>, handler: WenuLinkHandler) {
         if (!client.mustProcessMessages()) {
             logger.w { "MAVLink client is not ready!" }
             return
@@ -154,7 +154,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 
             // create the message from controllers definitions
             val message = controllers.asSequence()
-                .mapNotNull { it.createMessage(rate.messageID, aircraft) }
+                .mapNotNull { it.createMessage(rate.messageID, handler) }
                 .firstOrNull()
 
             if (message == null) {

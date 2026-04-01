@@ -14,7 +14,6 @@ enum class ControlAuthority {
 data class AircraftState(
     val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
     val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
-    val controlAuthority: ControlAuthority = ControlAuthority.NONE,
     val homeCoordinates: Coordinates3D? = null
 ) {
 
@@ -211,23 +210,10 @@ class AircraftStateMachine {
     fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
         state.landed != target.landed
 
-    fun setControlAuthority(controlAuthority: ControlAuthority): AircraftState {
-        state = state.copy(controlAuthority = controlAuthority)
-        return state
-    }
-
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
         state = state.copy(homeCoordinates = homeCoordinates)
         return state
     }
-
-    fun isMissionWaypoint() = state.controlAuthority == ControlAuthority.WAYPOINT_MISSION
-
-    fun isTimelineCommand() = state.controlAuthority == ControlAuthority.TIMELINE_COMMAND
-
-    fun isRemoteController() = state.controlAuthority == ControlAuthority.REMOTE_CONTROLLER
-
-    fun isNewControlAuthority(authority: ControlAuthority) = state.controlAuthority != authority
 }
 
 /**

@@ -27,10 +27,12 @@ import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.RequestReposition
+import org.WenuLink.adapters.RequestStartMission
+import org.WenuLink.adapters.WenuLinkCommand
+import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.aircraft.RequestReposition
-import org.WenuLink.adapters.aircraft.RequestStartMission
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionHandler
 import org.WenuLink.adapters.mission.MissionNode
@@ -53,25 +55,24 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     var wasRequested = false
         private set
 
-    override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         when (msg.msgid) {
             msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST ->
-                sendMissionCount(aircraft.mission)
+                sendMissionCount(handler.mission)
 
             msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT ->
-                createNewMission(msg, aircraft.mission)
+                createNewMission(msg, handler.mission)
 
             msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT ->
-                processMissionItem(msg, aircraft.mission)
+                processMissionItem(msg, handler.mission)
 
             msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT ->
-                sendMissionItem(msg, aircraft.mission)
+                sendMissionItem(msg, handler.mission)
 
             msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL ->
-                sendMissionClear(aircraft.mission)
+                sendMissionClear(handler.mission)
 
-            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK ->
-                processAck(msg)
+            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
 
             else -> return false
         }
@@ -80,44 +81,44 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ): Boolean {
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, aircraft)
+            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, handler)
             else -> return false
         }
         return true
     }
 
-    override fun createMessage(messageID: Int, aircraft: AircraftHandler): MAVLinkMessage? =
+    override fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? =
         when (messageID) {
             msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT ->
-                msgMissionCurrent(aircraft.mission)
+                msgMissionCurrent(handler.mission)
 
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION ->
-                msgHomePosition(aircraft)
+                msgHomePosition(handler.aircraft)
 
             msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT ->
-                msgRawGPSInt(aircraft.telemetry)
+                msgRawGPSInt(handler.aircraft.telemetry)
 
             msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT ->
-                msgGlobalPositionInt(aircraft.telemetry)
+                msgGlobalPositionInt(handler.aircraft.telemetry)
 
             msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED ->
-                msgLocalPositionNed(aircraft)
+                msgLocalPositionNed(handler.aircraft)
 
             msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN ->
-                msgGpsGlobalOrigin(aircraft)
+                msgGpsGlobalOrigin(handler.aircraft)
 
             else -> null
         }
 
     override fun processCommandInt(
         commandIntMsg: msg_command_int,
-        aircraft: AircraftHandler
+        handler: WenuLinkHandler
     ): Boolean {
         when (commandIntMsg.command) {
-            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, aircraft)
+            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, handler)
 
             // 192
             else -> return false
@@ -281,9 +282,16 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         client.sendMessage(msg)
     }
 
-    fun missionStart(msg: MAVLinkMessage, aircraft: AircraftHandler) {
+    fun missionStart(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
         // TODO: Process init seq to custom first mission element
-        aircraft.dispatchCommand(RequestStartMission())
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestStartMission(
+                    commandLongMsg.param1.toInt(),
+                    commandLongMsg.param2.toInt()
+                )
+            )
+        )
         client.sendMessage(
             MessageUtils.msgCommandAck(
                 MAV_CMD.MAV_CMD_MISSION_START,
@@ -292,15 +300,17 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    fun processDoReposition(commandIntMsg: msg_command_int, aircraft: AircraftHandler) {
+    fun processDoReposition(commandIntMsg: msg_command_int, handler: WenuLinkHandler) {
         val latitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.x)
         val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
         val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
 
-        aircraft.dispatchCommand(
-            RequestReposition(
-                coordinate,
-                if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestReposition(
+                    coordinate,
+                    if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
+                )
             )
         )
 
