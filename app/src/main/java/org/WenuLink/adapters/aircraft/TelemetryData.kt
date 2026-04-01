@@ -111,26 +111,31 @@ data class RCData(
 }
 
 data class BatteryData(
-    var percentCharge: Int = -1,
-    var voltage: Int = -1,
-    var current: Int = -1,
-    var fullChargeCapacity: Int = -1,
-    var chargeRemaining: Int = -1,
-    var temperature: Float = -1.0f,
-    var voltageCells: IntArray? = null
+    val percentCharge: Int? = null,
+    val voltage: Int? = null,
+    val current: Int? = null,
+    val fullChargeCapacity: Int? = null,
+    val chargeRemaining: Int? = null,
+    val temperature: Float? = null,
+    val voltageCells: List<Int>? = null
 ) {
-
-    fun updateFrom(other: BatteryData) {
-        if (other.percentCharge != -1) percentCharge = other.percentCharge
-        if (other.voltage != -1) voltage = other.voltage
-        if (other.current != -1) current = other.current
-        if (other.fullChargeCapacity != -1) fullChargeCapacity = other.fullChargeCapacity
-        if (other.chargeRemaining != -1) chargeRemaining = other.chargeRemaining
-        if (other.temperature != -1.0f) temperature = other.temperature
-        other.voltageCells?.let {
-            voltageCells = other.voltageCells?.clone() // Clone to avoid reference issues
-        }
-    }
+    fun merge(
+        percentCharge: Int? = null,
+        voltage: Int? = null,
+        current: Int? = null,
+        fullChargeCapacity: Int? = null,
+        chargeRemaining: Int? = null,
+        temperature: Float? = null,
+        voltageCells: List<Int>? = null
+    ): BatteryData = copy(
+        percentCharge = percentCharge ?: this.percentCharge,
+        voltage = voltage ?: this.voltage,
+        current = current ?: this.current,
+        fullChargeCapacity = fullChargeCapacity ?: this.fullChargeCapacity,
+        chargeRemaining = chargeRemaining ?: this.chargeRemaining,
+        temperature = temperature ?: this.temperature,
+        voltageCells = voltageCells ?: this.voltageCells
+    )
 
     override fun toString(): String = "BatteryData(" +
         "percentCharge=$percentCharge%, " +
@@ -140,6 +145,47 @@ data class BatteryData(
         "fullChargeCapacity=$chargeRemaining A, " +
         "temperature=$temperature °C, " +
         "voltageCells=${voltageCells?.joinToString()})"
+}
+
+data class MAVLinkBatteryData(
+    val currentConsumed: Int, // mAh, -1 = unknown
+    val temperature: Short, // cdegC, INT16_MAX = unknown
+    val voltages: List<Int>, // mV
+    val currentBattery: Short, // cA, -1 = unknown
+    val batteryRemaining: Byte, // %, -1 = unknown
+    val voltagesBattery: Int, // mV, -1 = unknown
+    val currentBatteryRaw: Short // 10mA, -1 = unknown
+)
+
+object BatteryMapper {
+    private const val UNKNOWN_INT = -1
+    private const val UNKNOWN_SHORT = Short.MAX_VALUE // INT16_MAX per MAVLink spec
+
+    fun toMavlink(source: BatteryData): MAVLinkBatteryData {
+        val fullCharge = source.fullChargeCapacity
+        val remaining = source.chargeRemaining
+        return MAVLinkBatteryData(
+            currentConsumed = if (fullCharge != null && remaining != null) {
+                fullCharge - remaining
+            } else {
+                UNKNOWN_INT
+            },
+            temperature = source.temperature
+                ?.let { (it * 100.0).toInt().toShort() }
+                ?: UNKNOWN_SHORT,
+            voltages = source.voltageCells ?: emptyList(),
+            currentBattery = source.current
+                ?.let { (it * 10).toShort() }
+                ?: UNKNOWN_INT.toShort(),
+            batteryRemaining = if (fullCharge != null && remaining != null) {
+                (remaining.toFloat() / fullCharge * 100f).toInt().toByte()
+            } else {
+                UNKNOWN_INT.toByte()
+            },
+            voltagesBattery = source.voltage ?: UNKNOWN_INT,
+            currentBatteryRaw = source.current?.toShort() ?: UNKNOWN_INT.toShort()
+        )
+    }
 }
 
 data class Coordinates3D(val lat: Double, val long: Double, val alt: Float)

@@ -1,16 +1,14 @@
 package org.WenuLink.sdk
 
-import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
 import io.getstream.log.taggedLogger
-import kotlin.math.round
 import org.WenuLink.adapters.aircraft.BatteryData
 import org.WenuLink.adapters.aircraft.RCData
 
 object RCManager {
     private val logger by taggedLogger(RCManager::class.java.simpleName)
     private var lastData: RCData? = null
-    private val lastBatteryData: BatteryData = BatteryData()
+    private var lastBatteryData = BatteryData()
     private var rcInstance: RemoteController? = null
 
     @Synchronized
@@ -20,7 +18,7 @@ object RCManager {
     }
 
     @Synchronized
-    fun isUpdated(): Boolean = lastData != null && lastBatteryData.percentCharge > -1
+    fun isUpdated(): Boolean = lastData != null && lastBatteryData.percentCharge != null
 
     @Synchronized
     fun isRCConnected(): Boolean = rcInstance != null
@@ -47,14 +45,15 @@ object RCManager {
     }
 
     @Synchronized
-    private fun updateBatteryData(battery: BatteryData) {
-        if (battery.voltageCells == null) {
-            battery.voltageCells = IntArray(1)
-        }
-        battery.voltage = 7400
-        battery.current = 6
-        battery.voltageCells!![0] = round(7.4 * battery.percentCharge).toInt()
-        lastBatteryData.updateFrom(battery)
+    private fun updateBatteryData(percentCharge: Int) {
+        // simulated 2S LiPo, equal cell distribution
+        val cellVoltage = 3700 * percentCharge / 100
+        lastBatteryData = lastBatteryData.merge(
+            percentCharge = percentCharge,
+            voltage = 7400,
+            current = 6,
+            voltageCells = listOf(cellVoltage, cellVoltage)
+        )
     }
 
     private fun startHardwareListener() {
@@ -84,16 +83,14 @@ object RCManager {
 
     private fun startBatteryListener() {
         logger.d { "Starting RC BatteryListener" }
-        rcInstance?.setChargeRemainingCallback { batteryState: BatteryState ->
-            updateBatteryData(
-                BatteryData(batteryState.remainingChargeInPercent)
-            )
+        rcInstance?.setChargeRemainingCallback { state ->
+            updateBatteryData(state.remainingChargeInPercent)
         }
     }
 
     private fun stopBatteryListener() {
         logger.d { "Stopping RC BatteryListener" }
-        rcInstance?.setChargeRemainingCallback { null }
-        updateBatteryData(BatteryData())
+        rcInstance?.setChargeRemainingCallback { }
+        lastBatteryData = BatteryData()
     }
 }

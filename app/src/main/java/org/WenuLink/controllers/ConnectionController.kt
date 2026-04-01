@@ -26,6 +26,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.BatteryMapper
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
@@ -63,6 +64,21 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_BATTERY or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
+
+    // TODO: Update accordingly?
+    val sensorsEnabled = sensorsPresent and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv() and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE.inv() and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING.inv()
+
+    val sensorsHealth = (
+        sensorsPresent or
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_GPS or
+            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROXIMITY
+        ) and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
+        MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
 
     override fun processMessage(msg: MAVLinkMessage, aircraft: AircraftHandler): Boolean {
         when (msg.msgid) {
@@ -149,21 +165,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
     }
 
     fun msgSysStatus(telemetry: TelemetryHandler): MAVLinkMessage {
-        val aircraftBattery = telemetry.getAircraftBattery()
+        val battery = BatteryMapper.toMavlink(telemetry.getAircraftBattery())
         val msg = msg_sys_status()
-
-        // TODO: Update accordingly?
-        val sensorsEnabled = sensorsPresent and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv() and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE.inv() and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING.inv()
-
-        val sensorsHealth = sensorsPresent or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_GPS or
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROXIMITY and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
-            MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
 
 //        if (!aircraft.preArmCheckOk) sensorsHealth = sensorsHealth and
 //                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK.inv()
@@ -172,9 +175,9 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         msg.onboard_control_sensors_enabled = sensorsEnabled.toLong()
         msg.onboard_control_sensors_health = sensorsHealth.toLong()
 
-        msg.battery_remaining = aircraftBattery.percentCharge.toByte()
-        msg.voltage_battery = aircraftBattery.voltage
-        msg.current_battery = aircraftBattery.current.toShort()
+        msg.battery_remaining = battery.batteryRemaining
+        msg.voltage_battery = battery.voltagesBattery
+        msg.current_battery = battery.currentBatteryRaw
 //        client.sendMessage(msg)
         return msg
     }
@@ -249,17 +252,13 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
     fun msgPowerStatus(): MAVLinkMessage = msg_power_status()
 
     fun msgBatteryStatus(telemetry: TelemetryHandler): MAVLinkMessage {
-        val aircraftBattery = telemetry.getAircraftBattery()
+        val battery = BatteryMapper.toMavlink(telemetry.getAircraftBattery())
         val msg = msg_battery_status()
-        msg.current_consumed = aircraftBattery.fullChargeCapacity - aircraftBattery.chargeRemaining
-        msg.voltages = aircraftBattery.voltageCells
-        msg.temperature = (aircraftBattery.temperature * 100.0).toInt().toShort()
-        msg.current_battery = (aircraftBattery.current * 10).toShort()
-        msg.battery_remaining = (
-            aircraftBattery.chargeRemaining.toFloat() /
-                aircraftBattery.fullChargeCapacity.toFloat() *
-                100.0f
-            ).toInt().toByte()
+        msg.current_consumed = battery.currentConsumed
+        msg.temperature = battery.temperature
+        msg.voltages = battery.voltages.toIntArray()
+        msg.battery_remaining = battery.batteryRemaining
+        msg.current_battery = battery.currentBattery
 //        client.sendMessage(msg)
         return msg
     }

@@ -11,8 +11,8 @@ import org.WenuLink.adapters.aircraft.BatteryData
 
 object AircraftManager {
     private val logger by taggedLogger(AircraftManager::class.java.simpleName)
-    private val lastBatteryData: BatteryData = BatteryData()
     private val lastAirLinkQuality: IntArray = intArrayOf(-1, -1)
+    private var lastBatteryData = BatteryData()
     private var aircraftInstance: Aircraft? = null
     private var batteryInstance: Battery? = null
     private var airLinkInstance: AirLink? = null
@@ -34,15 +34,8 @@ object AircraftManager {
     }
 
     @Synchronized
-    fun isUpdated(): Boolean {
-        var isUpdated = lastBatteryData.percentCharge > -1
-        if (useAirLink) {
-            isUpdated = isUpdated &&
-                lastAirLinkQuality[0] > -1 &&
-                lastAirLinkQuality[1] > -1
-        }
-        return isUpdated
-    }
+    fun isUpdated(): Boolean = lastBatteryData.percentCharge != null &&
+        (!useAirLink || (lastAirLinkQuality[0] > -1 && lastAirLinkQuality[1] > -1)
 
     @Synchronized
     fun isAircraftConnected(): Boolean = aircraftInstance != null
@@ -65,13 +58,20 @@ object AircraftManager {
     fun getModel(): String = aircraftInstance?.model?.toString() ?: "NONE"
 
     @Synchronized
-    private fun updateBattery(battery: BatteryData) {
-        lastBatteryData.updateFrom(battery)
+    private fun updateBattery(state: BatteryState) {
+        lastBatteryData = lastBatteryData.merge(
+            state.chargeRemainingInPercent,
+            state.voltage,
+            state.current,
+            state.fullChargeCapacity,
+            state.chargeRemaining,
+            state.temperature
+        )
     }
 
     @Synchronized
-    private fun updateBatteryCellVoltages(cellVoltage: IntArray) {
-        lastBatteryData.voltageCells = cellVoltage.clone()
+    private fun updateBatteryCellVoltages(cellVoltage: List<Int>) {
+        lastBatteryData = lastBatteryData.merge(voltageCells = cellVoltage)
     }
 
     @Synchronized
@@ -85,22 +85,11 @@ object AircraftManager {
 
     private fun startBatteryListeners() {
         logger.d { "Starting Battery updates" }
-        batteryInstance?.setStateCallback { batteryState: BatteryState ->
-            updateBattery(
-                BatteryData(
-                    batteryState.chargeRemainingInPercent,
-                    batteryState.voltage,
-                    batteryState.current,
-                    batteryState.fullChargeCapacity,
-                    batteryState.chargeRemaining,
-                    batteryState.temperature
-                )
-            )
-        }
+        batteryInstance?.setStateCallback { state -> updateBattery(state) }
 
         batteryInstance?.getCellVoltages(object : CompletionCallbackWith<Array<Int>> {
             override fun onSuccess(p0: Array<Int>) {
-                updateBatteryCellVoltages(p0.toIntArray())
+                updateBatteryCellVoltages(p0.toList())
                 logger.d { "getCellVoltages $p0" }
             }
 
