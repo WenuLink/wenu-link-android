@@ -6,7 +6,6 @@ import com.MAVLink.enums.MAV_PARAM_TYPE
  * ArduPilot parameters take for functionality with GCS
  */
 object ArduPilotParametersProvider : ParameterProvider {
-
     override fun provide(): List<ParameterSpec> {
         /* ---------- internal storage ---------- */
         val values = mutableMapOf<String, ParamValue>()
@@ -17,45 +16,41 @@ object ArduPilotParametersProvider : ParameterProvider {
             semantic: SemanticType,
             reader: ((ParamValue?) -> Unit) -> Unit
         ) = SimpleParameter(
-            name = name,
-            type = type,
-            semantic = semantic,
-            reader = reader,
-            writer = { v, cb ->
-                values[name] = v
-                cb(null)
-            }
-        )
+            name,
+            type,
+            semantic,
+            reader
+        ) { v, cb ->
+            values[name] = v
+            cb(null)
+        }
 
         fun intParam(name: String, initial: Int) = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
-            SemanticType.INT,
-            reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
-        )
+            SemanticType.INT
+        ) { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
 
         fun floatParam(name: String, initial: Float) = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_REAL32,
-            SemanticType.FLOAT,
-            reader = { cb -> cb(values[name] ?: ParamValue.FloatVal(initial)) }
-        )
+            SemanticType.FLOAT
+        ) { cb -> cb(values[name] ?: ParamValue.FloatVal(initial)) }
 
         fun int8Param(name: String, initial: Int) = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT8,
-            SemanticType.INT,
-            reader = { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
-        )
+            SemanticType.INT
+        ) { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
 
         fun boolParam(name: String, initial: Boolean) = SimpleParameter(
-            name = name,
-            type = MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
-            semantic = SemanticType.BOOL,
-            reader = { cb ->
+            name,
+            MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
+            SemanticType.BOOL,
+            { cb ->
                 cb(values[name] ?: ParamValue.BoolVal(initial))
             },
-            writer = { v, cb ->
+            { v, cb ->
                 values[name] = ParamValue.BoolVal((v as ParamValue.BoolVal).v)
                 cb(null)
             }

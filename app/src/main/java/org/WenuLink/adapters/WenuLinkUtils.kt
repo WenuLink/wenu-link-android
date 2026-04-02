@@ -84,7 +84,6 @@ object MessageUtils {
 }
 
 object OrientationUtils {
-
     fun eulerDegToQuaternion(rollDeg: Double, pitchDeg: Double, yawDeg: Double): Quaternion {
         val roll = Math.toRadians(rollDeg)
         val pitch = Math.toRadians(pitchDeg)

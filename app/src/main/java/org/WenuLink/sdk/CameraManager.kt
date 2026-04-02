@@ -27,17 +27,17 @@ object CameraManager {
         private set
     var cameraStreamID: String? = null
         private set
-    var frameWidth: Int = -1
+    var frameWidth = -1
         private set
-    var frameHeight: Int = -1
+    var frameHeight = -1
         private set
-    var frameRate: Float = -1f
+    var frameRate = -1f
         private set
     var serialNumber: String? = null
         private set
     var fwVersion: String? = null
-    var cameraMode: SettingsDefinitions.CameraMode = SettingsDefinitions.CameraMode.UNKNOWN
-    var captureMode: SettingsDefinitions.ShootPhotoMode = SettingsDefinitions.ShootPhotoMode.UNKNOWN
+    var cameraMode = SettingsDefinitions.CameraMode.UNKNOWN
+    var captureMode = SettingsDefinitions.ShootPhotoMode.UNKNOWN
 
     @Synchronized
     fun init(camera: Camera) {
@@ -64,13 +64,10 @@ object CameraManager {
         onResult: (String, Boolean) -> Unit
     ): CommonCallbacks.CompletionCallbackWith<String> =
         object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(value: String) {
-                onResult(value, true)
-            }
+            override fun onSuccess(value: String) = onResult(value, true)
 
-            override fun onFailure(p0: DJIError?) {
+            override fun onFailure(p0: DJIError?) =
                 onResult(p0?.description ?: "Unknown error", false)
-            }
         }
 
     suspend fun retrieveFirmwareVersion(): String? = suspendCancellableCoroutine { cont ->
@@ -101,14 +98,10 @@ object CameraManager {
         suspendCancellableCoroutine { cont ->
             mInstance?.getMode(
                 object : CommonCallbacks.CompletionCallbackWith<SettingsDefinitions.CameraMode> {
-
-                    override fun onSuccess(mode: SettingsDefinitions.CameraMode?) {
+                    override fun onSuccess(mode: SettingsDefinitions.CameraMode?) =
                         cont.resume(mode)
-                    }
 
-                    override fun onFailure(error: DJIError?) {
-                        cont.resume(null)
-                    }
+                    override fun onFailure(error: DJIError?) = cont.resume(null)
                 }
             ) ?: cont.resume(null)
         }
@@ -118,15 +111,11 @@ object CameraManager {
             mInstance?.getShootPhotoMode(
                 object :
                     CommonCallbacks.CompletionCallbackWith<SettingsDefinitions.ShootPhotoMode> {
-
-                    override fun onSuccess(mode: SettingsDefinitions.ShootPhotoMode?) {
+                    override fun onSuccess(mode: SettingsDefinitions.ShootPhotoMode?) =
                         cont.resume(mode)
-                    }
 
                     override fun onFailure(error: DJIError?) {
-                        if (error !=
-                            null
-                        ) {
+                        if (error != null) {
                             logger.d { "Error in reading CameraMode: ${error.description}" }
                         }
                         cont.resume(null)
@@ -136,22 +125,13 @@ object CameraManager {
         }
 
     suspend fun retrieveMetadata() {
-        if (mInstance == null) {
-            return
-        }
+        if (mInstance == null) return
 
         fwVersion = retrieveFirmwareVersion()
         serialNumber = retrieveSerialNumber()
 
-        val cameraMode = retrieveCameraMode()
-        if (cameraMode != null) {
-            this.cameraMode = cameraMode
-        }
-
-        val captureMode = retrieveCaptureMode()
-        if (captureMode != null) {
-            this.captureMode = captureMode
-        }
+        retrieveCameraMode()?.let { this.cameraMode = it }
+        retrieveCaptureMode()?.let { this.captureMode = it }
     }
 
     fun updateStreamID(id: String) {
@@ -162,10 +142,10 @@ object CameraManager {
     @Synchronized
     fun isConnected(): Boolean = mInstance != null
 
-    override fun toString(): String = if (mInstance == null) {
-        "No Camera to manage"
-    } else {
+    override fun toString(): String = if (isConnected()) {
         "Managing: $cameraName $frameWidth x $frameHeight @ $frameRate"
+    } else {
+        "No Camera to manage"
     }
 
     fun startCodecWithCallback(
@@ -278,7 +258,7 @@ object CameraManager {
 
     fun isSingleShoot() = captureMode == SettingsDefinitions.ShootPhotoMode.SINGLE
 
-    fun canRecordVideo() = mInstance?.isCaptureInVideoSupported ?: false
+    fun canRecordVideo() = mInstance?.isCaptureInVideoSupported == true
 
     suspend fun requestPhotoShoot(): String? {
         val camera = mInstance ?: return "Camera instance is null"

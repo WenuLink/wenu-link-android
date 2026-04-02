@@ -63,7 +63,6 @@ class StreamPeerConnection(
     private val onIceCandidate: ((IceCandidate, StreamPeerType) -> Unit)?,
     private val onVideoTrack: ((RtpTransceiver?) -> Unit)?
 ) : PeerConnection.Observer {
-
     private val typeTag = type.stringify()
 
     private val logger by taggedLogger(StreamPeerConnection::class.java.simpleName)

@@ -178,7 +178,6 @@ object MissionManager {
         logger.d { "addListeners" }
         removeListener()
         listener = object : WaypointMissionOperatorListener {
-
             override fun onUploadUpdate(p0: WaypointMissionUploadEvent) {
             }
 

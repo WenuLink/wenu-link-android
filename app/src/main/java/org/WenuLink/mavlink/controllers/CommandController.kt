@@ -79,9 +79,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
         messageID: Int,
         result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
         progress: Int = -1
-    ) {
-        client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
-    }
+    ) = client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
 
     fun sendAutopilotAck() = sendCommandAck(
         MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
@@ -119,6 +117,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
         if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+<<<<<<< HEAD:app/src/main/java/org/WenuLink/mavlink/controllers/CommandController.kt
         } else {
             handler.aircraft.requestMode(customMode)
                 .onSuccess {
@@ -127,7 +126,17 @@ class CommandController(override var client: MAVLinkClient) : IController {
                 .onFailure {
                     sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
                 }
+=======
+            return
+>>>>>>> develop:app/src/main/java/org/WenuLink/controllers/CommandController.kt
         }
+        aircraft.requestMode(customMode)
+            .onSuccess {
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+            }
+            .onFailure {
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            }
     }
 
     fun processArmDisarm(commandMsg: msg_command_long, handler: WenuLinkHandler) {
@@ -145,12 +154,18 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
         logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
 
+<<<<<<< HEAD:app/src/main/java/org/WenuLink/mavlink/controllers/CommandController.kt
         val command = if (action) {
             ArmCommand()
         } else {
             DisarmCommand()
         }
         handler.dispatchCommand(WenuLinkCommand.Aircraft(command)) { error ->
+=======
+        val command = if (action) ArmCommand() else DisarmCommand()
+
+        aircraft.dispatchCommand(command) { error ->
+>>>>>>> develop:app/src/main/java/org/WenuLink/controllers/CommandController.kt
             logger.d { "processTakeoff: $error" }
         }
 

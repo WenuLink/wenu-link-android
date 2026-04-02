@@ -27,7 +27,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
     private val assembler = MissionAssembler()
-    var flightSpeed: Float = 5.0f
+    var flightSpeed = 5.0f
         private set
     var currentSequence = 0
         private set
@@ -129,7 +129,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         // Assumes Global only
         val coordinates = getItemCoordinates(itemMsg)
         val delay = itemMsg.param1.toInt()
-        val yaw: Float = itemMsg.param4
+        val yaw = itemMsg.param4
 
         // TODO: airframe check
 //         val frameReference = itemMsg.frame.toInt()

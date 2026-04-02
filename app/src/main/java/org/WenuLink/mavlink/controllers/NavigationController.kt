@@ -143,7 +143,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun node2missionItemMsg(nIdx: Int, mission: MissionHandler): msg_mission_item_int {
+    fun node2MissionItemMsg(nIdx: Int, mission: MissionHandler): msg_mission_item_int {
         val node = mission.getWaypointNode(nIdx)
         val coordinates = node.coordinates3D
         val command = when (node) {
@@ -188,7 +188,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val idx = itemMsg.seq
         logger.d { "sendMissionItem #$idx" }
         if (mission.hasWaypointNodes()) {
-            val itemMsg = node2missionItemMsg(idx, mission)
+            val itemMsg = node2MissionItemMsg(idx, mission)
             client.sendMessage(itemMsg)
         }
     }

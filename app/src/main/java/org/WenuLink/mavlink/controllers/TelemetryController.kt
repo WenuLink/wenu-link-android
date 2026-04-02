@@ -41,7 +41,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
     private val logger by taggedLogger(TelemetryController::class.java.simpleName)
 
     private var broadcastSuppressed = true
-    private val messageRates: MutableList<MessageRate> = mutableListOf(
+    private val messageRates = mutableListOf(
         MessageRate( // begin with Heartbeat at 1Hz
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT,
             1_000_000L
@@ -127,9 +127,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         handler: WenuLinkHandler
     ): Boolean {
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL ->
-                processMessageInterval(commandLongMsg)
-
+            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL -> processMessageInterval(commandLongMsg)
             else -> return false
         }
         return true
@@ -193,7 +191,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         val dataList = availableDataList[request.req_stream_id.toInt()]
         if (dataList == null || dataList.isEmpty()) return
 
-        var timeInterval: Int = -1
+        var timeInterval = -1
         if (request.start_stop.toInt() == 1) {
             // requested interval in Hz
             timeInterval = request.req_message_rate

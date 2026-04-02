@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
         if (!servicesViewModel.isAircraftUp.value) {
             thisApp.apiDestroy()
         }
-        // TODO: mostrar aviso para forzar salida
+        // TODO: display warning to force exit
     }
 
     @Composable

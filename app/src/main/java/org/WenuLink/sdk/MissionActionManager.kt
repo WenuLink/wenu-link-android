@@ -1,5 +1,6 @@
 package org.WenuLink.sdk
 
+import dji.common.error.DJIError
 import dji.sdk.mission.MissionControl
 import dji.sdk.mission.timeline.TimelineElement
 import dji.sdk.mission.timeline.TimelineEvent
@@ -10,7 +11,6 @@ import kotlin.reflect.KClass
  * class related to https://developer.dji.com/api-reference/android-api/Components/Missions/TimelineMission.html
  */
 object MissionActionManager {
-
     data class ActionCallbackKey(
         val actionClass: KClass<out TimelineElement>,
         val event: TimelineEvent
@@ -33,25 +33,17 @@ object MissionActionManager {
         stopListener()
     }
 
-    fun start() {
-        missionControl.startTimeline()
-    }
+    fun start() = missionControl.startTimeline()
 
-    fun stop() {
-        missionControl.stopTimeline()
-    }
+    fun stop() = missionControl.stopTimeline()
 
-    fun pause() {
-        missionControl.pauseTimeline()
-    }
+    fun pause() = missionControl.pauseTimeline()
 
-    fun resume() {
-        missionControl.resumeTimeline()
-    }
+    fun resume() = missionControl.resumeTimeline()
 
     // ---- Actions ----
 
-    fun schedule(element: TimelineElement) = missionControl.scheduleElement(element)
+    fun schedule(element: TimelineElement): DJIError? = missionControl.scheduleElement(element)
 
     // ---- Listener and callbacks ----
 

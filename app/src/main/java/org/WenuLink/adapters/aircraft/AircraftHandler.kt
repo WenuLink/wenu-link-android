@@ -26,8 +26,8 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     private val logger by taggedLogger(AircraftHandler::class.java.simpleName)
     val stateMachine = AircraftStateMachine()
     val state: AircraftState get() = stateMachine.state
-    var sensorsTimestamp: Long = System.currentTimeMillis()
-    var homeTimestamp: Long = 0
+    var sensorsTimestamp = System.currentTimeMillis()
+    var homeTimestamp = sensorsTimestamp
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
@@ -61,20 +61,21 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
     private fun enforceModeConsistency() {
         if (!stateMachine.isModeAllowed(state.flightMode)) {
-            val fallbackMode = if (state.isFlying()) {
-                ArduCopterFlightMode.GUIDED
-            } else {
-                ArduCopterFlightMode.STABILIZE
-            }
-
-            logger.w {
-                "Mode ${state.flightMode} invalid for state ${state.mavlink}, fallback to $fallbackMode"
-            }
-
-            stateMachine.updateFlightMode(fallbackMode)
-        } else {
             stateMachine.syncArmState()
+            return
         }
+
+        val fallbackMode = if (state.isFlying()) {
+            ArduCopterFlightMode.GUIDED
+        } else {
+            ArduCopterFlightMode.STABILIZE
+        }
+
+        logger.w {
+            "Mode ${state.flightMode} invalid for state ${state.mavlink}, fallback to $fallbackMode"
+        }
+
+        stateMachine.updateFlightMode(fallbackMode)
     }
 
     fun canDispatchTransition(transition: StateTransition) = stateMachine.canDispatch(transition)
@@ -129,8 +130,8 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
         val perSensorTime = (timeout.toFloat() / 3).roundToLong()
         logger.i { "Waiting sensors data" }
-        var sensorsOk = true
-        if (!AsyncUtils.waitTimeout(100L, timeout, isReady = telemetry::isReadingSensors)) {
+
+        if (!AsyncUtils.waitTimeout(100L, timeout, telemetry::isReadingSensors)) {
             logger.e { "No sensor readings!" }
             return false
         }
@@ -139,25 +140,26 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         val compassOk = AsyncUtils.waitTimeout(
             100L,
             perSensorTime,
-            isReady = telemetry::isCompassOk
+            telemetry::isCompassOk
         )
         if (!compassOk) logger.e { "Compass error!" }
-        sensorsOk = sensorsOk && compassOk
 
         // https://developer.dji.com/api-reference/android-api/Components/IMUState/DJIIMUState.html
         val accOk = AsyncUtils.waitTimeout(
             100L,
             perSensorTime,
-            isReady = telemetry::isAccelerometerOk
+            telemetry::isAccelerometerOk
         )
         if (!accOk) logger.e { "Accelerometer error!" }
-        sensorsOk = sensorsOk && accOk
 
-        val gyroOk = AsyncUtils.waitTimeout(100L, perSensorTime, isReady = telemetry::isGyroscopeOk)
+        val gyroOk = AsyncUtils.waitTimeout(
+            100L,
+            perSensorTime,
+            telemetry::isGyroscopeOk
+        )
         if (!gyroOk) logger.e { "Gyroscope error!" }
-        sensorsOk = sensorsOk && gyroOk
 
-        return sensorsOk
+        return compassOk && accOk && gyroOk
     }
 
     // check for home location and set
@@ -242,11 +244,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::motorsMatchTarget)
 
-        if (mustArm && state.isArmed()) {
+        if (motorsUpdated) {
             logger.i { "Aircraft armed" }
-        }
-
-        if (!mustArm && !state.isArmed()) {
+        } else {
             logger.i { "Aircraft in standby" }
         }
 
@@ -255,12 +255,15 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
     fun getCurrentCoordinates(): Coordinates3D? {
         logger.d { "getCurrentCoordinates" }
-        val takeoffAltitude = FCManager.fcInstance?.state?.takeoffLocationAltitude
+
         val location = FCManager.fcInstance?.state?.aircraftLocation ?: return null
+        val takeoffAltitude = FCManager.fcInstance?.state?.takeoffLocationAltitude
+
         logger.d {
             "getCurrentCoordinates: currentAltitude: ${location.altitude}, " +
                 "takeoffAltitude: $takeoffAltitude"
         }
+
         return Coordinates3D(location.longitude, location.latitude, location.altitude)
     }
 
@@ -272,7 +275,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     suspend fun awaitFlightState(takingOff: Boolean): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
         fun flyingMatchesTarget(): Boolean = takingOff == state.isFlying()
-        AsyncUtils.waitReady(100L, isReady = ::flyingMatchesTarget)
+        AsyncUtils.waitReady(100L, ::flyingMatchesTarget)
 
         if (takingOff && state.isFlying()) {
             logger.d { "Aircraft flying" }

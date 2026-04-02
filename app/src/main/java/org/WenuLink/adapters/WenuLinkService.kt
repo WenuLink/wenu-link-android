@@ -1,7 +1,5 @@
 package org.WenuLink.adapters
 
-import android.R
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,6 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +24,7 @@ import org.WenuLink.webrtc.WebRTCService
 
 class WenuLinkService : Service() {
     private val logger by taggedLogger(WenuLinkService::class.java.simpleName)
-    private var serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
     private lateinit var handler: WenuLinkHandler
@@ -60,21 +59,16 @@ class WenuLinkService : Service() {
     private fun startForegroundServiceWithNotification() {
         val channelId = "MAVLINK_CHANNEL"
 
+        // Create channel (required for Android 8+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
                 "WenuLink Service",
                 NotificationManager.IMPORTANCE_LOW
             )
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
         }
-
-        val notification: Notification.Builder =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Notification.Builder(this, channelId)
-            } else {
-                Notification.Builder(this)
-            }
 
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -88,16 +82,15 @@ class WenuLinkService : Service() {
             contentText = "Sending periodic heartbeats to GCS\n"
         }
         if (::webRTC.isInitialized) {
-            contentText += "WebRTC streaming: ${webRTC.mediaOptions.VIDEO_CAMERA_NAME}"
+            contentText += "WebRTC streaming: ${webRTC.mediaOptions.videoCameraName}"
         }
-        // .setContentText(webRTC.mediaOptions?.VIDEO_CAMERA_NAME)
         // TODO: update according to each present service
         startForeground(
             1,
-            notification
+            NotificationCompat.Builder(this, channelId)
                 .setContentTitle("WenuLink service running")
                 .setContentText(contentText)
-                .setSmallIcon(R.drawable.ic_menu_compass)
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .setContentIntent(pendingIntent) // Open MainActivity when tapped
                 .setOngoing(true)
                 .build()
@@ -224,9 +217,7 @@ class WenuLinkService : Service() {
         webRTCStopJob?.join()
         mavlinkStopJob?.join()
         handler.unload()
-        AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L) {
-            !handler.isAircraftPowerOn
-        }
+        AsyncUtils.waitTimeout(1000L, 20000L) { !handler.isAircraftPowerOn }
         isAircraftBoot.value = false
     }
 }

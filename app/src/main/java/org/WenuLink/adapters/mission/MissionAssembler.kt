@@ -5,7 +5,7 @@ import org.WenuLink.adapters.aircraft.Coordinates3D
 class MissionAssembler {
     private val nodes = mutableListOf<MissionNode>()
     private var rtlWhenFinish = false
-    var nWaypoints: Int = 0
+    var nWaypoints = 0
         private set
 
     fun getNode(nId: Int) = nodes[nId]

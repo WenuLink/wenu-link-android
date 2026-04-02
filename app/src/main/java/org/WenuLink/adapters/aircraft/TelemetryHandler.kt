@@ -13,6 +13,7 @@ import org.WenuLink.commands.IHandler
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
+import org.WenuLink.sdk.SignalQuality
 import org.WenuLink.sdk.SimManager
 
 class TelemetryHandler : IHandler<TelemetryHandler> {
@@ -40,7 +41,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         get() = SimManager.isAvailable()
     val isSimulationActive: Boolean
         get() = SimManager.isActive()
-    private var mustRunSimulation: Boolean = false
+    private var mustRunSimulation = false
 
     private val _isBroadcasting = MutableStateFlow(false)
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
@@ -57,17 +58,11 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     }
 
     @Synchronized
-    fun enableSimulation(enable: Boolean) {
-        if (isActive()) {
-            logger.e { "Unable to set runSimulation=$enable, Telemetry active." }
-            return
-        }
-
-        if (!isSimulationAvailable) {
-            logger.e { "Unable to set runSimulation=$enable, Simulation not available." }
-            return
-        }
-
+    fun enableSimulation(enable: Boolean) = if (isActive()) {
+        logger.e { "Unable to set runSimulation=$enable, Telemetry active." }
+    } else if (!isSimulationAvailable) {
+        logger.e { "Unable to set runSimulation=$enable, Simulation not available." }
+    } else {
         mustRunSimulation = enable
         logger.i { "Enable Simulation $mustRunSimulation" }
     }
@@ -77,7 +72,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         SimManager.unregisterStateCallback()
         if (register) {
             SimManager.registerStateCallback { state ->
-                updateTelemetryData(SimManager.state2telemetry(state, lastTelemetryData))
+                updateTelemetryData(SimManager.state2Telemetry(state, lastTelemetryData))
             }
         }
     }
@@ -93,7 +88,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         if (register) {
             FCManager.registerStateCallback { state ->
                 // TODO: positionX,Y,Z values must be updated
-                updateTelemetryData(FCManager.state2telemetry(state))
+                updateTelemetryData(FCManager.state2Telemetry(state))
             }
         }
     }
@@ -110,20 +105,16 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         registerSensorState(register)
     }
 
-    fun listenRemoteController(listen: Boolean) {
-        if (listen) {
-            RCManager.startListeners()
-        } else {
-            RCManager.stopListeners()
-        }
+    fun listenRemoteController(listen: Boolean) = if (listen) {
+        RCManager.startListeners()
+    } else {
+        RCManager.stopListeners()
     }
 
-    fun listenAircraft(listen: Boolean) {
-        if (listen) {
-            AircraftManager.startListeners()
-        } else {
-            AircraftManager.stopListeners()
-        }
+    fun listenAircraft(listen: Boolean) = if (listen) {
+        AircraftManager.startListeners()
+    } else {
+        AircraftManager.stopListeners()
     }
 
     fun listenSimulation(listen: Boolean) {
@@ -146,12 +137,10 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         }
     }
 
-    fun listenVehicleState(listen: Boolean) {
-        if (mustRunSimulation) {
-            listenSimulation(listen)
-        } else {
-            listenAircraft(listen)
-        }
+    fun listenVehicleState(listen: Boolean) = if (mustRunSimulation) {
+        listenSimulation(listen)
+    } else {
+        listenAircraft(listen)
     }
 
     fun registerSensorState(listen: Boolean) {
@@ -177,10 +166,10 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     fun isCompassOk() = FCManager.compassOk()
 
     @Synchronized
-    fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } ?: false
+    fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } == true
 
     @Synchronized
-    fun isGyroscopeOk() = lastIMUState?.gyroscope?.all { it == SensorState.OK } ?: false
+    fun isGyroscopeOk() = lastIMUState?.gyroscope?.all { it == SensorState.OK } == true
 
     fun startBroadcast() {
         if (isReadingData()) {
@@ -238,19 +227,15 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         stopBroadcast()
     }
 
-    fun isReadingData(): Boolean {
-        // RC should always exists
-        var isFlowing = RCManager.isUpdated()
-        // If simulation activated, must wait for its startup
-        isFlowing = isFlowing &&
+    fun isReadingData(): Boolean = // RC should always exists
+        RCManager.isUpdated() &&
+            // If simulation activated, must wait for its startup
             if (mustRunSimulation) {
                 isSimulationActive
             } // Assumes that if not sim, Aircraft is present
             else {
                 AircraftManager.isUpdated()
             }
-        return isFlowing
-    }
 
     suspend fun waitDataReading(timeout: Long = 5000L): Boolean {
         // First check wait for listeners transfer data
@@ -266,7 +251,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     suspend fun waitDataRemoving(delay: Long = 1000L): Boolean {
         // Wait for listeners to stop receiving data
         fun stopReading() = !isReadingData()
-        AsyncUtils.waitReady(delay, isReady = ::stopReading)
+        AsyncUtils.waitReady(delay, ::stopReading)
         // reset the telemetry info
         updateTelemetryData(null)
         val listenersOk = !(isReadingData() || hasData())
@@ -280,17 +265,15 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
 
     fun getRCData(): RCData? = RCManager.getHardwareData()
 
-    fun getAircraftBattery(): BatteryData {
-        // TODO: Maybe include some custom battery level
-        return if (mustRunSimulation) {
+    fun getAircraftBattery(): BatteryData = // TODO: Maybe include some custom battery level
+        if (mustRunSimulation) {
             RCManager.getBatteryData()
         } else {
             AircraftManager.getBatteryData()
         }
-    }
 
-    fun getAirlinkSignal(): IntArray = if (mustRunSimulation) {
-        intArrayOf(98, 95)
+    fun getAirlinkSignal(): SignalQuality = if (mustRunSimulation) {
+        SignalQuality(98, 95)
     } else {
         AircraftManager.getAirlinkData()
     }

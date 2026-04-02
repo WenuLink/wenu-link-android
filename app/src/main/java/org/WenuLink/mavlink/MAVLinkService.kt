@@ -16,20 +16,20 @@ import org.WenuLink.adapters.WenuLinkHandler
 
 class MAVLinkService(handler: WenuLinkHandler) {
     companion object {
-        var isEnabled: Boolean = true
+        var isEnabled = true
             private set
     }
     private val logger by taggedLogger(MAVLinkService::class.java.simpleName)
 
     private var client: MAVLinkClient? = null
-    private var controller: MAVLinkController = MAVLinkController(handler)
+    private var controller = MAVLinkController(handler)
     private var groundControlStation = ServiceAddress("192.168.1.220", 14550, "UDP")
     private var messagesScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
-    var isReady: Boolean = false
+    var isReady = false
         private set
-    val hasStationConnected: Boolean
+    val hasStationConnected
         get() = controller.isStationConnected()
 
     private val _isRunning = MutableStateFlow(false)
@@ -66,19 +66,15 @@ class MAVLinkService(handler: WenuLinkHandler) {
         logger.d { "MAVLinkClient ended." }
     }
 
-    fun launchListeningJob(): Job {
-        // Start listening for messages
-        return messagesScope!!.launch {
+    fun launchListeningJob(): Job  = // Start listening for messages
+        messagesScope!!.launch {
             client?.startListening(controller::processMessage)
         }
-    }
 
-    fun launchSendingJob(): Job {
-        // Start sending messages
-        return messagesScope!!.launch {
+    fun launchSendingJob(): Job = // Start sending messages
+        messagesScope!!.launch {
             client?.startSending(controller::sendMessages)
         }
-    }
 
     suspend fun launchService(onResult: (String?) -> Unit) {
         logger.d { "Requesting to launch MAVLinkService." }
