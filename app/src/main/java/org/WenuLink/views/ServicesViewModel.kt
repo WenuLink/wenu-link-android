@@ -24,10 +24,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     val sdkStatus: StateFlow<String> = thisApp.sdkStatus.asStateFlow()
     val workflowStatus: StateFlow<String> = thisApp.workflowStatus.asStateFlow()
     val isSimReady: StateFlow<Boolean> = thisApp.isSimulationReady.asStateFlow()
-
-    // To expose the StateFlow for Aircraft boot
-    val isAircraftUp: StateFlow<Boolean>
-        get() = (thisApp.wenuLinkService?.isAircraftBoot ?: MutableStateFlow(false))
+    val isAircraftBoot: StateFlow<Boolean> = thisApp.isAircraftBoot.asStateFlow()
 
     // To expose the StateFlow for Telemetry
     val telemetryStateFlow: StateFlow<Boolean>

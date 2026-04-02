@@ -17,6 +17,7 @@ class MissionAssembler {
     fun reset() {
         nodes.clear()
         rtlWhenFinish = false
+        nWaypoints = 0
     }
 
     fun addTakeoff(coordinates: Coordinates3D) {

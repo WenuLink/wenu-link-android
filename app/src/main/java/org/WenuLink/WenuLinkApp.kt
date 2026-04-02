@@ -34,24 +34,35 @@ class WenuLinkApp : Application() {
     val workflowStatus = MutableStateFlow("Idle")
     val sdkStatus = MutableStateFlow("Idle")
     val isSimulationReady = MutableStateFlow(false)
+    val isAircraftBoot = MutableStateFlow(false)
 
     var wenuLinkService: WenuLinkService? = null
     var wenuLinkHandler: WenuLinkHandler? = null
     var isContextAttached: Boolean = false
 
-    val permissionsList = mutableListOf(
-        Manifest.permission.VIBRATE,
-        Manifest.permission.INTERNET,
-        Manifest.permission.ACCESS_WIFI_STATE,
-        Manifest.permission.WAKE_LOCK,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.ACCESS_NETWORK_STATE,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.CHANGE_WIFI_STATE,
-        Manifest.permission.BLUETOOTH,
-        Manifest.permission.BLUETOOTH_ADMIN,
-        Manifest.permission.READ_PHONE_STATE
-    )
+    private val permissionsList by lazy {
+        val permList = mutableListOf(
+            Manifest.permission.VIBRATE,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.WAKE_LOCK,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.CHANGE_WIFI_STATE,
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.READ_PHONE_STATE
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            permList += Manifest.permission.FOREGROUND_SERVICE
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permList += Manifest.permission.POST_NOTIFICATIONS
+        }
+        return@lazy permList
+    }
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -62,10 +73,10 @@ class WenuLinkApp : Application() {
         }
     }
 
-    fun getMissingPermissions() = permissionsList.filter {
+    val missingPermissions: List<String> get() = permissionsList.filter {
         ContextCompat.checkSelfPermission(applicationContext, it) !=
             PackageManager.PERMISSION_GRANTED
-    }
+    }.toList()
 
     private fun updatePermission(granted: Boolean) {
         isPermissionsGranted.value = granted
@@ -113,13 +124,8 @@ class WenuLinkApp : Application() {
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            permissionsList += arrayOf(Manifest.permission.FOREGROUND_SERVICE)
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(usbReceiver, filter, RECEIVER_EXPORTED)
-            permissionsList += arrayOf(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             registerReceiver(usbReceiver, filter)
         }
@@ -137,7 +143,7 @@ class WenuLinkApp : Application() {
         }
         startFunction(Intent(this, WenuLinkService::class.java))
 
-        AsyncUtils.waitReady(500L) { wenuLinkService?.isAircraftBoot?.value ?: false }
+        AsyncUtils.waitReady(500L) { isAircraftBoot.value }
 
         wenuLinkService?.runServices()
     }

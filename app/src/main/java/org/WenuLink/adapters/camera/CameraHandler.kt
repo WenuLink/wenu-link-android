@@ -29,10 +29,15 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     var captureTimestamp: Long = System.currentTimeMillis()
     val lastCaptureMillis
         get() = System.currentTimeMillis() - captureTimestamp
+    var wasInitialized = false
+        private set
 
     override fun registerScope(scope: CoroutineScope) {
+        scope.launch {
+            initCameras()
+            wasInitialized = true
+        }
         startCommandProcessor(scope, this@CameraHandler, logger)
-        scope.launch { initCameras() }
     }
 
     override fun unload() {
@@ -133,5 +138,9 @@ class CameraHandler : CommandHandler<CameraHandler>() {
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 
-    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(scope)
+    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(
+        scope,
+        this@CameraHandler,
+        logger
+    )
 }

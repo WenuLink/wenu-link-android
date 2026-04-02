@@ -194,7 +194,10 @@ object MissionManager {
                 }
             }
 
-            override fun onExecutionFinish(p0: DJIError?) = logger.d { "onExecutionFinish: $p0" }
+            override fun onExecutionFinish(p0: DJIError?) {
+                logger.d { "onExecutionFinish: $p0" }
+                onWaypointStart(-1)
+            }
         }
 
         operator.addListener(listener!!)

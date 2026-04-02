@@ -24,7 +24,7 @@ data class UploadMissionCommand(
 ) : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        ctx.canCreateMission() -> null
+        ctx.state.canCreateMission() -> null
         else -> "Upload not ready"
     }
 
@@ -45,9 +45,9 @@ data class UploadMissionCommand(
 data object StartWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        ctx.canCreateMission() -> "No mission found"
-        ctx.isMissionActive -> "Already started"
-        ctx.canStartMission() -> null
+        ctx.state.canCreateMission() -> "No mission found"
+        ctx.state.isActive() -> "Already started"
+        ctx.state.canStartMission() -> null
         else -> "Not ready"
     }
 
@@ -68,7 +68,7 @@ data object StartWaypointMission : MissionCommand {
 data object PauseWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        ctx.canPauseMission() -> null
+        ctx.state.canPauseMission() -> null
         else -> "Not started"
     }
 
@@ -89,7 +89,7 @@ data object PauseWaypointMission : MissionCommand {
 data object ResumeWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        ctx.canResumeMission() -> null
+        ctx.state.canResumeMission() -> null
         else -> "Already in execution"
     }
 
@@ -110,7 +110,7 @@ data object ResumeWaypointMission : MissionCommand {
 data object StopWaypointMission : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {
-        !ctx.canCreateMission() -> null
+        !ctx.state.canCreateMission() -> null
         else -> "Nothing to stop"
     }
 
@@ -177,7 +177,7 @@ open class ActionCommand(val action: MissionAction) : MissionCommand {
                 return@suspendCancellableCoroutine
             }
 
-            MissionActionManager.onFinish(action::class) {
+            val actionKey = MissionActionManager.onFinish(action::class) {
                 cont.resume(null)
             }
 
@@ -190,6 +190,7 @@ open class ActionCommand(val action: MissionAction) : MissionCommand {
 
             cont.invokeOnCancellation {
                 // Add SDK cancel if available
+                MissionActionManager.removeCallback(actionKey)
                 MissionActionManager.stop()
             }
         }

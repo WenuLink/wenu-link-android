@@ -29,7 +29,6 @@ class WenuLinkService : Service() {
     private lateinit var webRTC: WebRTCService
     private lateinit var handler: WenuLinkHandler
     private lateinit var thisApp: WenuLinkApp
-    val isAircraftBoot = MutableStateFlow(false)
     val mavlinkStateFlow: StateFlow<Boolean>?
         get() = if (isMAVLinkReady()) mavlink.isRunning else null
     val webRTCStateFlow: StateFlow<Boolean>?
@@ -116,7 +115,7 @@ class WenuLinkService : Service() {
                 terminate()
                 onDestroy()
             } else {
-                isAircraftBoot.value = true
+                thisApp.isAircraftBoot.value = true
             }
         }
 
@@ -218,6 +217,6 @@ class WenuLinkService : Service() {
         mavlinkStopJob?.join()
         handler.unload()
         AsyncUtils.waitTimeout(1000L, 20000L) { !handler.isAircraftPowerOn }
-        isAircraftBoot.value = false
+        thisApp.isAircraftBoot.value = false
     }
 }

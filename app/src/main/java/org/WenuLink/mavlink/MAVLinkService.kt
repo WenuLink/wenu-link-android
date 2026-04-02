@@ -66,7 +66,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         logger.d { "MAVLinkClient ended." }
     }
 
-    fun launchListeningJob(): Job  = // Start listening for messages
+    fun launchListeningJob(): Job = // Start listening for messages
         messagesScope!!.launch {
             client?.startListening(controller::processMessage)
         }

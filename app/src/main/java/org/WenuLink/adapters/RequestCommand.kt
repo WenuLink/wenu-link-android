@@ -36,20 +36,11 @@ open class RequestTransition(open val transition: StateTransition) : RequestComm
     override fun validate(ctx: WenuLinkHandler): String? =
         ctx.aircraft.canDispatchTransition(transition)
 
-    override suspend fun execute(ctx: WenuLinkHandler): String? =
-        suspendCancellableCoroutine { cont ->
-            val prevState = ctx.aircraft.state.copy()
-            ctx.aircraft.dispatchTransition(transition)
-            val newState = ctx.aircraft.state.copy()
-
-            cont.resume(
-                if (prevState == newState) "State not changed" else null
-            )
-
-            cont.invokeOnCancellation {
-                ctx.manualControl()
-            }
-        }
+    override suspend fun execute(ctx: WenuLinkHandler): String? {
+        val prevState = ctx.aircraft.state.copy()
+        ctx.aircraft.dispatchTransition(transition)
+        return if (prevState == ctx.aircraft.state) "State not changed" else null
+    }
 
     override suspend fun onStop(ctx: WenuLinkHandler) {
         ctx.manualControl()
@@ -150,7 +141,7 @@ data class RequestStartMission(
 
         return suspendCancellableCoroutine { cont ->
 
-            ctx.mission.setItemSequenceIndex(startSequence)
+            ctx.mission.setItemSequence(startSequence)
             ctx.dispatchCommand(
                 WenuLinkCommand.Mission(StartWaypointMission),
                 cont::resume

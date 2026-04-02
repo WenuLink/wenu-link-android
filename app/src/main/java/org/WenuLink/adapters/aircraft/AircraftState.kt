@@ -227,8 +227,10 @@ class AircraftStateMachine {
 
     fun isModeAllowed(mode: ArduCopterFlightMode): Boolean = when (mode) {
         ArduCopterFlightMode.GUIDED -> state.isFlying() || state.isStandBy()
-//        ArduCopterFlightMode.AUTO -> state.isFlying() && mission.isMissionRunning
+
+        //        ArduCopterFlightMode.AUTO -> state.isFlying() && mission.isMissionRunning
         ArduCopterFlightMode.LAND, ArduCopterFlightMode.RTL -> state.isFlying()
+
         else -> true
     }
 }

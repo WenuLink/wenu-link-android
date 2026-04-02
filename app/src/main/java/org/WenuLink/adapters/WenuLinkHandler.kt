@@ -60,7 +60,9 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     val telemetryStateFlow: StateFlow<Boolean> get() = aircraft.telemetry.isBroadcasting
     val hasActiveJoystickInput: Boolean
         get() = aircraft.telemetry.getRCData()?.hasCenteredJoystick() == false
-    val isAircraftPowerOn: Boolean get() = !aircraft.isPowerOff && monitorJob != null
+    val isAircraftPowerOn: Boolean get() = !aircraft.isPowerOff &&
+        camera.wasInitialized &&
+        monitorJob != null
     val availableCameras: List<CameraMetadata> get() = camera.availableCameras.toList()
 
     override fun registerScope(scope: CoroutineScope) {
@@ -68,6 +70,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         mission.registerScope(scope)
         camera.registerScope(scope)
         startMonitorJob(scope)
+        startCommandProcessor(scope, this@WenuLinkHandler, logger)
     }
 
     override fun unload() {
@@ -106,13 +109,17 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             while (isActive) {
                 try {
                     // --- Sync real aircraft state ---
-                    launch { aircraft.syncState() }
+                    launch {
+                        aircraft.syncState()
+                        modeHooks()
+                    }
 
-                    launch { mission.syncState() }
+                    launch {
+                        missionHooks()
+                        mission.syncState()
+                    }
 
                     launch { safetyChecks() }
-
-                    modeHooks()
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -180,7 +187,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                 mission.dispatchCommand(PauseWaypointMission) { error ->
                     if (error != null) {
                         logger.i {
-                            "Unable to pause the mission at ${mission.currentSequence}: $error"
+                            "Unable to pause the mission at ${mission.state.sequence}: $error"
                         }
                     }
                 }
@@ -244,6 +251,16 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         ArduCopterFlightMode.AUTO -> missionResume()
         ArduCopterFlightMode.LAND -> stopAndDispatch(RequestLand(true))
         ArduCopterFlightMode.RTL -> stopAndDispatch(RequestGoHome)
+        else -> {}
+    }
+
+    private fun missionHooks() = when {
+        mission.state.unvisitedSequence -> logger.d {
+            "Starting from new WP ${mission.state.sequence}"
+        }
+
+        mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
+
         else -> {}
     }
 }

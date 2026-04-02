@@ -12,6 +12,53 @@ import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
+data class MissionState(
+    val mavlink: Int = MISSION_STATE.MISSION_STATE_UNKNOWN,
+    val sequence: Int? = null,
+    val assembler: MissionAssembler = MissionAssembler(),
+    val id: Int = 202512,
+    val unvisitedSequence: Boolean = false
+) {
+    fun totalNodes() = assembler.size()
+
+    fun isActive() = mavlink == MISSION_STATE.MISSION_STATE_ACTIVE
+
+    fun canCreateMission() = mavlink == MISSION_STATE.MISSION_STATE_NO_MISSION
+
+    fun canStartMission() = mavlink == MISSION_STATE.MISSION_STATE_NOT_STARTED
+
+    fun canPauseMission() = mavlink == MISSION_STATE.MISSION_STATE_ACTIVE
+
+    fun canResumeMission() = mavlink == MISSION_STATE.MISSION_STATE_PAUSED
+
+    fun isComplete() = mavlink == MISSION_STATE.MISSION_STATE_COMPLETE
+
+    fun updateItemSequence(sequence: Int?) = copy(sequence = sequence, unvisitedSequence = true)
+
+    fun nextItemSequence() = updateItemSequence(sequence?.plus(1))
+
+    fun setComplete() = copy(mavlink = MISSION_STATE.MISSION_STATE_COMPLETE)
+
+    fun markSequenceOld() = copy(unvisitedSequence = false)
+
+    fun fromMissionManager() = copy(
+        mavlink = when {
+            MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
+            MissionManager.isMissionReady() -> MISSION_STATE.MISSION_STATE_NOT_STARTED
+            MissionManager.isMissionStarted() -> MISSION_STATE.MISSION_STATE_ACTIVE
+            MissionManager.isMissionPaused() -> MISSION_STATE.MISSION_STATE_PAUSED
+            else -> MISSION_STATE.MISSION_STATE_UNKNOWN
+        }
+    )
+
+    fun reset(): MissionState {
+        assembler.reset()
+        return copy(sequence = null)
+            .fromMissionManager()
+            .markSequenceOld()
+    }
+}
+
 class MissionHandler : CommandHandler<MissionHandler>() {
     companion object {
         private var mInstance: MissionHandler? = null
@@ -26,22 +73,14 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
-    private val assembler = MissionAssembler()
     var flightSpeed = 5.0f
         private set
-    var currentSequence = 0
+    var state = MissionState()
         private set
-    val isMissionActive: Boolean get() = currentState == MISSION_STATE.MISSION_STATE_ACTIVE
-    var currentState = MISSION_STATE.MISSION_STATE_UNKNOWN
-        private set
-    val totalNodes: Int
-        get() = assembler.size()
-    val currentId: Long
-        get() = 202512
 
     override fun registerScope(scope: CoroutineScope) {
         MissionManager.addListeners { index ->
-            scope.launch { setItemSequenceIndex(index) }
+            scope.launch { setItemSequence(index) }
         }
         startCommandProcessor(scope, this@MissionHandler, logger)
     }
@@ -53,14 +92,23 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     @Synchronized
     fun syncState() {
-        logger.d { "updateMissionState: ${MissionManager.currentState}" }
-        currentState = when {
-            MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
-            MissionManager.isMissionReady() -> MISSION_STATE.MISSION_STATE_NOT_STARTED
-            MissionManager.isMissionStarted() -> MISSION_STATE.MISSION_STATE_ACTIVE
-            MissionManager.isMissionPaused() -> MISSION_STATE.MISSION_STATE_PAUSED
-            else -> currentState
-        }
+        state = state
+            .fromMissionManager()
+            .markSequenceOld()
+        logger.d { "updateMissionState: $state" }
+    }
+
+    @Synchronized
+    fun setItemSequence(sequence: Int): MissionState {
+        state = state.updateItemSequence(sequence)
+        if (sequence == -1) state = state.setComplete()
+        return state
+    }
+
+    @Synchronized
+    fun nextItemSequence(): MissionState {
+        state = state.nextItemSequence()
+        return state
     }
 
     fun setSpeed(speed: Float) {
@@ -75,20 +123,12 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         itemMsg.z
     )
 
-    fun getWaypointNode(index: Int) = assembler.getNode(index)
+    fun getWaypointNode(index: Int) = state.assembler.getNode(index)
 
-    fun hasWaypointNodes() = assembler.hasNodes()
-
-    fun canCreateMission() = currentState == MISSION_STATE.MISSION_STATE_NO_MISSION
-
-    fun canStartMission() = currentState == MISSION_STATE.MISSION_STATE_NOT_STARTED
-
-    fun canPauseMission() = currentState == MISSION_STATE.MISSION_STATE_ACTIVE
-
-    fun canResumeMission() = currentState == MISSION_STATE.MISSION_STATE_PAUSED
+    fun hasWaypointNodes() = state.assembler.hasNodes()
 
     fun clear() {
-        assembler.reset()
+        state = state.reset()
         MissionActionManager.clear()
     }
 
@@ -97,27 +137,27 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
-                assembler.addTakeoff(getItemCoordinates(itemMsg))
+                state.assembler.addTakeoff(getItemCoordinates(itemMsg))
 
             MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_DELAY ->
-                assembler.addActionToLast(MissionAction.Delay(itemMsg.param1.toInt()))
+                state.assembler.addActionToLast(MissionAction.Delay(itemMsg.param1.toInt()))
 
             MAV_CMD.MAV_CMD_CONDITION_YAW ->
-                assembler.addActionToLast(MissionAction.Rotate(itemMsg.param1.toInt()))
+                state.assembler.addActionToLast(MissionAction.Rotate(itemMsg.param1.toInt()))
 
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE ->
-                assembler.addActionToLast(MissionAction.TakePhoto)
+                state.assembler.addActionToLast(MissionAction.TakePhoto)
 
             MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE ->
-                assembler.addActionToLast(MissionAction.StartRecord)
+                state.assembler.addActionToLast(MissionAction.StartRecord)
 
             MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE ->
-                assembler.addActionToLast(MissionAction.StopRecord)
+                state.assembler.addActionToLast(MissionAction.StopRecord)
 
             MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH ->
-                assembler.setRTLWhenFinish()
+                state.assembler.setRTLWhenFinish()
 
             else -> return false
         }
@@ -142,11 +182,11 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 //             return
 //         }
 
-        assembler.addWaypoint(coordinates)
+        state.assembler.addWaypoint(coordinates)
 
         // Delay (seconds)
         if (delay > 0) {
-            assembler.addActionToLast(
+            state.assembler.addActionToLast(
                 MissionAction.Delay(delay)
             )
         }
@@ -154,7 +194,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         // Yaw (rad → deg)
         if (yaw != 0f) {
             val deg = (yaw * 180f / Math.PI).toInt()
-            assembler.addActionToLast(
+            state.assembler.addActionToLast(
                 MissionAction.Rotate(deg)
             )
         }
@@ -163,10 +203,5 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) =
-        dispatchCommand(UploadMissionCommand(assembler, flightSpeed), onResult)
-
-    @Synchronized
-    fun setItemSequenceIndex(sequence: Int) {
-        currentSequence = sequence
-    }
+        dispatchCommand(UploadMissionCommand(state.assembler, flightSpeed), onResult)
 }

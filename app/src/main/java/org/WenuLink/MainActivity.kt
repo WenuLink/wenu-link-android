@@ -54,9 +54,7 @@ class MainActivity : ComponentActivity() {
     private fun checkAndRequestPermissions() {
         thisApp.updateWorkflow("Checking permissions")
 
-        val missingPermissions = thisApp.getMissingPermissions()
-
-        if (missingPermissions.isEmpty()) {
+        if (thisApp.missingPermissions.isEmpty()) {
             thisApp.onPermissionsGranted()
             return
         }
@@ -72,7 +70,7 @@ class MainActivity : ComponentActivity() {
                     thisApp.onPermissionsDenied()
                 }
             }
-        requestPermissionLauncher.launch(missingPermissions.toTypedArray())
+        requestPermissionLauncher.launch(thisApp.missingPermissions.toTypedArray())
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -105,7 +103,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // Deinitialize sdk only when no service is running
-        if (!servicesViewModel.isAircraftUp.value) {
+        if (!thisApp.isAircraftBoot.value) {
             thisApp.apiDestroy()
         }
         // TODO: display warning to force exit
@@ -124,7 +122,7 @@ class MainActivity : ComponentActivity() {
 //        val activationState by viewModel.activationState.collectAsState("Waiting Activation")
         val isAircraftPresent by viewModel.isAircraftPresent.collectAsState(false)
         val isSimulationReady by viewModel.isSimReady.collectAsState(false)
-        val isAircraftUp by viewModel.isAircraftUp.collectAsState(false)
+        val isAircraftUp by viewModel.isAircraftBoot.collectAsState(false)
         // services
         val isDataFlowing by viewModel.telemetryStateFlow.collectAsState(false)
         val isMAVLinkRunning by viewModel.isMAVLinkRunning.collectAsState(false)

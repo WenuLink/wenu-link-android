@@ -57,7 +57,7 @@ object MissionActionManager {
         return key
     }
 
-    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit): ActionCallbackKey =
+    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
         registerCallback(action, TimelineEvent.FINISHED, callback)
 
     fun startListener(onError: (String) -> Unit = {}) {
@@ -84,4 +84,6 @@ object MissionActionManager {
         listener?.let { missionControl.removeListener(it) }
         listener = null
     }
+
+    fun removeCallback(key: ActionCallbackKey) = callbacks.remove(key)
 }

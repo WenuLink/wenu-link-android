@@ -164,7 +164,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     fun sendAckAnswer(type: Int, mission: MissionHandler) {
         val msg = msg_mission_ack()
         msg.type = type.toShort()
-        msg.opaque_id = mission.currentId
+        msg.opaque_id = mission.state.id.toLong()
         client.sendMessage(msg)
     }
 
@@ -177,8 +177,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     fun sendMissionCount(mission: MissionHandler) {
         val msg = msg_mission_count()
         msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        msg.count = mission.totalNodes
-        msg.opaque_id = mission.currentId
+        msg.count = mission.state.totalNodes()
+        msg.opaque_id = mission.state.id.toLong()
         logger.d { "sendMissionCount: ${msg.count}" }
         client.sendMessage(msg)
     }
@@ -210,7 +210,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         logger.d { "createNewMission" }
         val missionMsg = msg as msg_mission_count
 
-        if (!mission.canCreateMission()) return
+        if (!mission.state.canCreateMission()) return
 
         // TODO: Stop mission execution first if needed
         numberOfExpectedItems = missionMsg.count
@@ -237,7 +237,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         val itemMsg = msg as msg_mission_item_int
         logger.d { "\t$itemMsg" }
         // Validate sequence
-        val expectedSeq = mission.totalNodes
+        val expectedSeq = mission.state.totalNodes()
         if (itemMsg.seq != expectedSeq) {
             logger.e { "Received item #${itemMsg.seq} instead #$expectedSeq, re-requesting..." }
             if (currentRetryTimes < maxRetryTimes) {
@@ -342,9 +342,9 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     fun msgMissionCurrent(mission: MissionHandler): msg_mission_current {
         val msg = msg_mission_current()
-        msg.seq = mission.currentSequence
-        msg.mission_id = mission.currentId
-        msg.mission_state = mission.currentState.toShort()
+        msg.seq = mission.state.sequence ?: 0
+        msg.mission_id = mission.state.id.toLong()
+        msg.mission_state = mission.state.mavlink.toShort()
         return msg
     }
 
