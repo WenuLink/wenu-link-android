@@ -24,6 +24,12 @@ All types of contributions are encouraged and valued. See the [Table of Contents
   - [Suggesting Enhancements](#suggesting-enhancements)
 - [Styleguide](#styleguide)
   - [Code Style](#code-style)
+    - [General Principles](#general-principles)
+    - [Immutability](#immutability)
+    - [Type Inference](#type-inference)
+    - [Null Safety](#null-safety)
+    - [Function Style](#function-style)
+  - [Ktlint](#ktlint)
     - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
@@ -112,7 +118,6 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 
 > You must never report security related issues, vulnerabilities or bugs including sensitive information to the issue tracker, or elsewhere in public.
 
-
 We use GitHub issues to track bugs and errors. If you run into an issue with the project:
 
 - Open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
@@ -171,7 +176,36 @@ Regards class naming convention:
 This project follows the [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
 and the [Android Kotlin style guide](https://developer.android.com/kotlin/style-guide).
 
-Code style is enforced via **ktlint**. Before submitting a PR, run:
+Code style is enforced via **ktlint**, additionally the following conventions are applied during code review to ensure consistency across the project.
+
+#### General Principles
+
+- Prefer readability and consistency over personal preference.
+- Align with existing patterns in the surrounding code unless there is a clear reason to improve them.
+
+#### Immutability
+
+- Prefer `val` over `var` whenever possible.
+- Use mutable state only when necessary and keep its scope minimal.
+
+#### Type Inference
+
+- Omit explicit types when they are obvious from the right-hand side.
+- Keep type annotations where they improve readability or clarity.
+
+#### Null Safety
+
+- Prefer safe calls (`?.`) and scope functions (`let`, `also`, etc.) over non-null assertions (`!!`).
+- Avoid patterns that obscure the difference between `null` and actual values.
+
+#### Function Style
+
+- Prefer expression bodies for simple functions.
+- Use block bodies when logic becomes more complex or requires multiple steps.
+
+### Ktlint
+
+Before submitting a PR, run:
 
     ./gradlew ktlintCheck
 
