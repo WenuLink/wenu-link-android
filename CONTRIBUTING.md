@@ -148,7 +148,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/WenuLi
 
 ## Styleguide
 
-The overall coding style is based con actual Kotlin/Android development specifications. Specific definitions needs to be made for a more detailed style to address. Initially, the only requirement is to follow the package and visibility aspects so far.
+The overall coding style is based on actual Kotlin/Android development specifications. Specific definitions needs to be made for a more detailed style to address. Initially, the only requirement is to follow the package and visibility aspects so far.
 
 In terms of package organization:
 

@@ -51,7 +51,7 @@ class WebRTCClient(serverAddress: String) {
         ICE // to send and receive ice candidates
     }
 
-    private val logger by taggedLogger("SignalingClient")
+    private val logger by taggedLogger(WebRTCClient::class.java.simpleName)
     private val signalingScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val client = OkHttpClient()
     private val request = Request
@@ -116,7 +116,7 @@ class WebRTCClient(serverAddress: String) {
         }
     }
 
-    fun message2eventData(textMessage: String): Pair<String, String> {
+    fun message2EventData(textMessage: String): Pair<String, String> {
         var event = ""
         var dataString = ""
         try {
@@ -143,7 +143,7 @@ class WebRTCClient(serverAddress: String) {
     private inner class SignalingWebSocketListener : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
             logger.d { "onMessage $text" }
-            val (event, rawData) = message2eventData(text)
+            val (event, rawData) = message2EventData(text)
 
             if (event == "client_id") emitReadyState()
 

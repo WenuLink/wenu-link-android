@@ -14,32 +14,33 @@ import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.controllers.MAVLinkController
 
-data class Endpoint(val ip: String, val port: Int)
+data class Endpoint(val ip: String, val port: Int) {
+    fun toUrl(): String = "udp://$ip:$port"
+}
 
 class MAVLinkService(aircraft: AircraftHandler) {
     companion object {
-        var isEnabled: Boolean = true
+        var isEnabled = true
             private set
     }
     private val logger by taggedLogger(MAVLinkService::class.java.simpleName)
 
     private var client: MAVLinkClient? = null
-    private var controller: MAVLinkController = MAVLinkController(aircraft)
+    private var controller = MAVLinkController(aircraft)
     private var endpoint = Endpoint("192.168.1.220", 14550)
     private var mavlinkScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
-    var isReady: Boolean = false
+    var isReady = false
         private set
-    val hasStationConnected: Boolean
+    val hasStationConnected
         get() = controller.isStationConnected()
 
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun updateServerAddress(serverAddress: String) {
-        val (ip, port) = serverAddress.split(":")
-        endpoint = Endpoint(ip, port.toInt())
+    fun updateServerAddress(endpoint: Endpoint) {
+        this.endpoint = endpoint
     }
 
     fun clientExists(): Boolean = client != null
@@ -53,10 +54,10 @@ class MAVLinkService(aircraft: AircraftHandler) {
 
     fun createClient() {
         if (clientExists()) {
-            logger.d { "MAVLinkClient already created for udp://$endpoint." }
+            logger.d { "MAVLinkClient already created for udp://${endpoint.toUrl()}." }
             return
         }
-        logger.d { "Creating MAVLinkClient for udp://$endpoint." }
+        logger.d { "Creating MAVLinkClient for udp://${endpoint.toUrl()}." }
 
         client = MAVLinkClient(endpoint.ip, endpoint.port)
     }
@@ -68,19 +69,15 @@ class MAVLinkService(aircraft: AircraftHandler) {
         logger.d { "MAVLinkClient ended." }
     }
 
-    fun launchListeningJob(): Job {
-        // Start listening for messages
-        return mavlinkScope!!.launch {
+    fun launchListeningJob(): Job = // Start listening for messages
+        mavlinkScope!!.launch {
             client?.startListening(controller::processMessage)
         }
-    }
 
-    fun launchSendingJob(): Job {
-        // Start sending messages
-        return mavlinkScope!!.launch {
+    fun launchSendingJob(): Job = // Start sending messages
+        mavlinkScope!!.launch {
             client?.startSending(controller::sendMessages)
         }
-    }
 
     suspend fun launchService(onResult: (String?) -> Unit) {
         logger.d { "Requesting to launch MAVLinkService." }

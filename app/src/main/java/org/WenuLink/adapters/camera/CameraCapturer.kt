@@ -13,12 +13,32 @@ import org.webrtc.VideoCapturer
 
 class CameraCapturer : VideoCapturer {
     data class MediaMetadata(
-        var MEDIA_STREAM_ID: String = "WenuLink-${CameraManager.cameraStreamID!!}",
-        var VIDEO_CAMERA_NAME: String = CameraManager.cameraName!!,
-        var VIDEO_RESOLUTION_WIDTH: Int = CameraManager.frameWidth,
-        var VIDEO_RESOLUTION_HEIGHT: Int = CameraManager.frameHeight,
-        var FPS: Int = round(CameraManager.frameRate).toInt()
-    )
+        val mediaStreamId: String,
+        val videoCameraName: String,
+        val videoResolutionWidth: Int,
+        val videoResolutionHeight: Int,
+        val fps: Int
+    ) {
+        companion object {
+            fun fromCameraManager(): MediaMetadata? {
+                val streamId = CameraManager.cameraStreamID ?: return null
+                val cameraName = CameraManager.cameraName ?: return null
+                if (CameraManager.frameWidth <= 0 ||
+                    CameraManager.frameHeight <= 0 ||
+                    CameraManager.frameRate <= 0
+                ) {
+                    return null
+                }
+                return MediaMetadata(
+                    "WenuLink-$streamId",
+                    cameraName,
+                    CameraManager.frameWidth,
+                    CameraManager.frameHeight,
+                    round(CameraManager.frameRate).toInt()
+                )
+            }
+        }
+    }
 
     companion object {
         private val logger by taggedLogger(CameraCapturer::class.java.simpleName)

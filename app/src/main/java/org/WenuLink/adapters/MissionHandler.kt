@@ -4,8 +4,6 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
-import kotlin.math.max
-import kotlin.math.min
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.mission.MissionAction
 import org.WenuLink.adapters.mission.MissionAssembler
@@ -27,7 +25,7 @@ class MissionHandler {
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
     private val assembler = MissionAssembler()
-    var flightSpeed: Float = 5.0f
+    var flightSpeed = 5.0f
         private set
     var currentSequence = 0
         private set
@@ -112,7 +110,7 @@ class MissionHandler {
         // Assumes Global only
         val coordinates = getItemCoordinates(itemMsg)
         val delay = itemMsg.param1.toInt()
-        val yaw: Float = itemMsg.param4
+        val yaw = itemMsg.param4
 
         // TODO: airframe check
 //         val frameReference = itemMsg.frame.toInt()
@@ -249,8 +247,8 @@ class MissionHandler {
         logger.i { "doReposition" }
         MissionActionManager.clear()
         val error = MissionActionManager.scheduleGoTo(
-            coordinates = target,
-            speed = speed
+            target,
+            speed
         )
 
         if (error != null) {

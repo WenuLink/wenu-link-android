@@ -25,7 +25,6 @@ import org.WenuLink.mavlink.MAVLinkClient
  * - TelemetryController: Message Protocol
  */
 class MAVLinkController(private val aircraft: AircraftHandler) {
-
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private val controllers: MutableList<IController> = mutableListOf()
     private lateinit var client: MAVLinkClient
@@ -70,11 +69,8 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
             msg_command_int.MAVLINK_MSG_ID_COMMAND_INT -> processCommandInt(msg)
 
-            else -> {
-                // Notify if no message ID definition was found in any Controller
-                logger.w { "Unhandled message ${msg.name()}" }
-                client.sendMessage(MessageUtils.msgCommandAck(msg.msgid))
-            }
+            // Notify if no message ID definition was found in any Controller
+            else -> unhandledCommand(msg.name(), msg.msgid)
         }
     }
 
@@ -100,10 +96,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
             // TODO: Unhandled command ID: 521.
             // MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> {}
-            else -> {
-                logger.w { "Unhandled COMMAND_LONG ID: ${commandMsg.command}" }
-                client.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
-            }
+            else -> unhandledCommand("COMMAND_LONG", commandMsg.command)
         }
     }
 
@@ -122,11 +115,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
         when (commandMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_MESSAGE -> processRequestInt(commandMsg)
-
-            else -> {
-                logger.w { "Unhandled COMMAND_INT ID: ${commandMsg.command}" }
-                client.sendMessage(MessageUtils.msgCommandAck(commandMsg.command))
-            }
+            else -> unhandledCommand("COMMAND_INT", commandMsg.command)
         }
     }
 
@@ -147,10 +136,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
             // TODO: Unhandled request ID: 397
             // https://mavlink.io/en/messages/common.html#COMPONENT_METADATA
             // MAVLINK_MSG_ID_COMPONENT_METADATA -> {}// MAVLink WIP
-            else -> {
-                logger.w { "Unhandled REQUEST_LONG ID: $requestID" }
-                client.sendMessage(MessageUtils.msgRequestAck())
-            }
+            else -> unhandledRequest("REQUEST_LONG", requestID)
         }
     }
 
@@ -163,10 +149,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         if (processed) return
 
         when (requestID) {
-            else -> {
-                logger.w { "Unhandled REQUEST_INT ID: $requestID" }
-                client.sendMessage(MessageUtils.msgRequestAck())
-            }
+            else -> unhandledRequest("REQUEST_INT", requestID)
         }
     }
 
@@ -236,5 +219,15 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
             1_000_000L
         )
         return true
+    }
+
+    private fun unhandledCommand(label: String, id: Int) {
+        logger.w { "Unhandled $label ID: $id" }
+        client.sendMessage(MessageUtils.msgCommandAck(id))
+    }
+
+    private fun unhandledRequest(label: String, id: Int) {
+        logger.w { "Unhandled $label ID: $id" }
+        client.sendMessage(MessageUtils.msgRequestAck())
     }
 }

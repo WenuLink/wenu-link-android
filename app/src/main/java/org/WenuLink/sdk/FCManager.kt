@@ -70,17 +70,18 @@ object FCManager {
     @Synchronized
     fun isConnected(): Boolean = fcInstance != null
 
-    override fun toString(): String = if (!isConnected()) {
-        if (serialNumber != null && fwVersion != null) {
-            "FlightController SN: ${(serialNumber ?: "N/A")} - FW: ${(fwVersion ?: "N/A")}"
-        } else {
+    override fun toString(): String {
+        val isConnected = isConnected()
+        return if (isConnected && serialNumber != null && fwVersion != null) {
+            "FlightController SN: $serialNumber - FW: $fwVersion"
+        } else if (isConnected) {
             "Reading FlightController"
+        } else {
+            "No FlightController"
         }
-    } else {
-        "No FlightController"
     }
 
-    fun state2telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+    fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
         roll = state.attitude.roll,
         pitch = state.attitude.pitch,
         yaw = state.attitude.yaw,
@@ -98,22 +99,17 @@ object FCManager {
         isFlying = state.isFlying,
         motorsOn = state.areMotorsOn(),
         satelliteCount = state.satelliteCount,
-        gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
+        gpsLevel = SDKUtils.gpsSignalLevelFlags(state.gpsSignalLevel)
     )
 
-    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
+    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
         fcInstance?.setStateCallback(stateCallback)
-    }
 
-    fun unregisterStateCallback() {
-        fcInstance?.setStateCallback(null)
-    }
+    fun unregisterStateCallback() = fcInstance?.setStateCallback(null)
 
     fun getHomePosition(): Coordinates3D? {
         val flightState = fcInstance!!.state
-        if (!flightState.isHomeLocationSet) {
-            return null
-        }
+        if (!flightState.isHomeLocationSet) return null
 
         val homeLocation = flightState.homeLocation
         return Coordinates3D(
@@ -144,14 +140,11 @@ object FCManager {
 
     fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
 
-    fun startTakeoff() {
-        fcInstance?.startTakeoff { }
-    }
+    fun startTakeoff() = fcInstance?.startTakeoff { }
 
-    fun confirmLanding(onResult: (String?) -> Unit) {
+    fun confirmLanding(onResult: (String?) -> Unit) =
         // for somehow these kind of actions does not return anything, possibly is a thread issue.
         fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
-    }
 
     fun areMotorsArmed(): Boolean = fcInstance?.state?.areMotorsOn() == true
 
@@ -189,57 +182,52 @@ object FCManager {
     fun registerIMUState(onSensor: (AppIMUState) -> Unit) {
         val nSensors = fcInstance?.imuCount ?: 0
         logger.d { "Listening sensor: $nSensors IMU(s)" }
-        val state = AppIMUState()
-        if (nSensors > 0) {
-            fcInstance?.setIMUStateCallback { p0 ->
-                // The callback is executed one time per sensor, with -1 indicating the list's end
-                if (p0.index != -1) {
-                    // assumes same number gyros and accel
-                    if (state.gyroscope.getOrNull(p0.index) == null) {
-                        state.gyroscope.add(sensorState(p0.gyroscopeState))
-                    } else {
-                        state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
-                    }
 
-                    if (state.accelerometer.getOrNull(p0.index) == null) {
-                        state.accelerometer.add(sensorState(p0.accelerometerState))
-                    } else {
-                        state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
-                    }
-                } else {
-                    // Publish a copy after receiving the entire list
-                    onSensor(
-                        AppIMUState().copy(
-                            gyroscope = state.gyroscope,
-                            accelerometer = state.accelerometer
-                        )
-                    )
-                }
-            }
-        } else {
+        if (nSensors <= 0) {
             logger.i { "No IMU sensor found!" }
+            return
+        }
+
+        val state = AppIMUState(
+            MutableList(nSensors) { AppSensorState.BOOT },
+            MutableList(nSensors) { AppSensorState.BOOT }
+        )
+
+        fcInstance?.setIMUStateCallback { p0 ->
+            // The callback is executed one time per sensor, with -1 indicating the list's end
+            if (p0.index == -1) {
+                // Publish a copy after receiving the entire list
+                onSensor(
+                    AppIMUState().copy(
+                        gyroscope = state.gyroscope,
+                        accelerometer = state.accelerometer
+                    )
+                )
+                return@setIMUStateCallback
+            }
+
+            // assumes same number gyros and accel
+            state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
+            state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
         }
     }
 
     fun unregisterIMUState() {
         logger.d { "Stop listening sensor: ${fcInstance?.imuCount} IMU(s)" }
-        if ((fcInstance?.imuCount ?: 0) > 0) {
-            fcInstance?.setIMUStateCallback(null)
-        }
+        fcInstance?.setIMUStateCallback(null)
     }
 
     fun compassOk(): Boolean {
         val nSensors = fcInstance?.compassCount ?: 0
-        var compassOk = false
         logger.d { "Reading sensor: $nSensors compasses" }
-        if (nSensors > 0) {
-            val hasError = fcInstance?.compass?.hasError() ?: true
-            val calState = fcInstance?.compass?.calibrationState
-            compassOk = !hasError && calState == CompassCalibrationState.NOT_CALIBRATING
-        } else {
+
+        if (nSensors <= 0) {
             logger.i { "No Compass sensor found!" }
+            return false
         }
 
-        return compassOk
+        val compass = fcInstance?.compass
+        return compass?.hasError() != true &&
+            compass?.calibrationState == CompassCalibrationState.NOT_CALIBRATING
     }
 }

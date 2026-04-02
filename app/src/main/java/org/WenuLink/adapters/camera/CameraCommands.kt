@@ -12,22 +12,22 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
     override suspend fun validate(ctx: CameraHandler): String? = null
 
     suspend fun setPhotoMode(cameraIdx: Int = 0): Result<String?> {
-        if (CameraManager.isPhotoMode()) return Result.success(null)
-
-        val error = CameraManager.setPhotoMode()
-        if (error != null) {
-            return Result.failure(IllegalStateException("setPhotoMode error: $error"))
+        if (!CameraManager.isPhotoMode()) {
+            val error = CameraManager.setPhotoMode()
+            if (error != null) {
+                return Result.failure(IllegalStateException("setPhotoMode error: $error"))
+            }
         }
 
         return Result.success(null)
     }
 
     suspend fun setVideoMode(cameraIdx: Int = 0): Result<String?> {
-        if (CameraManager.isVideoMode()) return Result.success(null)
-
-        val error = CameraManager.setVideoMode()
-        if (error != null) {
-            return Result.failure(IllegalStateException("setVideoMode error: $error"))
+        if (!CameraManager.isVideoMode()) {
+            val error = CameraManager.setVideoMode()
+            if (error != null) {
+                return Result.failure(IllegalStateException("setVideoMode error: $error"))
+            }
         }
 
         return Result.success(null)
@@ -57,7 +57,6 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
 }
 
 data class TakePhotoCommand(val cameraIdx: Int) : CameraCommand {
-
     override suspend fun validate(ctx: CameraHandler): String? = when {
         !ctx.isPhotoMode(cameraIdx) -> "Not in photo mode!"
         !ctx.captureIdle(cameraIdx) -> "Busy"
@@ -80,7 +79,6 @@ data class TakePhotoCommand(val cameraIdx: Int) : CameraCommand {
 }
 
 data class StartRecordCommand(val cameraIdx: Int) : CameraCommand {
-
     override suspend fun validate(ctx: CameraHandler): String? = when {
         !ctx.isVideoMode(cameraIdx) -> "Not in video mode!"
         !ctx.canRecordVideo(cameraIdx) -> "Unable to start recording"
@@ -103,7 +101,6 @@ data class StartRecordCommand(val cameraIdx: Int) : CameraCommand {
 }
 
 data class StopRecordCommand(val cameraIdx: Int) : CameraCommand {
-
     override suspend fun validate(ctx: CameraHandler): String? = when {
         !ctx.isVideoMode(cameraIdx) -> "Not in video mode!"
         !ctx.captureInProgress(cameraIdx) -> "Record not started"

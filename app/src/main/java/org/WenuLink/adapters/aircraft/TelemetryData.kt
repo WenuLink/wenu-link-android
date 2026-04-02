@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.aircraft
 
-import com.MAVLink.enums.CAMERA_MODE
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.Int
 import kotlin.math.roundToInt
@@ -32,7 +31,7 @@ data class TelemetryData(
     val satelliteCount: Int,
     // DJI reports signal quality on a scale of 1-11
     // Mavlink has separate codes for fix type.
-    val gpsLevel: BooleanArray,
+    val gpsLevel: List<Boolean>,
     val gpsFixType: Int = 0
 )
 
@@ -54,7 +53,6 @@ data class MAVLinkTelemetryData(
 )
 
 object TelemetryMapper {
-
     fun toMavlink(source: TelemetryData): MAVLinkTelemetryData = MAVLinkTelemetryData(
         timestamp = source.timestamp,
         roll = source.roll.toFloat(),
@@ -83,63 +81,113 @@ data class RCData(
     val buttonC3: Boolean,
     val mode: FlightModeSwitch?
 ) {
-    private fun stickValue2percent(value: Int): Int {
+    private fun stickValue2Percent(value: Int): Int =
         // transform from DJI range [-660, 660] => [0, 100]
-        return (((value + 660).toFloat() / 1320f) * 100).roundToInt()
-    }
+        (((value + 660).toFloat() / 1320f) * 100).roundToInt()
 
-    private fun stickValue2rcValue(value: Int): Int {
+    private fun stickValue2RcValue(value: Int): Int =
         // transform from DJI range [-660, 660] => [1000, 2000]
-        return ((value.toFloat() / 660) * 500).roundToInt() + 1500
-    }
+        ((value.toFloat() / 660) * 500).roundToInt() + 1500
 
-    fun toMAVLink(): RCData {
-        val currRC = this.copy(
-            throttleSetting = stickValue2percent(this.throttleSetting),
-            leftStickVertical = stickValue2rcValue(this.leftStickVertical),
-            leftStickHorizontal = stickValue2rcValue(this.leftStickHorizontal),
-            rightStickVertical = stickValue2rcValue(this.rightStickVertical),
-            rightStickHorizontal = stickValue2rcValue(this.rightStickHorizontal)
-        )
-        return currRC
-    }
+    fun toMAVLink(): RCData = this.copy(
+        throttleSetting = stickValue2Percent(this.throttleSetting),
+        leftStickVertical = stickValue2RcValue(this.leftStickVertical),
+        leftStickHorizontal = stickValue2RcValue(this.leftStickHorizontal),
+        rightStickVertical = stickValue2RcValue(this.rightStickVertical),
+        rightStickHorizontal = stickValue2RcValue(this.rightStickHorizontal)
+    )
 
-    fun hasCenteredJoystick(): Boolean = this.leftStickVertical == 0 &&
-        this.leftStickHorizontal == 0 &&
-        this.rightStickVertical == 0 &&
-        this.rightStickHorizontal == 0
+    fun hasCenteredJoystick(): Boolean = listOf(
+        this.leftStickVertical,
+        this.leftStickHorizontal,
+        this.rightStickVertical,
+        this.rightStickHorizontal
+    ).all { it == 0 }
 }
 
 data class BatteryData(
-    var percentCharge: Int = -1,
-    var voltage: Int = -1,
-    var current: Int = -1,
-    var fullChargeCapacity: Int = -1,
-    var chargeRemaining: Int = -1,
-    var temperature: Float = -1.0f,
-    var voltageCells: IntArray? = null
+    val percentCharge: Int? = null,
+    val voltage: Int? = null,
+    val current: Int? = null,
+    val fullChargeCapacity: Int? = null,
+    val chargeRemaining: Int? = null,
+    val temperature: Float? = null,
+    val voltageCells: List<Int>? = null
 ) {
-
-    fun updateFrom(other: BatteryData) {
-        if (other.percentCharge != -1) percentCharge = other.percentCharge
-        if (other.voltage != -1) voltage = other.voltage
-        if (other.current != -1) current = other.current
-        if (other.fullChargeCapacity != -1) fullChargeCapacity = other.fullChargeCapacity
-        if (other.chargeRemaining != -1) chargeRemaining = other.chargeRemaining
-        if (other.temperature != -1.0f) temperature = other.temperature
-        other.voltageCells?.let {
-            voltageCells = other.voltageCells?.clone() // Clone to avoid reference issues
-        }
-    }
+    fun merge(
+        percentCharge: Int? = null,
+        voltage: Int? = null,
+        current: Int? = null,
+        fullChargeCapacity: Int? = null,
+        chargeRemaining: Int? = null,
+        temperature: Float? = null,
+        voltageCells: List<Int>? = null
+    ): BatteryData = copy(
+        percentCharge = percentCharge ?: this.percentCharge,
+        voltage = voltage ?: this.voltage,
+        current = current ?: this.current,
+        fullChargeCapacity = fullChargeCapacity ?: this.fullChargeCapacity,
+        chargeRemaining = chargeRemaining ?: this.chargeRemaining,
+        temperature = temperature ?: this.temperature,
+        voltageCells = voltageCells ?: this.voltageCells
+    )
 
     override fun toString(): String = "BatteryData(" +
         "percentCharge=$percentCharge%, " +
-        "voltage=$voltage V, " +
-        "current=$current A, " +
-        "fullChargeCapacity=$fullChargeCapacity A, " +
-        "fullChargeCapacity=$chargeRemaining A, " +
+        "voltage=$voltage mV, " +
+        "current=$current mA, " +
+        "fullChargeCapacity=$fullChargeCapacity mAh, " +
+        "chargeRemaining=$chargeRemaining mAh, " +
         "temperature=$temperature °C, " +
         "voltageCells=${voltageCells?.joinToString()})"
+}
+
+data class MAVLinkBatteryData(
+    // mAh, -1 = unknown
+    val currentConsumed: Int,
+    // cdegC, INT16_MAX = unknown
+    val temperature: Short,
+    // mV
+    val voltages: List<Int>,
+    // cA, -1 = unknown
+    val currentBattery: Short,
+    // %, -1 = unknown
+    val batteryRemaining: Byte,
+    // mV, -1 = unknown
+    val voltagesBattery: Int,
+    /* 10mA, -1 = unknown */
+    val currentBatteryRaw: Short
+)
+
+object BatteryMapper {
+    private const val UNKNOWN_INT = -1
+    private const val UNKNOWN_SHORT = Short.MAX_VALUE // INT16_MAX per MAVLink spec
+
+    fun toMavlink(source: BatteryData): MAVLinkBatteryData {
+        val fullCharge = source.fullChargeCapacity
+        val remaining = source.chargeRemaining
+        return MAVLinkBatteryData(
+            currentConsumed = if (fullCharge != null && remaining != null) {
+                fullCharge - remaining
+            } else {
+                UNKNOWN_INT
+            },
+            temperature = source.temperature
+                ?.let { (it * 100.0).toInt().toShort() }
+                ?: UNKNOWN_SHORT,
+            voltages = source.voltageCells ?: emptyList(),
+            currentBattery = source.current
+                ?.let { (it * 10).toShort() }
+                ?: UNKNOWN_INT.toShort(),
+            batteryRemaining = if (fullCharge != null && remaining != null) {
+                (remaining.toFloat() / fullCharge * 100f).toInt().toByte()
+            } else {
+                UNKNOWN_INT.toByte()
+            },
+            voltagesBattery = source.voltage ?: UNKNOWN_INT,
+            currentBatteryRaw = source.current?.toShort() ?: UNKNOWN_INT.toShort()
+        )
+    }
 }
 
 data class Coordinates3D(val lat: Double, val long: Double, val alt: Float)

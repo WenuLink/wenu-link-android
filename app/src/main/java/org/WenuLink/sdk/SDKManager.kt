@@ -6,8 +6,7 @@ import androidx.multidex.MultiDex
 import com.cySdkyc.clx.Helper
 
 object SDKManager {
-    private val TAG: String = SDKManager::class.java.simpleName
-    var isContextAttached: Boolean = false
+    var isContextAttached = false
     var aircraftBindingState: String? = "Idle"
         private set
     var appActivationState: String? = "Idle"
@@ -21,29 +20,24 @@ object SDKManager {
 
     fun getIntentAction(): String = SDKUtils.getUsbAction()
 
-    fun isRegistered(): Boolean = RegistrationHandler.isRegistered()
+    fun isRegistered(): Boolean = RegistrationHandler.registered
 
-    fun setActivationCallback(callback: (Boolean, String?) -> Unit) {
+    fun setActivationCallback(callback: (Boolean, String?) -> Unit) =
         RegistrationHandler.setActivationCallback(callback)
-    }
 
-    fun setBindingCallback(callback: (Boolean, String?) -> Unit) {
+    fun setBindingCallback(callback: (Boolean, String?) -> Unit) =
         RegistrationHandler.setBindingCallback(callback)
-    }
 
-    fun setProductChangeCallback(callback: (Boolean) -> Unit) {
+    fun setProductChangeCallback(callback: (Boolean) -> Unit) =
         RegistrationHandler.setProductChangeCallback(callback)
-    }
 
     fun startRegistration(context: Context, callback: (Boolean, String?) -> Unit) {
         RegistrationHandler.setSuccessCallback(callback)
         RegistrationHandler.initialize(context)
     }
 
-    fun destroy(context: Context) {
-        // TODO: unload everything
+    fun destroy(context: Context) = // TODO: unload everything
         RegistrationHandler.destroy()
-    }
 
     fun getAircraftModel(): String =
         SDKUtils.getAircraftInstance()?.model?.displayName ?: "No Aircraft Detected"

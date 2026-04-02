@@ -26,7 +26,6 @@ data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
 }
 
 data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
-
     override fun validate(ctx: AircraftHandler): String? {
         if (!ctx.sensorsHealthy) return "Sensors failing"
         return ctx.stateMachine.canDispatch(ArmTransition)
@@ -55,7 +54,6 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 }
 
 data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
-
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(StandbyTransition)
 
@@ -72,7 +70,6 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
 }
 
 data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
-
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(TakeoffTransition)
 
@@ -136,7 +133,6 @@ data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Fl
 }
 
 object GoHomeCommand : AircraftCommand {
-
     override fun validate(ctx: AircraftHandler): String? =
         ctx.stateMachine.canDispatch(FlyingTransition)
 
