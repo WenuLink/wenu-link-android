@@ -24,22 +24,24 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     private val logger by taggedLogger(AircraftHandler::class.java.simpleName)
-    val startTimestamp: Long = System.currentTimeMillis()
-    val systemBootTime: Long get() = System.currentTimeMillis() - startTimestamp
     val stateMachine = AircraftStateMachine()
     val state: AircraftState get() = stateMachine.state
-    var sensorsTimestamp: Long = startTimestamp
-    var homeTimestamp: Long = startTimestamp
+    var sensorsTimestamp: Long = System.currentTimeMillis()
+    var homeTimestamp: Long = 0
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
     var isPowerOff = true
-    val parameters = ParameterRegistry(
-        listOf(
-            ArduPilotParametersProvider,
-            DJIParametersProvider(FCManager.fcInstance ?: error("FlightController not available"))
+    val parameters by lazy {
+        ParameterRegistry(
+            listOf(
+                ArduPilotParametersProvider,
+                DJIParametersProvider(
+                    FCManager.fcInstance ?: error("FlightController not available")
+                )
+            )
         )
-    )
+    }
 
     fun requestMode(mode: ArduCopterFlightMode): Result<Unit> {
         if (mode == state.flightMode) return Result.success(Unit)

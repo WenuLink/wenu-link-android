@@ -31,7 +31,6 @@ import org.WenuLink.adapters.RequestReposition
 import org.WenuLink.adapters.RequestStartMission
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
-import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionHandler
@@ -96,7 +95,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
                 msgMissionCurrent(handler.mission)
 
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION ->
-                msgHomePosition(handler.aircraft)
+                msgHomePosition(handler)
 
             msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT ->
                 msgRawGPSInt(handler.aircraft.telemetry)
@@ -104,11 +103,10 @@ class NavigationController(override val client: MAVLinkClient) : IController {
             msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT ->
                 msgGlobalPositionInt(handler.aircraft.telemetry)
 
-            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED ->
-                msgLocalPositionNed(handler.aircraft)
+            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed(handler)
 
             msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN ->
-                msgGpsGlobalOrigin(handler.aircraft)
+                msgGpsGlobalOrigin(handler)
 
             else -> null
         }
@@ -352,8 +350,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     // TODO: start, pause, and resume procedures
 
-    fun msgHomePosition(aircraft: AircraftHandler): MAVLinkMessage? {
-        val coordinates = aircraft.state.homeCoordinates ?: return null
+    fun msgHomePosition(handler: WenuLinkHandler): MAVLinkMessage? {
+        val coordinates = handler.aircraft.state.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
@@ -412,10 +410,10 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgLocalPositionNed(aircraft: AircraftHandler): MAVLinkMessage? {
-        val telemetryData = aircraft.telemetry.getData() ?: return null
+    fun msgLocalPositionNed(handler: WenuLinkHandler): MAVLinkMessage? {
+        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
         val msg = msg_local_position_ned()
-        msg.time_boot_ms = aircraft.systemBootTime
+        msg.time_boot_ms = handler.systemBootTime
         msg.x = telemetryData.positionX
         msg.y = telemetryData.positionY
         msg.z = telemetryData.positionZ
@@ -425,8 +423,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgGpsGlobalOrigin(aircraft: AircraftHandler): MAVLinkMessage? {
-        val homeLoc = aircraft.state.homeCoordinates ?: return null
+    fun msgGpsGlobalOrigin(handler: WenuLinkHandler): MAVLinkMessage? {
+        val homeLoc = handler.aircraft.state.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
         msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)

@@ -2,8 +2,6 @@ package org.WenuLink.views
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,24 +9,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
-import org.WenuLink.adapters.AsyncUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.adapters.aircraft.TelemetryData
 
 class ServicesViewModel(application: Application) : AndroidViewModel(application) {
     private val logger by taggedLogger(ServicesViewModel::class.java.simpleName)
 
     private var thisApp = (getApplication() as WenuLinkApp)
 
-    private val aircraft: AircraftHandler = AircraftHandler.getInstance()
+    val isPermissionsGranted: StateFlow<Boolean> = thisApp.isPermissionsGranted.asStateFlow()
+    val isRegistered: StateFlow<Boolean> = thisApp.isRegistered.asStateFlow()
+    val isAircraftPresent: StateFlow<Boolean> = thisApp.isAircraftPresent.asStateFlow()
 
-    private val _isServiceRunning = MutableStateFlow(false)
-    val isServiceRunning: StateFlow<Boolean> = _isServiceRunning
+//    val bindingString: StateFlow<String> = thisApp.bindingString.asStateFlow()
+//    val activationString: StateFlow<String> = thisApp.activationString.asStateFlow()
+    val sdkStatus: StateFlow<String> = thisApp.sdkStatus.asStateFlow()
+    val workflowStatus: StateFlow<String> = thisApp.workflowStatus.asStateFlow()
+    val isSimReady: StateFlow<Boolean> = thisApp.isSimulationReady.asStateFlow()
 
-    val isDataFlowing: StateFlow<Boolean> = aircraft.telemetry.isBroadcasting
+    // To expose the StateFlow for Aircraft boot
+    val isAircraftUp: StateFlow<Boolean>
+        get() = (thisApp.wenuLinkService?.isAircraftBoot ?: MutableStateFlow(false))
 
-    private val _telemetryData = MutableLiveData<TelemetryData?>()
-    val telemetryData: LiveData<TelemetryData?> = _telemetryData
+    // To expose the StateFlow for Telemetry
+    val telemetryStateFlow: StateFlow<Boolean>
+        get() = thisApp.wenuLinkHandler?.telemetryStateFlow ?: MutableStateFlow(false)
 
     // To expose the StateFlow for MAVLink
     val isMAVLinkRunning: StateFlow<Boolean>
@@ -38,53 +41,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     val isWebRTCRunning: StateFlow<Boolean>
         get() = thisApp.wenuLinkService?.webRTCStateFlow ?: MutableStateFlow(false)
 
-    private val _isSimReady = MutableStateFlow(false)
-    val isSimReady: StateFlow<Boolean> = _isSimReady.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            // Wait for flag change
-            _isSimReady.value = AsyncUtils.waitTimeout(
-                1000,
-                60000,
-                ::isSimulationReady
-            )
-        }
-    }
-
-    fun isSimulationReady(): Boolean = aircraft.telemetry.isSimulationAvailable
-
-    fun isServiceReady(): Boolean = thisApp.wenuLinkService?.isReady() ?: false
-
-    fun startService() {
-        thisApp.launchWenulinkService()
-        // Async wait and update for state change
-        viewModelScope.launch {
-            _isServiceRunning.value = AsyncUtils.waitTimeout(
-                1000,
-                60000,
-                ::isServiceReady
-            )
-            thisApp.wenuLinkService?.runServices { error ->
-                logger.d { "runServices error: $error" }
-            }
-        }
-    }
-
-    fun stopService() {
-        if (thisApp.wenuLinkService == null) return
-
-        // Stop services and wait for shutdown
-        viewModelScope.launch {
-            thisApp.wenuLinkService?.terminate()
-            aircraft.telemetry.enableSimulation(false) // always disable
-            thisApp.stopWenulinkService()
-            _isServiceRunning.value = false
-        }
-    }
-
     fun forceStop() {
-        if (thisApp.wenuLinkService == null) return
         viewModelScope.launch {
             thisApp.wenuLinkService?.stopCommands()
         }
@@ -118,11 +75,15 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     fun runService(run: Boolean, simEnabled: Boolean = false) {
         logger.d { "runService($run)" }
-        if (simEnabled) aircraft.telemetry.enableSimulation(true)
-        if (run) {
-            startService()
-        } else {
-            stopService()
+        viewModelScope.launch {
+            if (simEnabled) thisApp.wenuLinkHandler?.enableSimulation(true)
+            if (run) {
+                // Launch and wait for state update
+                thisApp.launchWenulinkService()
+            } else {
+                // Stop services and wait for shutdown
+                thisApp.stopWenulinkService()
+            }
         }
     }
 }

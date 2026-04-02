@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
@@ -28,6 +29,8 @@ class WenuLinkService : Service() {
     private lateinit var mavlink: MAVLinkService
     private lateinit var webRTC: WebRTCService
     private lateinit var handler: WenuLinkHandler
+    private lateinit var thisApp: WenuLinkApp
+    val isAircraftBoot = MutableStateFlow(false)
     val mavlinkStateFlow: StateFlow<Boolean>?
         get() = if (isMAVLinkReady()) mavlink.isRunning else null
     val webRTCStateFlow: StateFlow<Boolean>?
@@ -35,7 +38,8 @@ class WenuLinkService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        (application as WenuLinkApp).wenuLinkService = this // Store the service reference
+        thisApp = (application as WenuLinkApp)
+        thisApp.wenuLinkService = this // Store the service reference
 
         // create the aircraft instance
         handler = WenuLinkHandler.getInstance()
@@ -118,6 +122,8 @@ class WenuLinkService : Service() {
                 // No aircraft -> No service
                 terminate()
                 onDestroy()
+            } else {
+                isAircraftBoot.value = true
             }
         }
 
@@ -125,7 +131,7 @@ class WenuLinkService : Service() {
     }
 
     override fun onDestroy() {
-        (application as WenuLinkApp).wenuLinkService = null // Clear the reference
+        thisApp.wenuLinkService = null // Clear the reference
         serviceScope.cancel()
         logger.i { "WenuLinkService ended." }
         super.onDestroy()
@@ -201,18 +207,12 @@ class WenuLinkService : Service() {
         }
     }
 
-    fun isRunning(): Boolean = (isMAVLinkReady() && mavlink.isServiceRunning()) || isWebRTCUp()
-
-    fun isReady(): Boolean = ::handler.isInitialized && handler.isAircraftPowerOn
-
-    fun isPowerOff(): Boolean = !handler.isAircraftPowerOn
-
     fun runServices(
-        onMAVLinkResult: (String?) -> Unit
+//        onMAVLinkResult: (String?) -> Unit
 //        onWebRTCResult: (String?) -> Unit
     ) {
         // Start services
-        startMAVLinkService(onMAVLinkResult)
+        startMAVLinkService { }
         startWebRTCService()
     }
 
@@ -224,6 +224,9 @@ class WenuLinkService : Service() {
         webRTCStopJob?.join()
         mavlinkStopJob?.join()
         handler.unload()
-        AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L, isReady = ::isPowerOff)
+        AsyncUtils.waitTimeout(intervalTime = 1000L, timeout = 20000L) {
+            !handler.isAircraftPowerOn
+        }
+        isAircraftBoot.value = false
     }
 }

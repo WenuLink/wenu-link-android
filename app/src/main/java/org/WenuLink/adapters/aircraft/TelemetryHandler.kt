@@ -294,4 +294,6 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     } else {
         AircraftManager.getAirlinkData()
     }
+
+    fun getAircraftModelName(): String = AircraftManager.getModelName()
 }

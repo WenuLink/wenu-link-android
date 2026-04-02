@@ -228,7 +228,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (!isHomeSet) return false
 
         // Send origin coordinates
-        client.sendMessage(navigationController.msgGpsGlobalOrigin(handler.aircraft)!!)
+        client.sendMessage(navigationController.msgGpsGlobalOrigin(handler)!!)
         // update message rate of HOME_POSITION
         telemetryController.setMessageRate(
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION,

@@ -8,7 +8,6 @@ import com.MAVLink.common.msg_param_value
 import io.getstream.log.taggedLogger
 import kotlin.math.round
 import org.WenuLink.adapters.WenuLinkHandler
-import org.WenuLink.adapters.aircraft.AircraftHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.parameters.ParamValue
 import org.WenuLink.parameters.ParameterSpec
@@ -24,23 +23,22 @@ class ParameterController(override val client: MAVLinkClient) : IController {
 
     override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
         when (msg.msgid) {
-            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST ->
-                requestList(handler.aircraft)
-
-            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ ->
-                requestRead(msg, handler.aircraft)
-
-            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg, handler.aircraft)
-
+            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList(handler)
+            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg, handler)
+            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg, handler)
             else -> return false
         }
         return true
     }
 
-    fun requestList(aircraft: AircraftHandler) {
-        aircraft.parameters.all().forEach { param ->
+    fun requestList(handler: WenuLinkHandler) {
+        handler.aircraft.parameters.all().forEach { param ->
             param.spec.read { value ->
-                if (value != null) sendParameter(param.spec, value, aircraft.parameters.size())
+                if (value !=
+                    null
+                ) {
+                    sendParameter(param.spec, value, handler.aircraft.parameters.size())
+                }
             }
         }
         wasRequested = true
@@ -68,10 +66,10 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         client.sendMessage(msg)
     }
 
-    fun requestRead(msg: MAVLinkMessage, aircraft: AircraftHandler) {
+    fun requestRead(msg: MAVLinkMessage, handler: WenuLinkHandler) {
         val paramMsg = msg as msg_param_request_read
-        val param = aircraft.parameters.getByIndex(paramMsg.param_index.toInt())
-            ?: aircraft.parameters.getByName(paramMsg.param_Id)
+        val param = handler.aircraft.parameters.getByIndex(paramMsg.param_index.toInt())
+            ?: handler.aircraft.parameters.getByName(paramMsg.param_Id)
 
         if (param == null) {
             logger.w { "Parameter not found: $paramMsg" }
@@ -79,13 +77,13 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         }
 
         param.spec.read { value ->
-            if (value != null) sendParameter(param.spec, value, aircraft.parameters.size())
+            if (value != null) sendParameter(param.spec, value, handler.aircraft.parameters.size())
         }
     }
 
-    fun requestUpdate(msg: MAVLinkMessage, aircraft: AircraftHandler) {
+    fun requestUpdate(msg: MAVLinkMessage, handler: WenuLinkHandler) {
         val paramMsg = msg as msg_param_set
-        val param = aircraft.parameters.getByName(paramMsg.param_Id)
+        val param = handler.aircraft.parameters.getByName(paramMsg.param_Id)
         if (param == null) {
             logger.w { "Parameter not found: $paramMsg" }
             return
@@ -95,7 +93,7 @@ class ParameterController(override val client: MAVLinkClient) : IController {
 
         param.spec.write(value) { error ->
             if (error == null) {
-                sendParameter(param.spec, value, aircraft.parameters.size())
+                sendParameter(param.spec, value, handler.aircraft.parameters.size())
             }
         }
     }

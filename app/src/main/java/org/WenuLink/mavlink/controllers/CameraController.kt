@@ -110,7 +110,7 @@ class CameraController(
         handler.availableCameras.forEach {
             // Append boot time before send
             val msg = msgCameraInformation(it).apply {
-                time_boot_ms = handler.aircraft.systemBootTime
+                time_boot_ms = handler.systemBootTime
             }
             logger.d { "CameraReport: $msg" }
             client.sendMessage(msg)
@@ -137,7 +137,7 @@ class CameraController(
             // Append boot time before send
             client.sendMessage(
                 msgSettings(it).apply {
-                    time_boot_ms = handler.aircraft.systemBootTime
+                    time_boot_ms = handler.systemBootTime
                 }
             )
         }
@@ -168,7 +168,7 @@ class CameraController(
     private fun sendStorageStatus(handler: WenuLinkHandler) {
         client.sendMessage(
             msgStorageInformation().apply {
-                time_boot_ms = handler.aircraft.systemBootTime
+                time_boot_ms = handler.systemBootTime
             }
         )
     }
@@ -177,7 +177,7 @@ class CameraController(
         val cameraInfo: CameraMetadata = handler.availableCameras.first()
         client.sendMessage(
             msgCaptureStatus(cameraInfo).apply {
-                time_boot_ms = handler.aircraft.systemBootTime
+                time_boot_ms = handler.systemBootTime
             }
         )
     }

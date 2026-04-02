@@ -6,10 +6,12 @@ import kotlin.getValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.AircraftHandler
+import org.WenuLink.adapters.aircraft.AircraftState
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.BootCommand
 import org.WenuLink.adapters.aircraft.ControlAuthority
@@ -40,16 +42,26 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     private val logger by taggedLogger(WenuLinkHandler::class.java.simpleName)
     private var monitorJob: Job? = null
-    val aircraft = AircraftHandler.getInstance()
-    val mission = MissionHandler.getInstance()
-    val camera = CameraHandler.getInstance()
+    private var controlAuthority = ControlAuthority(ControlAuthorityType.NONE)
+    var startTimestamp: Long = -1
+        private set
+    val systemBootTime: Long
+        get() = if (startTimestamp == -1L) {
+            -1
+        } else {
+            System.currentTimeMillis() - startTimestamp
+        }
+    val aircraft by lazy { AircraftHandler.getInstance() }
+    val mission by lazy { MissionHandler.getInstance() }
+    val camera by lazy { CameraHandler.getInstance() }
+    val aircraftState: AircraftState get() = aircraft.state
+    val aircraftModel: String get() = aircraft.telemetry.getAircraftModelName()
     val isTelemetryActive: Boolean get() = aircraft.telemetry.isActive()
+    val telemetryStateFlow: StateFlow<Boolean> get() = aircraft.telemetry.isBroadcasting
     val hasActiveJoystickInput: Boolean
         get() = aircraft.telemetry.getRCData()?.hasCenteredJoystick() == false
     val isAircraftPowerOn: Boolean get() = !aircraft.isPowerOff && monitorJob != null
     val availableCameras: List<CameraMetadata> get() = camera.availableCameras.toList()
-    var controlAuthority = ControlAuthority(ControlAuthorityType.NONE)
-        private set
 
     override fun registerScope(scope: CoroutineScope) {
         aircraft.registerScope(scope)
@@ -66,6 +78,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         }
         super.unload()
     }
+
+    fun enableSimulation(enable: Boolean) = aircraft.telemetry.enableSimulation(enable)
 
     fun safetyChecks() {
         // --- Safety hooks ---
@@ -129,7 +143,10 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     suspend fun bootAircraft(): String? {
         val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10000L)))
-        if (bootError == null) manualControl()
+        if (bootError == null) {
+            manualControl()
+            startTimestamp = System.currentTimeMillis()
+        }
         return bootError
     }
 

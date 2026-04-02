@@ -6,31 +6,10 @@ package org.WenuLink.sdk
 import dji.common.error.DJIError
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
-import dji.sdk.base.BaseProduct
-import dji.sdk.products.Aircraft
-import dji.sdk.realname.AppActivationManager
-import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
 
 object SDKUtils {
     private val logger by taggedLogger(SDKUtils::class.java.simpleName)
-
-    fun getUsbAction(): String = DJISDKManager.USB_ACCESSORY_ATTACHED
-
-    fun getProductInstance(): BaseProduct? = DJISDKManager.getInstance().product
-
-    fun isAircraftConnected(): Boolean =
-        getProductInstance() != null && getProductInstance() is Aircraft
-
-    fun getAircraftInstance(): Aircraft? {
-        if (!isAircraftConnected()) {
-            return null
-        }
-        return getProductInstance() as Aircraft?
-    }
-
-    fun getAppActivationManager(): AppActivationManager? =
-        DJISDKManager.getInstance().appActivationManager
 
     fun getGPSSignalLevelArray(inputLevel: GPSSignalLevel): BooleanArray {
         // Create a boolean array with the same size as the number of enum constants
