@@ -45,7 +45,7 @@ If you then still feel the need to ask a question and need clarification, we rec
 
 - Open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new).
 - Provide as much context as you can about what you're running into.
-- Provide project and platform versions (Android platform, AndrodStudio, Aircraft, etc), depending on what seems relevant.
+- Provide project and platform versions (Android platform, AndroidStudio, Aircraft, etc), depending on what seems relevant.
 
 We will then take care of the issue as soon as possible.
 
@@ -60,7 +60,7 @@ Unless you have a good idea to implement, you can browse the [beginner issues](h
 
 ### Your First Code Contribution
 
-For prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches managament](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
+For prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches management](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
 This project follows a common git flow initialization setup with the following branches:
 
 - `main` for stable releases
@@ -79,18 +79,18 @@ More information will be added.
 
 Before building the project, you need to provide a DJI developer API key.
 
-1. Copy `local.properties.example` to `local.properties` in the project toor (this file is gitignored and must never be commited).
+1. Copy `local.properties.example` to `local.properties` in the project root (this file is git-ignored and must never be commited).
 2. Register at https://developer.dji.com/ and create an app with the package name `org.WenuLink`.
 3. Fill in the `dji.api.key` value in your `local.properties`.
 
-Android Studio will automatically populate `sdk.dir` when you open the project. If building from command line, set in manually to your Andorid SDK path.
+Android Studio will automatically populate `sdk.dir` when you open the project. If building from command line, set in manually to your Android SDK path.
 
 ### Improving The Documentation
 
 Current documentation is focused for initial users to have an starting point on how the application works.
 Documentation writing for end-users and developers are welcome. The documentation roadmap is being discussed on [issue #5](https://github.com/WenuLink/wenu-link-android/issues/5) over a few defined use cases that guides the application development.
 
-Developers documentation should focus on a more technical aspect relating architecture design and the patterns used for the current code development. The ideia is to encourage good coding practices to keeps the project organized in terms of packages, classes, and methods names defition.
+Developers documentation should focus on a more technical aspect relating architecture design and the patterns used for the current code development. The idea is to encourage good coding practices to keeps the project organized in terms of packages, classes, and methods names definition.
 
 ### Reporting Bugs
 
@@ -179,15 +179,11 @@ To auto-fix most formatting issues:
 
     ./gradlew ktlintFormat
 
-The project's `.editorconfig` configures indentation and line length
-automatically in both Android Studio and VS Code — no manual IDE
-configuration needed.
+The project's `.editorconfig` configures indentation and line length automatically in both Android Studio and VS Code, no manual IDE configuration needed.
 
 #### Running Gradle commands
 
-`./gradlew` commands must be run using the same JDK that Android Studio
-uses for building. The easiest way is to use Android Studio's built-in
-terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
+`./gradlew` commands must be run using the same JDK that Android Studio uses for building. The easiest way is to use Android Studio's built-in terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
 The path varies by OS:
 
 - Windows: `C:\Program Files\Android\Android Studio\jbr`
@@ -196,15 +192,11 @@ The path varies by OS:
 
 #### Recommended: pre-commit hook
 
-To have ktlint check your code automatically on every `git commit`,
-run this once after cloning the repository:
+To have ktlint check your code automatically on every `git commit`, run this once after cloning the repository:
 
     ./gradlew addKtlintCheckGitPreCommitHook
 
-This installs a local git hook that aborts the commit if any style
-violations are found. Run `./gradlew ktlintFormat` to fix them, then
-commit again. The hook is not committed to the repository, so each
-contributor who wants it must run this command once themselves.
+This installs a local git hook that aborts the commit if any style violations are found. Run `./gradlew ktlintFormat` to fix them, then commit again. The hook is not committed to the repository, so each contributor who wants it must run this command once themselves.
 
 Optionally, install the [ktlint Android Studio plugin](https://plugins.jetbrains.com/plugin/15057-ktlint)
 for real-time violation highlighting in the editor.
@@ -234,15 +226,14 @@ For the common case for a commit focused to an specific feature, hot fix, or bug
 ```
 Add user authentication
 
-Implemented user registration and login features. This refactor introduces
-JWT tokens for session management, improving security and user experience.
+Implemented user registration and login features. This refactor introduces JWT tokens for session management, improving security and user experience.
 
 Fixes #42
 ```
 
 ## Join The Project Team
 
-As initial team, we are accepting new members that would compromise in improving the development of the presented project. Authorization and roles must be requested by open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Triagem,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
+As initial team, we are accepting new members that would compromise in improving the development of the presented project. Authorization and roles must be requested by open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Role,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
 
 ## Attribution
 This guide is based on the **contributing.md**. [Make your own](https://contributing.md/)!
