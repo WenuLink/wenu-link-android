@@ -203,6 +203,11 @@ Code style is enforced via **ktlint**, additionally the following conventions ar
 - Prefer expression bodies for simple functions.
 - Use block bodies when logic becomes more complex or requires multiple steps.
 
+#### Private first
+
+- Prefer all classes, functions, properties, and nested types as private by default, and only elevate visibility when necessary.
+- Hide internal state, helper functions, and implementation-specific classes behind private scopes and sealed types. 
+
 ### Ktlint
 
 Before submitting a PR, run:
