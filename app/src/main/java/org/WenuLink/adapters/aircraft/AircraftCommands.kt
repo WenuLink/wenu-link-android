@@ -1,6 +1,6 @@
 package org.WenuLink.adapters.aircraft
 
-import org.WenuLink.adapters.commands.ICommand
+import org.WenuLink.commands.ICommand
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
     override fun validate(ctx: AircraftHandler): String?
@@ -11,32 +11,32 @@ sealed interface AircraftCommand : ICommand<AircraftHandler> {
 data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? {
         if (!ctx.isPowerOff) return "Already booted"
-        return ctx.stateMachine.canDispatch(BootTransition)
+        return ctx.canDispatchTransition(BootTransition)
     }
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(BootTransition)
+        ctx.dispatchTransition(BootTransition)
         return ctx.boot(timeout)
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.stateMachine.dispatch(InitialTransition)
+        ctx.dispatchTransition(InitialTransition)
     }
 }
 
 data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? {
         if (!ctx.sensorsHealthy) return "Sensors failing"
-        return ctx.stateMachine.canDispatch(ArmTransition)
+        return ctx.canDispatchTransition(ArmTransition)
     }
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(ArmTransition)
+        ctx.dispatchTransition(ArmTransition)
         // TODO: update according to each mode
         // https://ardupilot.org/copter/docs/arming_the_motors.html
-        val armed = if (ctx.copterFlightMode == ArduCopterFlightMode.STABILIZE) {
+        val armed = if (ctx.state.flightMode == ArduCopterFlightMode.STABILIZE) {
             // Manual takeoff
             ctx.armMotors()
             ctx.waitArmTransition(true, timeout)
@@ -55,11 +55,11 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
 data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(StandbyTransition)
+        ctx.canDispatchTransition(StandbyTransition)
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(StandbyTransition)
+        ctx.dispatchTransition(StandbyTransition)
         ctx.disarmMotors()
         val disarmed = ctx.waitArmTransition(false, timeout)
 
@@ -71,16 +71,16 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
 data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(TakeoffTransition)
+        ctx.canDispatchTransition(TakeoffTransition)
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(TakeoffTransition)
+        ctx.dispatchTransition(TakeoffTransition)
         ctx.takeOff() // ctx.takeOff(initialAltitude)
         val isFlying = ctx.awaitFlightState(true)
 
         if (!isFlying) {
-            ctx.dispatchCommand(LandCommand(true))
+            ctx.dispatchCommand(DisarmCommand())
             return "Unable to takeoff"
         }
 
@@ -88,63 +88,24 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.dispatchCommand(LandCommand(true))
-    }
-}
-
-data class LandCommand(val withLandingConfirmation: Boolean = true) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(LandTransition)
-
-    override suspend fun execute(ctx: AircraftHandler): String? {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(LandTransition)
-        ctx.land() // ctx.land(forceConfirmation)
-        val onTheGround = ctx.awaitFlightState(false)
-
-        if (!onTheGround) return "Unable to land"
-
         ctx.dispatchCommand(DisarmCommand())
-
-        return null
-    }
-
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
     }
 }
 
-data class RepositionCommand(val targetCoordinates: Coordinates3D, val speed: Float?) :
-    AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(FlyingTransition)
+data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): String? = when {
+        ctx.isPowerOff -> "Already power off"
+        !withTransitionCheck -> null
+        else -> ctx.canDispatchTransition(PowerOffTransition)
+    }
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(FlyingTransition)
-        ctx.doReposition(targetCoordinates, speed)
-        // TODO: wait for reaching location?
-        return null
+        if (withTransitionCheck) ctx.dispatchTransition(PowerOffTransition)
+        return ctx.shutdown()
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
-    }
-}
-
-object GoHomeCommand : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
-        ctx.stateMachine.canDispatch(FlyingTransition)
-
-    override suspend fun execute(ctx: AircraftHandler): String? {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(FlyingTransition)
-        ctx.doGoHome()
-        // TODO: wait for reaching location?
-        return null
-    }
-
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.manualControl()
+        ctx.dispatchTransition(InitialTransition)
     }
 }

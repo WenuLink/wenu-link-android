@@ -11,14 +11,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.controllers.MAVLinkController
+import org.WenuLink.adapters.ServiceAddress
+import org.WenuLink.adapters.WenuLinkHandler
 
-data class Endpoint(val ip: String, val port: Int) {
-    fun toUrl(): String = "udp://$ip:$port"
-}
-
-class MAVLinkService(aircraft: AircraftHandler) {
+class MAVLinkService(handler: WenuLinkHandler) {
     companion object {
         var isEnabled = true
             private set
@@ -26,9 +22,9 @@ class MAVLinkService(aircraft: AircraftHandler) {
     private val logger by taggedLogger(MAVLinkService::class.java.simpleName)
 
     private var client: MAVLinkClient? = null
-    private var controller = MAVLinkController(aircraft)
-    private var endpoint = Endpoint("192.168.1.220", 14550)
-    private var mavlinkScope: CoroutineScope? = null
+    private var controller = MAVLinkController(handler)
+    private var groundControlStation = ServiceAddress("192.168.1.220", 14550, "UDP")
+    private var messagesScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
     var isReady = false
@@ -39,8 +35,9 @@ class MAVLinkService(aircraft: AircraftHandler) {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun updateServerAddress(endpoint: Endpoint) {
-        this.endpoint = endpoint
+    fun updateGCSAddress(serverAddress: String) {
+        val (ip, port) = serverAddress.split(":")
+        groundControlStation = ServiceAddress(ip, port.toInt(), "UDP")
     }
 
     fun clientExists(): Boolean = client != null
@@ -54,12 +51,12 @@ class MAVLinkService(aircraft: AircraftHandler) {
 
     fun createClient() {
         if (clientExists()) {
-            logger.d { "MAVLinkClient already created for udp://${endpoint.toUrl()}." }
+            logger.d { "MAVLinkClient already created for $groundControlStation." }
             return
         }
-        logger.d { "Creating MAVLinkClient for udp://${endpoint.toUrl()}." }
+        logger.d { "Creating MAVLinkClient for $groundControlStation." }
 
-        client = MAVLinkClient(endpoint.ip, endpoint.port)
+        client = MAVLinkClient(groundControlStation.ip, groundControlStation.port)
     }
 
     fun destroyClient() {
@@ -70,12 +67,12 @@ class MAVLinkService(aircraft: AircraftHandler) {
     }
 
     fun launchListeningJob(): Job = // Start listening for messages
-        mavlinkScope!!.launch {
+        messagesScope!!.launch {
             client?.startListening(controller::processMessage)
         }
 
     fun launchSendingJob(): Job = // Start sending messages
-        mavlinkScope!!.launch {
+        messagesScope!!.launch {
             client?.startSending(controller::sendMessages)
         }
 
@@ -92,7 +89,7 @@ class MAVLinkService(aircraft: AircraftHandler) {
         // Initialize controllers
         controller.attachClient(client!!)
         // IO jobs and scope
-        mavlinkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        messagesScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         listeningJob = launchListeningJob()
         sendingJob = launchSendingJob()
 
@@ -118,11 +115,8 @@ class MAVLinkService(aircraft: AircraftHandler) {
                 "(sending=${sendingJob?.isActive})"
         }
 
-        // Wait for service's boot up
-        val hasParams = controller.loadParameters()
-        if (hasParams) logger.d { "Parameters loaded" }
-
-        mavlinkScope?.launch {
+        // Wait for parameters and mission items request
+        messagesScope?.launch {
             // TODO: move timeout to a UserPreference due to user's local network latency
             isReady = controller.waitServicesRequest(30000L)
 
@@ -143,12 +137,12 @@ class MAVLinkService(aircraft: AircraftHandler) {
     suspend fun stopClient() {
         if (isServiceStop()) return // nothing to stop
 
-        mavlinkScope?.launch {
+        messagesScope?.launch {
             logger.d { "Stop client listening" }
             client?.stopListening()
             listeningJob?.join()
         }
-        mavlinkScope?.launch {
+        messagesScope?.launch {
             logger.d { "Stop client sending" }
             client?.stopSending()
             sendingJob?.join()
@@ -156,7 +150,7 @@ class MAVLinkService(aircraft: AircraftHandler) {
         logger.d { "Waiting 5s for client to stop" }
         val hasStop = AsyncUtils.waitTimeout(500L, 5000L, ::clientCanStart)
         if (!hasStop) logger.i { "Forcing stop client" }
-        mavlinkScope?.cancel()
+        messagesScope?.cancel()
         sendingJob = null
         listeningJob = null
     }

@@ -11,18 +11,6 @@ import kotlinx.coroutines.delay
 import org.WenuLink.adapters.aircraft.Quaternion
 
 object AsyncUtils {
-    suspend fun waitReadiness(
-        delayTime: Long = 100,
-        timeout: Long = 2000,
-        invertCondition: Boolean = false,
-        isReady: () -> Boolean,
-        onResult: (Boolean) -> Unit
-    ) {
-        fun preparedReadyCondition() = if (invertCondition) isReady() else !isReady()
-        waitTimeout(delayTime, timeout, ::preparedReadyCondition)
-        onResult(preparedReadyCondition())
-    }
-
     suspend fun waitTimeout(
         intervalTime: Long = 100,
         timeout: Long = 2000,
@@ -115,4 +103,8 @@ object OrientationUtils {
 
         return Quaternion(w, x, y, z).normalized()
     }
+}
+
+data class ServiceAddress(val ip: String, val port: Int, val protocol: String) {
+    override fun toString(): String = "$protocol://$ip:$port".lowercase()
 }

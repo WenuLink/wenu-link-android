@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.ServiceAddress
 import org.WenuLink.adapters.camera.CameraCapturer
 import org.WenuLink.webrtc.peer.StreamPeerConnection
 import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
@@ -26,10 +27,6 @@ import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
-
-data class SignalingEndpoint(val host: String, val port: Int, val protocol: String = "ws") {
-    fun toUrl(): String = "$protocol://$host:$port"
-}
 
 class WebRTCService {
     companion object {
@@ -58,7 +55,7 @@ class WebRTCService {
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
 
     // Signaling configuration
-    private var signalingEndpoint = SignalingEndpoint("192.168.1.220", 8090)
+    private var signalingServer = ServiceAddress("192.168.1.220", 8090, "WS")
     var isServiceUp = false
         private set
     var isStreaming = false
@@ -90,8 +87,9 @@ class WebRTCService {
     lateinit var mediaOptions: CameraCapturer.MediaMetadata
     private var offer: String? = null
 
-    fun updateServerAddress(endpoint: SignalingEndpoint) {
-        signalingEndpoint = endpoint
+    fun updateServerAddress(serverAddress: String) {
+        val (ip, port) = serverAddress.split(":")
+        signalingServer = ServiceAddress(ip, port.toInt(), "WS")
     }
 
     private val peerConnection: StreamPeerConnection by lazy {
@@ -121,10 +119,10 @@ class WebRTCService {
 
         this.serviceScope = serviceScope
 
-        logger.i { "Connecting WebRTC client to ${signalingEndpoint.toUrl()}" }
+        logger.i { "Connecting WebRTC client to $signalingServer" }
         if (::webRTCClient.isInitialized) return
 
-        webRTCClient = WebRTCClient(signalingEndpoint.toUrl())
+        webRTCClient = WebRTCClient(signalingServer.toString())
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(
             "SurfaceTextureHelperThread",

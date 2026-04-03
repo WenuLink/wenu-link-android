@@ -4,18 +4,29 @@ import com.MAVLink.enums.MAV_LANDED_STATE
 import com.MAVLink.enums.MAV_MODE_FLAG
 import com.MAVLink.enums.MAV_STATE
 
-enum class ControlAuthority {
+enum class ControlAuthorityType {
     NONE,
     WAYPOINT_MISSION,
     TIMELINE_COMMAND,
     REMOTE_CONTROLLER
 }
 
+data class ControlAuthority(val authorityType: ControlAuthorityType) {
+    fun isWaypoint() = authorityType == ControlAuthorityType.WAYPOINT_MISSION
+
+    fun isCommand() = authorityType == ControlAuthorityType.TIMELINE_COMMAND
+
+    fun isRemote() = authorityType == ControlAuthorityType.REMOTE_CONTROLLER
+
+    fun isNewAuthority(authority: ControlAuthorityType) = authorityType != authority
+}
+
 data class AircraftState(
     val mavlink: Int = MAV_STATE.MAV_STATE_UNINIT,
     val landed: Int = MAV_LANDED_STATE.MAV_LANDED_STATE_UNDEFINED,
-    val controlAuthority: ControlAuthority = ControlAuthority.NONE,
-    val homeCoordinates: Coordinates3D? = null
+    val homeCoordinates: Coordinates3D? = null,
+    val modeFlag: Int = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+    val flightMode: ArduCopterFlightMode = ArduCopterFlightMode.STABILIZE
 ) {
     fun isHomeSet() = homeCoordinates != null
 
@@ -24,6 +35,8 @@ data class AircraftState(
     fun isArmed() = mavlink == MAV_STATE.MAV_STATE_ACTIVE
 
     fun isFlying() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+
+    fun isLanding() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
 
     fun isOnTheGround() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
 
@@ -193,23 +206,33 @@ class AircraftStateMachine {
     fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
         state.landed != target.landed
 
-    fun setControlAuthority(controlAuthority: ControlAuthority): AircraftState {
-        state = state.copy(controlAuthority = controlAuthority)
-        return state
-    }
-
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
         state = state.copy(homeCoordinates = homeCoordinates)
         return state
     }
 
-    fun isMissionWaypoint() = state.controlAuthority == ControlAuthority.WAYPOINT_MISSION
+    fun syncArmState(): AircraftState {
+        var modeFlag = state.flightMode.baseMode
+        if (state.isArmed()) {
+            modeFlag = modeFlag or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
+        }
+        state = state.copy(modeFlag = modeFlag)
+        return state
+    }
 
-    fun isTimelineCommand() = state.controlAuthority == ControlAuthority.TIMELINE_COMMAND
+    fun updateFlightMode(mode: ArduCopterFlightMode): AircraftState {
+        state = state.copy(flightMode = mode)
+        return syncArmState()
+    }
 
-    fun isRemoteController() = state.controlAuthority == ControlAuthority.REMOTE_CONTROLLER
+    fun isModeAllowed(mode: ArduCopterFlightMode): Boolean = when (mode) {
+        ArduCopterFlightMode.GUIDED -> state.isFlying() || state.isStandBy()
 
-    fun isNewControlAuthority(authority: ControlAuthority) = state.controlAuthority != authority
+        //        ArduCopterFlightMode.AUTO -> state.isFlying() && mission.isMissionRunning
+        ArduCopterFlightMode.LAND, ArduCopterFlightMode.RTL -> state.isFlying()
+
+        else -> true
+    }
 }
 
 /**

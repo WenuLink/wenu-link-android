@@ -1,4 +1,4 @@
-package org.WenuLink.controllers
+package org.WenuLink.mavlink
 
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.common.msg_command_int
@@ -8,8 +8,14 @@ import com.MAVLink.enums.MAV_CMD
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.aircraft.AircraftHandler
-import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.adapters.WenuLinkHandler
+import org.WenuLink.mavlink.controllers.CameraController
+import org.WenuLink.mavlink.controllers.CommandController
+import org.WenuLink.mavlink.controllers.ConnectionController
+import org.WenuLink.mavlink.controllers.IController
+import org.WenuLink.mavlink.controllers.NavigationController
+import org.WenuLink.mavlink.controllers.ParameterController
+import org.WenuLink.mavlink.controllers.TelemetryController
 
 /**
  * Management class for different MAVLink's microservices message processing.
@@ -24,7 +30,7 @@ import org.WenuLink.mavlink.MAVLinkClient
  * - NavigationController: Mission Protocol
  * - TelemetryController: Message Protocol
  */
-class MAVLinkController(private val aircraft: AircraftHandler) {
+class MAVLinkController(private val handler: WenuLinkHandler) {
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)
     private val controllers: MutableList<IController> = mutableListOf()
     private lateinit var client: MAVLinkClient
@@ -61,7 +67,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         }
 
         // Process message with registered Controllers
-        val processed = controllers.any { it.processMessage(msg, aircraft) }
+        val processed = controllers.any { it.processMessage(msg, handler) }
         if (processed) return
 
         when (msg.msgid) {
@@ -87,7 +93,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
         val processed = controllers.any {
-            it.processCommandLong(commandMsg, aircraft)
+            it.processCommandLong(commandMsg, handler)
         }
         if (processed) return
 
@@ -109,7 +115,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
         val processed = controllers.any {
-            it.processCommandInt(commandMsg, aircraft)
+            it.processCommandInt(commandMsg, handler)
         }
         if (processed) return
 
@@ -125,7 +131,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
         val requestID = commandMsg.param1.toInt()
         logger.d { "\t- REQUEST_LONG ID: $requestID" }
-        val processed = controllers.any { it.processRequestLong(commandMsg, aircraft) }
+        val processed = controllers.any { it.processRequestLong(commandMsg, handler) }
         if (processed) return
 
         when (requestID) {
@@ -145,7 +151,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
         val requestID = commandMsg.param1.toInt()
         logger.d { "\t- REQUEST_INT ID: $requestID" }
-        val processed = controllers.any { it.processRequestInt(commandMsg, aircraft) }
+        val processed = controllers.any { it.processRequestInt(commandMsg, handler) }
         if (processed) return
 
         when (requestID) {
@@ -155,7 +161,7 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
 
     @Synchronized
     fun sendMessages() {
-        telemetryController.sendMessages(controllers, aircraft)
+        telemetryController.sendMessages(controllers, handler)
     }
 
     fun notifySystemReady() {
@@ -197,22 +203,14 @@ class MAVLinkController(private val aircraft: AircraftHandler) {
         return true
     }
 
-    suspend fun loadParameters(): Boolean {
-        // Load and wait parameters
-        logger.d { "Waiting for parameters" }
-        parameterController.load()
-        AsyncUtils.waitReady(1000L, parameterController::isLoaded)
-        return parameterController.isLoaded()
-    }
-
     suspend fun waitHomePosition(): Boolean {
         // Wait for home position to send GPS_GLOBAL_ORIGIN and periodic HOME_POSITION
-        val isHomeSet = aircraft.waitHomeSet(360000) // 5min
+        val isHomeSet = handler.aircraft.waitHomeSet(360000) // 5min
 
         if (!isHomeSet) return false
 
         // Send origin coordinates
-        client.sendMessage(navigationController.msgGpsGlobalOrigin(aircraft)!!)
+        client.sendMessage(navigationController.msgGpsGlobalOrigin(handler)!!)
         // update message rate of HOME_POSITION
         telemetryController.setMessageRate(
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION,

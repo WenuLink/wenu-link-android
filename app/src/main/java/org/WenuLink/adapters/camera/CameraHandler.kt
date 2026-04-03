@@ -6,12 +6,11 @@ import io.getstream.log.taggedLogger
 import kotlin.getValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.CameraManager
 
-class CameraHandler {
+class CameraHandler : CommandHandler<CameraHandler>() {
     companion object {
         private var mInstance: CameraHandler? = null
 
@@ -25,50 +24,26 @@ class CameraHandler {
     }
 
     private val logger by taggedLogger(CameraHandler::class.java.simpleName)
-    private val availableCameras: MutableList<CameraMetadata> = mutableListOf()
-    val list: List<CameraMetadata>
-        get() = availableCameras.toList()
-    private var commandJob: Job? = null
-    private var currentCommand: CameraCommand? = null
-    private val commandChannel =
-        Channel<Pair<CameraCommand, (String?) -> Unit>>(capacity = Channel.UNLIMITED)
-    var sequenceIndex = 0
-    var captureTimestamp = System.currentTimeMillis()
+    val availableCameras: MutableList<CameraMetadata> = mutableListOf()
+    var photoSeqIndex: Int = 0
+    var captureTimestamp: Long = System.currentTimeMillis()
     val lastCaptureMillis
         get() = System.currentTimeMillis() - captureTimestamp
+    var wasInitialized = false
+        private set
 
-    private fun startCommandProcessor(scope: CoroutineScope) {
-        commandJob?.cancel()
-
-        commandJob = scope.launch {
-            for ((cmd, onResult) in commandChannel) {
-                currentCommand = cmd
-
-                try {
-                    logger.d { "Executing: ${cmd::class.simpleName}" }
-
-                    val error = cmd.validate(this@CameraHandler)
-                    if (error != null) {
-                        onResult(error)
-                        continue
-                    }
-
-                    cmd.execute(this@CameraHandler, onResult)
-                } catch (e: Exception) {
-                    logger.e { "Command failed: ${cmd::class.simpleName} -> ${e.message}" }
-                    onResult(e.message)
-                } finally {
-                    currentCommand = null
-                }
-            }
+    override fun registerScope(scope: CoroutineScope) {
+        scope.launch {
+            initCameras()
+            wasInitialized = true
         }
+        startCommandProcessor(scope, this@CameraHandler, logger)
     }
 
-    fun dispatchCommand(cmd: CameraCommand, onResult: (String?) -> Unit = {}) {
-        val result = commandChannel.trySend(cmd to onResult)
-        if (result.isFailure) {
-            onResult("Failed to enqueue command: ${cmd::class.simpleName}")
-        }
+    override fun unload() {
+        availableCameras.clear()
+        photoSeqIndex = 0
+        super.unload()
     }
 
     suspend fun initCameras(): Boolean {
@@ -163,5 +138,9 @@ class CameraHandler {
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 
-    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(scope)
+    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(
+        scope,
+        this@CameraHandler,
+        logger
+    )
 }
