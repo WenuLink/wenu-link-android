@@ -86,8 +86,8 @@ object APIManager {
     fun registerCallbacks(
         registrationCallback: (String?) -> Unit,
         productConnectedCallback: (Boolean) -> Unit,
-        activationCallback: (Boolean, String?) -> Unit = { s, e -> },
-        bindingCallback: (Boolean, String?) -> Unit = { s, e -> }
+        activationCallback: (Boolean, String?) -> Unit = { _, _ -> },
+        bindingCallback: (Boolean, String?) -> Unit = { _, _ -> }
     ) {
         setActivationCallback(activationCallback)
         setBindingCallback(bindingCallback)
@@ -96,7 +96,7 @@ object APIManager {
             override fun onRegister(djiError: DJIError) {
                 if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                     DJISDKManager.getInstance().startConnectionToProduct()
-                    loggerC.i { "Successfully registration" }
+                    loggerC.i { "Successfully registered" }
                     registrationCallback(null)
                 } else {
                     val errorDescription = djiError.description

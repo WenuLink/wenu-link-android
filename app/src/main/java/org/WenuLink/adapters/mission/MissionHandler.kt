@@ -36,7 +36,8 @@ data class MissionState(
 
     fun setStartSequence(sequence: Int) = copy(startSequence = sequence)
 
-    fun updateItemSequence(sequence: Int?) = copy(currentSequence = sequence, unvisitedSequence = true)
+    fun updateItemSequence(sequence: Int?) =
+        copy(currentSequence = sequence, unvisitedSequence = true)
 
     fun nextItemSequence() = updateItemSequence(currentSequence?.plus(1))
 
