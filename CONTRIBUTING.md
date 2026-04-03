@@ -16,18 +16,32 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [I Have a Question](#i-have-a-question)
-- [I Want To Contribute](#i-want-to-contribute)
+- [I Want to Contribute](#i-want-to-contribute)
+  - [Need Ideas to Contribute?](#need-ideas-to-contribute)
   - [Your First Code Contribution](#your-first-code-contribution)
   - [Setup](#setup)
   - [Improving The Documentation](#improving-the-documentation)
   - [Reporting Bugs](#reporting-bugs)
+  - [How Do I Submit a Good Bug Report?](#how-do-i-submit-a-good-bug-report)
   - [Suggesting Enhancements](#suggesting-enhancements)
+    - [Before Submitting an Enhancement](#before-submitting-an-enhancement)
+    - [How Do I Submit a Good Enhancement Suggestion?](#how-do-i-submit-a-good-enhancement-suggestion?)
+  - [Working With Git](#working-with-git)
+    - [Keeping Your Branch Up to Date](#keeping-your-branch-up-to-date)
 - [Styleguide](#styleguide)
   - [Code Style](#code-style)
+    - [General Principles](#general-principles)
+    - [Immutability](#immutability)
+    - [Type Inference](#type-inference)
+    - [Null Safety](#null-safety)
+    - [Function Style](#function-style)
+    - [Private First](#private-first)
+  - [Ktlint](#ktlint)
     - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
-  - [Join The Project Team](#join-the-project-team)
+- [Join The Project Team](#join-the-project-team)
+- [Attribution](#attribution)
 
 ---
 
@@ -45,22 +59,22 @@ If you then still feel the need to ask a question and need clarification, we rec
 
 - Open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new).
 - Provide as much context as you can about what you're running into.
-- Provide project and platform versions (Android platform, AndrodStudio, Aircraft, etc), depending on what seems relevant.
+- Provide project and platform versions (Android platform, AndroidStudio, Aircraft, etc), depending on what seems relevant.
 
 We will then take care of the issue as soon as possible.
 
-## I Want To Contribute
+## I Want to Contribute
 
 > ### Legal Notice
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
 
-### Need ideas to contribute?
+### Need Ideas to Contribute?
 
 Unless you have a good idea to implement, you can browse the [beginner issues](https://github.com/WenuLink/wenu-link-android/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) and select a feature or bug fix that should be fairly easy to implement. Once you will become an experienced developer, you will be able to address more complex issues.
 
 ### Your First Code Contribution
 
-For prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches managament](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
+To prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches management](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
 This project follows a common git flow initialization setup with the following branches:
 
 - `main` for stable releases
@@ -71,7 +85,7 @@ This project follows a common git flow initialization setup with the following b
 - `support/*` for Support branches
 - no version tag prefix defined
 
-In this regard, you can fork any branch that you are interested to contribute. For example, if a new feature will be added, the fork must be done from the `develop` branch. If the idea is to contribute in Work In Progress (WIP) features, the fork must be done from the any `feature/*` branch. Current development stage is focused in core aspects of the application, this is why **test cases with other Aircraft and Android devices** is essential to ensure a wide compatibility range. After achieving a first stable version, the development must be focused on including the DJI SDK v5, aiming to increase the number of compatible Aircraft.
+In this regard, you can fork any branch that you are interested in contributing to. For example, if a new feature will be added, the fork must be done from the `develop` branch. If the idea is to contribute to Work In Progress (WIP) features, the fork must be done from the any `feature/*` branch. Current development stage is focused in core aspects of the application, this is why **test cases with other Aircraft and Android devices** is essential to ensure a wide compatibility range. After achieving a first stable version, the development must be focused on including the DJI SDK v5, aiming to increase the number of compatible Aircraft.
 
 More information will be added.
 
@@ -79,18 +93,18 @@ More information will be added.
 
 Before building the project, you need to provide a DJI developer API key.
 
-1. Copy `local.properties.example` to `local.properties` in the project toor (this file is gitignored and must never be commited).
+1. Copy `local.properties.example` to `local.properties` in the project root (this file is git-ignored and must never be commited).
 2. Register at https://developer.dji.com/ and create an app with the package name `org.WenuLink`.
 3. Fill in the `dji.api.key` value in your `local.properties`.
 
-Android Studio will automatically populate `sdk.dir` when you open the project. If building from command line, set in manually to your Andorid SDK path.
+Android Studio will automatically populate `sdk.dir` when you open the project. If building from command line, set in manually to your Android SDK path.
 
 ### Improving The Documentation
 
 Current documentation is focused for initial users to have an starting point on how the application works.
 Documentation writing for end-users and developers are welcome. The documentation roadmap is being discussed on [issue #5](https://github.com/WenuLink/wenu-link-android/issues/5) over a few defined use cases that guides the application development.
 
-Developers documentation should focus on a more technical aspect relating architecture design and the patterns used for the current code development. The ideia is to encourage good coding practices to keeps the project organized in terms of packages, classes, and methods names defition.
+Developers documentation should focus on a more technical aspect relating architecture design and the patterns used for the current code development. The idea is to encourage good coding practices to keeps the project organized in terms of packages, classes, and methods names definition.
 
 ### Reporting Bugs
 
@@ -111,7 +125,6 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 ### How Do I Submit a Good Bug Report?
 
 > You must never report security related issues, vulnerabilities or bugs including sensitive information to the issue tracker, or elsewhere in public.
-
 
 We use GitHub issues to track bugs and errors. If you run into an issue with the project:
 
@@ -144,11 +157,28 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/WenuLi
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
-- **Explain why this enhancement would be useful** to most CONTRIBUTING.md users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+- **Explain why this enhancement would be useful** to most WenuLink users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+
+### Working With Git
+
+#### Keeping Your Branch Up to Date
+
+If your feature branch falls behind `develop` during review, prefer rebasing over merging:
+
+```bash
+git fetch upstream
+git rebase upstream/develop
+git push --force-with-lease
+```
+Rebasing keeps the commit history linear and ensures that a pull request clearly reflects only the changes introduced by the feature branch.
+
+Merging `develop` into a feature branch can introduce additional commits into the history, which may make the review process less clear.
+
+Force-pushing after a rebase is expected for feature branches. Prefer `--force-with-lease` over `--force` to avoid accidentally overwriting others’ work.
 
 ## Styleguide
 
-The overall coding style is based on actual Kotlin/Android development specifications. Specific definitions needs to be made for a more detailed style to address. Initially, the only requirement is to follow the package and visibility aspects so far.
+The overall coding style is based on actual Kotlin/Android development specifications. Specific definitions need to be made for a more detailed style guide. For now the only requirement is to follow the package and visibility aspects.
 
 In terms of package organization:
 
@@ -158,7 +188,7 @@ In terms of package organization:
 - `views` package comprise all classes for interfacing logic-level and UI-level information.
 - `webrtc` package comprise all classes for WebRTC protocol support.
 
-Regards class naming convention:
+Regarding class naming convention:
 
 - `Service` suffix will be used with classes that handle specific communication protocol or long-time running operations.
 - `Controller` suffix will be used with classes that address different [MAVLink's microservice](https://mavlink.io/en/services/) messaging interface.
@@ -171,7 +201,41 @@ Regards class naming convention:
 This project follows the [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
 and the [Android Kotlin style guide](https://developer.android.com/kotlin/style-guide).
 
-Code style is enforced via **ktlint**. Before submitting a PR, run:
+Code style is enforced via **ktlint**, additionally the following conventions are applied during code review to ensure consistency across the project.
+
+#### General Principles
+
+- Prefer readability and consistency over personal preference.
+- Align with existing patterns in the surrounding code unless there is a clear reason to improve them.
+
+#### Immutability
+
+- Prefer `val` over `var` whenever possible.
+- Use mutable state only when necessary and keep its scope minimal.
+
+#### Type Inference
+
+- Omit explicit types when they are obvious from the right-hand side.
+- Keep type annotations where they improve readability or clarity.
+
+#### Null Safety
+
+- Prefer safe calls (`?.`) and scope functions (`let`, `also`, etc.) over non-null assertions (`!!`).
+- Avoid patterns that obscure the difference between `null` and actual values.
+
+#### Function Style
+
+- Prefer expression bodies for simple functions.
+- Use block bodies when logic becomes more complex or requires multiple steps.
+
+#### Private First
+
+- Prefer all classes, functions, properties, and nested types as private by default. Only elevate visibility when necessary.
+- Hide internal state, helper functions, and implementation-specific classes behind private scopes and sealed types.
+
+### Ktlint
+
+Before submitting a PR, run:
 
     ./gradlew ktlintCheck
 
@@ -179,32 +243,24 @@ To auto-fix most formatting issues:
 
     ./gradlew ktlintFormat
 
-The project's `.editorconfig` configures indentation and line length
-automatically in both Android Studio and VS Code — no manual IDE
-configuration needed.
+The project's `.editorconfig` configures indentation and line length automatically in both Android Studio and VS Code, no manual IDE configuration needed.
 
 #### Running Gradle commands
 
-`./gradlew` commands must be run using the same JDK that Android Studio
-uses for building. The easiest way is to use Android Studio's built-in
-terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
+`./gradlew` commands must be run using the same JDK that Android Studio uses for building. The easiest way is to use Android Studio's built-in terminal, then set JAVA_HOME to point to Android Studio's bundled JDK.
 The path varies by OS:
 
 - Windows: `C:\Program Files\Android\Android Studio\jbr`
 - macOS: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
 - Linux: `/opt/android-studio/jbr`
 
-#### Recommended: pre-commit hook
+#### Recommended: Pre-Commit Hook
 
-To have ktlint check your code automatically on every `git commit`,
-run this once after cloning the repository:
+To have ktlint check your code automatically on every `git commit`, run this once after cloning the repository:
 
     ./gradlew addKtlintCheckGitPreCommitHook
 
-This installs a local git hook that aborts the commit if any style
-violations are found. Run `./gradlew ktlintFormat` to fix them, then
-commit again. The hook is not committed to the repository, so each
-contributor who wants it must run this command once themselves.
+This installs a local git hook that aborts the commit if any style violations are found. Run `./gradlew ktlintFormat` to fix them, then commit again. The hook is not committed to the repository, so each contributor who wants it must run this command once themselves.
 
 Optionally, install the [ktlint Android Studio plugin](https://plugins.jetbrains.com/plugin/15057-ktlint)
 for real-time violation highlighting in the editor.
@@ -234,15 +290,14 @@ For the common case for a commit focused to an specific feature, hot fix, or bug
 ```
 Add user authentication
 
-Implemented user registration and login features. This refactor introduces
-JWT tokens for session management, improving security and user experience.
+Implemented user registration and login features. This refactor introduces JWT tokens for session management, improving security and user experience.
 
 Fixes #42
 ```
 
 ## Join The Project Team
 
-As initial team, we are accepting new members that would compromise in improving the development of the presented project. Authorization and roles must be requested by open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Triagem,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
+As the initial team, we are accepting new members that would commit in improving the development of the presented project. Authorization and roles must be requested by opening an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Role,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
 
 ## Attribution
 This guide is based on the **contributing.md**. [Make your own](https://contributing.md/)!
