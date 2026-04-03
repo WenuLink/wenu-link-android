@@ -8,8 +8,7 @@ import dji.sdk.battery.Battery
 import dji.sdk.products.Aircraft
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.aircraft.BatteryData
-
-data class SignalQuality(val downlink: Int?, val uplink: Int?)
+import org.WenuLink.adapters.aircraft.SignalQuality
 
 object AircraftManager {
     private val logger by taggedLogger(AircraftManager::class.java.simpleName)

@@ -250,7 +250,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         ArduCopterFlightMode.BRAKE -> missionPause()
         ArduCopterFlightMode.AUTO -> missionResume()
         ArduCopterFlightMode.LAND -> stopAndDispatch(RequestLand(true))
-        ArduCopterFlightMode.RTL -> stopAndDispatch(RequestGoHome)
+        ArduCopterFlightMode.RTL -> stopAndDispatch(RequestGoHome(true))
         else -> {}
     }
 

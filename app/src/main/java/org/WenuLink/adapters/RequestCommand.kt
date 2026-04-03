@@ -11,10 +11,11 @@ import org.WenuLink.adapters.aircraft.FlyingTransition
 import org.WenuLink.adapters.aircraft.LandTransition
 import org.WenuLink.adapters.aircraft.StateTransition
 import org.WenuLink.adapters.camera.CameraCommand
-import org.WenuLink.adapters.mission.LandCommand
+import org.WenuLink.adapters.mission.LandAction
+import org.WenuLink.adapters.mission.MissionActionCommand
 import org.WenuLink.adapters.mission.MissionCommand
-import org.WenuLink.adapters.mission.RepositionCommand
-import org.WenuLink.adapters.mission.ReturnToHomeCommand
+import org.WenuLink.adapters.mission.RepositionAction
+import org.WenuLink.adapters.mission.ReturnAction
 import org.WenuLink.adapters.mission.StartWaypointMission
 import org.WenuLink.commands.ICommand
 
@@ -57,7 +58,7 @@ data class RequestLand(val withLandingConfirmation: Boolean = true) :
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
-            ctx.dispatchCommand(WenuLinkCommand.Mission(LandCommand(true))) { error ->
+            ctx.dispatchCommand(WenuLinkCommand.Mission(LandAction(true))) { error ->
                 if (error == null) {
                     ctx.dispatchCommand(
                         WenuLinkCommand.Aircraft(DisarmCommand()),
@@ -69,53 +70,6 @@ data class RequestLand(val withLandingConfirmation: Boolean = true) :
             }
 
             cont.invokeOnCancellation {
-                ctx.manualControl()
-            }
-        }
-    }
-}
-
-data class RequestReposition(val targetCoordinates: Coordinates3D, val speed: Float?) :
-    RequestTransition(FlyingTransition) {
-
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
-
-        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
-
-        return suspendCancellableCoroutine { cont ->
-
-            ctx.dispatchCommand(
-                WenuLinkCommand.Mission(
-                    RepositionCommand(targetCoordinates, speed ?: ctx.mission.flightSpeed)
-                ),
-                cont::resume
-            )
-
-            cont.invokeOnCancellation {
-                // Add SDK cancel if available
-                ctx.manualControl()
-            }
-        }
-    }
-}
-
-object RequestGoHome : RequestTransition(FlyingTransition) {
-
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
-
-        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
-
-        return suspendCancellableCoroutine { cont ->
-            ctx.dispatchCommand(
-                WenuLinkCommand.Mission(ReturnToHomeCommand(true)),
-                cont::resume
-            )
-            cont.invokeOnCancellation {
-                // Add SDK cancel if available
                 ctx.manualControl()
             }
         }
@@ -154,3 +108,29 @@ data class RequestStartMission(
         }
     }
 }
+
+open class RequestMissionAction(private val action: MissionActionCommand) :
+    RequestTransition(FlyingTransition) {
+    override suspend fun execute(ctx: WenuLinkHandler): String? {
+        val transitionError = super.execute(ctx)
+        if (transitionError != null) return transitionError
+
+        ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
+
+        return suspendCancellableCoroutine { cont ->
+
+            ctx.dispatchCommand(
+                WenuLinkCommand.Mission(action),
+                cont::resume
+            )
+
+            cont.invokeOnCancellation {
+                // Add SDK cancel if available
+                ctx.manualControl()
+            }
+        }
+    }
+}
+
+data class RequestGoHome(private val autoConfirmLanding: Boolean) :
+    RequestMissionAction(ReturnAction(autoConfirmLanding))

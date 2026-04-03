@@ -7,7 +7,6 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
@@ -127,12 +126,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         if (speed !in range) logger.w { "Clipped speed $speed to [$range]" }
     }
 
-    fun getItemCoordinates(itemMsg: msg_mission_item_int): Coordinates3D = Coordinates3D(
-        MessageUtils.coordinateMAVLink2DJI(itemMsg.x),
-        MessageUtils.coordinateMAVLink2DJI(itemMsg.y),
-        itemMsg.z
-    )
-
     fun getWaypointNode(index: Int) = state.assembler.getNode(index)
 
     fun hasWaypointNodes() = state.assembler.hasNodes()
@@ -147,24 +140,31 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
-                state.assembler.addTakeoff(getItemCoordinates(itemMsg))
+                state.assembler.addTakeoff(
+                    MessageUtils.xyzMAVLink2Coordinates(itemMsg.x, itemMsg.y, itemMsg.z)
+                )
 
             MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_DELAY ->
-                state.assembler.addActionToLast(MissionAction.Delay(itemMsg.param1.toInt()))
+                state.assembler.addActionToLast(DelayAction.fromMissionItem(itemMsg))
 
             MAV_CMD.MAV_CMD_CONDITION_YAW ->
-                state.assembler.addActionToLast(MissionAction.Rotate(itemMsg.param1.toInt()))
+                state.assembler.addActionToLast(RotateAction(itemMsg.param1))
 
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE ->
-                state.assembler.addActionToLast(MissionAction.TakePhoto)
+                state.assembler.addActionToLast(
+                    PhotoAction(itemMsg.param3.toInt(), itemMsg.param2.toInt())
+                )
+
+            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE ->
+                state.assembler.addActionToLast(StopPhotoAction)
 
             MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE ->
-                state.assembler.addActionToLast(MissionAction.StartRecord)
+                state.assembler.addActionToLast(VideoAction())
 
             MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE ->
-                state.assembler.addActionToLast(MissionAction.StopRecord)
+                state.assembler.addActionToLast(StopVideoAction)
 
             MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH ->
                 state.assembler.setRTLWhenFinish()
@@ -177,9 +177,9 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     private fun assembleWaypointNode(itemMsg: msg_mission_item_int) {
         // Assumes Global only
-        val coordinates = getItemCoordinates(itemMsg)
+        val coordinates = MessageUtils.xyzMAVLink2Coordinates(itemMsg.x, itemMsg.y, itemMsg.z)
         val delay = itemMsg.param1.toInt()
-        val yaw = itemMsg.param4
+        val deg = itemMsg.param4
 
         // TODO: airframe check
 //         val frameReference = itemMsg.frame.toInt()
@@ -196,20 +196,15 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
         // Delay (seconds)
         if (delay > 0) {
-            state.assembler.addActionToLast(
-                MissionAction.Delay(delay)
-            )
+            state.assembler.addActionToLast(DelayAction(delay.toLong() * 1000))
         }
 
-        // Yaw (rad → deg)
-        if (yaw != 0f) {
-            val deg = (yaw * 180f / Math.PI).toInt()
-            state.assembler.addActionToLast(
-                MissionAction.Rotate(deg)
-            )
+        // Yaw
+        if (deg != 0f) {
+            state.assembler.addActionToLast(RotateAction(deg))
         }
 
-        logger.d { "Waypoint: ($coordinates) (Yaw=$yaw deg) (Delay=$delay)" }
+        logger.d { "Waypoint: ($coordinates) (Yaw=$deg deg) (Delay=$delay)" }
     }
 
     fun uploadWaypoints(onResult: (String?) -> Unit) =

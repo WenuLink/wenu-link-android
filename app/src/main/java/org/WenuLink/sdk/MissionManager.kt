@@ -15,12 +15,20 @@ import dji.common.mission.waypoint.WaypointMissionHeadingMode
 import dji.common.mission.waypoint.WaypointMissionState
 import dji.common.mission.waypoint.WaypointMissionUploadEvent
 import dji.sdk.mission.MissionControl
+import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import dji.sdk.mission.waypoint.WaypointMissionOperator
 import dji.sdk.mission.waypoint.WaypointMissionOperatorListener
 import io.getstream.log.taggedLogger
+import kotlin.math.roundToInt
 import org.WenuLink.adapters.mission.AssembledMission
-import org.WenuLink.adapters.mission.MissionAction
+import org.WenuLink.adapters.mission.DelayAction
+import org.WenuLink.adapters.mission.GimbalPitchAction
+import org.WenuLink.adapters.mission.MissionActionCommand
 import org.WenuLink.adapters.mission.MissionNode
+import org.WenuLink.adapters.mission.RotateAction
+import org.WenuLink.adapters.mission.StopPhotoAction
+import org.WenuLink.adapters.mission.StopVideoAction
+import org.WenuLink.adapters.mission.VideoAction
 
 /**
  * Object class to comply with DJI ref
@@ -140,24 +148,26 @@ object MissionManager {
         }
     }
 
-    private fun mapAction(action: MissionAction): WaypointAction = when (action) {
-        is MissionAction.Delay ->
-            WaypointAction(WaypointActionType.STAY, action.seconds * 1000)
+    private fun mapAction(action: MissionActionCommand): WaypointAction = when (action) {
+        is DelayAction ->
+            WaypointAction(WaypointActionType.STAY, action.timeMillis.toInt())
 
-        is MissionAction.Rotate ->
-            WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, action.degrees)
+        is RotateAction ->
+            WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, action.angle.roundToInt())
 
-        is MissionAction.GimbalPitch ->
-            WaypointAction(WaypointActionType.GIMBAL_PITCH, action.pitch)
+        is GimbalPitchAction ->
+            WaypointAction(WaypointActionType.GIMBAL_PITCH, action.angle.roundToInt())
 
-        MissionAction.TakePhoto ->
+        is ShootPhotoAction ->
             WaypointAction(WaypointActionType.START_TAKE_PHOTO, 0)
 
-        MissionAction.StartRecord ->
+        is VideoAction ->
             WaypointAction(WaypointActionType.START_RECORD, 0)
 
-        MissionAction.StopRecord ->
+        is StopVideoAction, StopPhotoAction ->
             WaypointAction(WaypointActionType.STOP_RECORD, 0)
+
+        else -> WaypointAction(WaypointActionType.STAY, 1000) // fallback
     }
 
     fun startMission(onResult: (String?) -> Unit) =

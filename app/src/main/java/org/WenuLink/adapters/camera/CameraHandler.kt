@@ -137,10 +137,4 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     )
 
     fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
-
-    fun registerHandlerScope(scope: CoroutineScope) = startCommandProcessor(
-        scope,
-        this@CameraHandler,
-        logger
-    )
 }

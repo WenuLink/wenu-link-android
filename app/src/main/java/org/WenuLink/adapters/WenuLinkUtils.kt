@@ -8,6 +8,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.Quaternion
 
 object AsyncUtils {
@@ -81,6 +82,12 @@ object MessageUtils {
                 shortArray[index] = char.code.toShort()
             }
         }
+
+    fun xyzMAVLink2Coordinates(x: Int, y: Int, z: Float) = Coordinates3D(
+        coordinateMAVLink2DJI(x),
+        coordinateMAVLink2DJI(y),
+        z
+    )
 }
 
 object OrientationUtils {
