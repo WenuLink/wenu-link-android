@@ -162,21 +162,22 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     fun processLanding(commandMsg: msg_command_long, handler: WenuLinkHandler) {
         logger.d { "processLanding: $commandMsg" }
-        handler.dispatchCommand(WenuLinkCommand.Request(RequestLand(true))) { error ->
-            logger.d { "processLanding: $error" }
+        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isSuccess) {
+            MAV_RESULT.MAV_RESULT_ACCEPTED
+        } else {
+            MAV_RESULT.MAV_RESULT_DENIED
         }
-        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        sendCommandAck(commandMsg.command, result)
     }
 
     fun processReturn(commandMsg: msg_command_long, handler: WenuLinkHandler) {
         logger.d { "processReturn: $commandMsg" }
-        handler.aircraft.requestMode(ArduCopterFlightMode.RTL)
-            .onSuccess {
-                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-            }
-            .onFailure {
-                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-            }
+        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isSuccess) {
+            MAV_RESULT.MAV_RESULT_ACCEPTED
+        } else {
+            MAV_RESULT.MAV_RESULT_DENIED
+        }
+        sendCommandAck(commandMsg.command, result)
     }
 
     fun processDelay(commandMsg: msg_command_long, handler: WenuLinkHandler) {
