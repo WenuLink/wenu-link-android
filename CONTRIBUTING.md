@@ -29,6 +29,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
     - [Type Inference](#type-inference)
     - [Null Safety](#null-safety)
     - [Function Style](#function-style)
+    - [Private First](#private-first)
   - [Ktlint](#ktlint)
     - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
@@ -203,10 +204,10 @@ Code style is enforced via **ktlint**, additionally the following conventions ar
 - Prefer expression bodies for simple functions.
 - Use block bodies when logic becomes more complex or requires multiple steps.
 
-#### Private first
+#### Private First
 
-- Prefer all classes, functions, properties, and nested types as private by default, and only elevate visibility when necessary.
-- Hide internal state, helper functions, and implementation-specific classes behind private scopes and sealed types. 
+- Prefer all classes, functions, properties, and nested types as private by default. Only elevate visibility when necessary.
+- Hide internal state, helper functions, and implementation-specific classes behind private scopes and sealed types.
 
 ### Ktlint
 
