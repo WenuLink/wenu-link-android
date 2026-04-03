@@ -275,7 +275,11 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         fun fromCommandInt(commandIntMsg: msg_command_int): RepositionAction {
             // DO_REPOSITION
             val targetCoordinates =
-                MessageUtils.xyzMAVLink2Coordinates(commandIntMsg.x, commandIntMsg.y, commandIntMsg.z)
+                MessageUtils.xyzMAVLink2Coordinates(
+                    commandIntMsg.x,
+                    commandIntMsg.y,
+                    commandIntMsg.z
+                )
             val flightSpeed = if (commandIntMsg.param1 == -1f) 1f else commandIntMsg.param1
 
             return RepositionAction(targetCoordinates, flightSpeed)
@@ -291,7 +295,11 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
 //            val passRadius = missionItemMsg.param3.toInt()
 //            val yawRel = missionItemMsg.param4.toInt()
             val targetCoordinates =
-                MessageUtils.xyzMAVLink2Coordinates(missionItemMsg.x, missionItemMsg.y, missionItemMsg.z)
+                MessageUtils.xyzMAVLink2Coordinates(
+                    missionItemMsg.x,
+                    missionItemMsg.y,
+                    missionItemMsg.z
+                )
 
             return RepositionAction(targetCoordinates, missionSpeed)
         }
