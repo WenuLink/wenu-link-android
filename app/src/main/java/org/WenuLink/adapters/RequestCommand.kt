@@ -141,7 +141,7 @@ data class RequestStartMission(
 
         return suspendCancellableCoroutine { cont ->
 
-            ctx.mission.setItemSequence(startSequence)
+            ctx.mission.setStartSequence(startSequence)
             ctx.dispatchCommand(
                 WenuLinkCommand.Mission(StartWaypointMission),
                 cont::resume

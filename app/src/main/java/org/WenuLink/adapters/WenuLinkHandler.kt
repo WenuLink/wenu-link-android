@@ -115,8 +115,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                     }
 
                     launch {
-                        missionHooks()
                         mission.syncState()
+                        missionHooks()
                     }
 
                     launch { safetyChecks() }
@@ -187,7 +187,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                 mission.dispatchCommand(PauseWaypointMission) { error ->
                     if (error != null) {
                         logger.i {
-                            "Unable to pause the mission at ${mission.state.sequence}: $error"
+                            "Unable to pause the mission at ${mission.state.currentSequence}: $error"
                         }
                     }
                 }
@@ -255,12 +255,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     private fun missionHooks() = when {
-        mission.state.unvisitedSequence -> logger.d {
-            "Starting from new WP ${mission.state.sequence}"
-        }
-
         mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
-
+        mission.state.unvisitedSequence -> mission.processNode()
         else -> {}
     }
 }

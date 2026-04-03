@@ -342,7 +342,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
     fun msgMissionCurrent(mission: MissionHandler): msg_mission_current {
         val msg = msg_mission_current()
-        msg.seq = mission.state.sequence ?: 0
+        msg.seq = mission.state.currentSequence ?: 0
         msg.mission_id = mission.state.id.toLong()
         msg.mission_state = mission.state.mavlink.toShort()
         return msg

@@ -14,9 +14,10 @@ import org.WenuLink.sdk.MissionManager
 
 data class MissionState(
     val mavlink: Int = MISSION_STATE.MISSION_STATE_UNKNOWN,
-    val sequence: Int? = null,
-    val assembler: MissionAssembler = MissionAssembler(),
     val id: Int = 202512,
+    val startSequence: Int = 1,
+    val currentSequence: Int? = null,
+    val assembler: MissionAssembler = MissionAssembler(),
     val unvisitedSequence: Boolean = false
 ) {
     fun totalNodes() = assembler.size()
@@ -33,13 +34,15 @@ data class MissionState(
 
     fun isComplete() = mavlink == MISSION_STATE.MISSION_STATE_COMPLETE
 
-    fun updateItemSequence(sequence: Int?) = copy(sequence = sequence, unvisitedSequence = true)
+    fun setStartSequence(sequence: Int) = copy(startSequence = sequence)
 
-    fun nextItemSequence() = updateItemSequence(sequence?.plus(1))
+    fun updateItemSequence(sequence: Int?) = copy(currentSequence = sequence, unvisitedSequence = true)
+
+    fun nextItemSequence() = updateItemSequence(currentSequence?.plus(1))
 
     fun setComplete() = copy(mavlink = MISSION_STATE.MISSION_STATE_COMPLETE)
 
-    fun markSequenceOld() = copy(unvisitedSequence = false)
+    fun markVisited() = copy(unvisitedSequence = false)
 
     fun fromMissionManager() = copy(
         mavlink = when {
@@ -53,9 +56,9 @@ data class MissionState(
 
     fun reset(): MissionState {
         assembler.reset()
-        return copy(sequence = null)
+        return copy(startSequence = 1, currentSequence = null)
             .fromMissionManager()
-            .markSequenceOld()
+            .markVisited()
     }
 }
 
@@ -80,7 +83,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     override fun registerScope(scope: CoroutineScope) {
         MissionManager.addListeners { index ->
-            scope.launch { setItemSequence(index) }
+            scope.launch { setCurrentSequence(index) }
         }
         startCommandProcessor(scope, this@MissionHandler, logger)
     }
@@ -92,22 +95,28 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     @Synchronized
     fun syncState() {
-        state = state
-            .fromMissionManager()
-            .markSequenceOld()
+        state = state.fromMissionManager()
         logger.d { "updateMissionState: $state" }
     }
 
     @Synchronized
-    fun setItemSequence(sequence: Int): MissionState {
-        state = state.updateItemSequence(sequence)
-        if (sequence == -1) state = state.setComplete()
+    fun processNode() {
+        if (!state.unvisitedSequence) return
+
+        logger.d { "Processing WP ${state.currentSequence}" }
+        state = state.markVisited()
+    }
+
+    @Synchronized
+    fun setStartSequence(sequence: Int): MissionState {
+        state = state.setStartSequence(sequence)
         return state
     }
 
     @Synchronized
-    fun nextItemSequence(): MissionState {
-        state = state.nextItemSequence()
+    fun setCurrentSequence(sequence: Int): MissionState {
+        state = state.updateItemSequence(sequence)
+        if (sequence == -1) state = state.setComplete().markVisited()
         return state
     }
 
