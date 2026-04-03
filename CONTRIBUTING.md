@@ -16,12 +16,16 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [I Have a Question](#i-have-a-question)
-- [I Want To Contribute](#i-want-to-contribute)
+- [I Want to Contribute](#i-want-to-contribute)
+  - [Need Ideas to Contribute?](#need-ideas-to-contribute)
   - [Your First Code Contribution](#your-first-code-contribution)
   - [Setup](#setup)
   - [Improving The Documentation](#improving-the-documentation)
   - [Reporting Bugs](#reporting-bugs)
+  - [How Do I Submit a Good Bug Report?](#how-do-i-submit-a-good-bug-report)
   - [Suggesting Enhancements](#suggesting-enhancements)
+    - [Before Submitting an Enhancement](#before-submitting-an-enhancement)
+    - [How Do I Submit a Good Enhancement Suggestion?](#how-do-i-submit-a-good-enhancement-suggestion?)
   - [Working With Git](#working-with-git)
     - [Keeping Your Branch Up to Date](#keeping-your-branch-up-to-date)
 - [Styleguide](#styleguide)
@@ -36,7 +40,8 @@ All types of contributions are encouraged and valued. See the [Table of Contents
     - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
-  - [Join The Project Team](#join-the-project-team)
+- [Join The Project Team](#join-the-project-team)
+- [Attribution](#attribution)
 
 ---
 
@@ -58,18 +63,18 @@ If you then still feel the need to ask a question and need clarification, we rec
 
 We will then take care of the issue as soon as possible.
 
-## I Want To Contribute
+## I Want to Contribute
 
 > ### Legal Notice
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
 
-### Need ideas to contribute?
+### Need Ideas to Contribute?
 
 Unless you have a good idea to implement, you can browse the [beginner issues](https://github.com/WenuLink/wenu-link-android/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) and select a feature or bug fix that should be fairly easy to implement. Once you will become an experienced developer, you will be able to address more complex issues.
 
 ### Your First Code Contribution
 
-For prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches management](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
+To prepare your first code contribution is required to know about [git flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) and [branches management](https://git-scm.com/book/en/v2/Git-Branching-Branch-Management).
 This project follows a common git flow initialization setup with the following branches:
 
 - `main` for stable releases
@@ -80,7 +85,7 @@ This project follows a common git flow initialization setup with the following b
 - `support/*` for Support branches
 - no version tag prefix defined
 
-In this regard, you can fork any branch that you are interested to contribute. For example, if a new feature will be added, the fork must be done from the `develop` branch. If the idea is to contribute in Work In Progress (WIP) features, the fork must be done from the any `feature/*` branch. Current development stage is focused in core aspects of the application, this is why **test cases with other Aircraft and Android devices** is essential to ensure a wide compatibility range. After achieving a first stable version, the development must be focused on including the DJI SDK v5, aiming to increase the number of compatible Aircraft.
+In this regard, you can fork any branch that you are interested in contributing to. For example, if a new feature will be added, the fork must be done from the `develop` branch. If the idea is to contribute to Work In Progress (WIP) features, the fork must be done from the any `feature/*` branch. Current development stage is focused in core aspects of the application, this is why **test cases with other Aircraft and Android devices** is essential to ensure a wide compatibility range. After achieving a first stable version, the development must be focused on including the DJI SDK v5, aiming to increase the number of compatible Aircraft.
 
 More information will be added.
 
@@ -152,7 +157,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/WenuLi
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
-- **Explain why this enhancement would be useful** to most CONTRIBUTING.md users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+- **Explain why this enhancement would be useful** to most WenuLink users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
 
 ### Working With Git
 
@@ -173,7 +178,7 @@ Force-pushing after a rebase is expected for feature branches. Prefer `--force-w
 
 ## Styleguide
 
-The overall coding style is based on actual Kotlin/Android development specifications. Specific definitions needs to be made for a more detailed style to address. Initially, the only requirement is to follow the package and visibility aspects so far.
+The overall coding style is based on actual Kotlin/Android development specifications. Specific definitions need to be made for a more detailed style guide. For now the only requirement is to follow the package and visibility aspects.
 
 In terms of package organization:
 
@@ -183,7 +188,7 @@ In terms of package organization:
 - `views` package comprise all classes for interfacing logic-level and UI-level information.
 - `webrtc` package comprise all classes for WebRTC protocol support.
 
-Regards class naming convention:
+Regarding class naming convention:
 
 - `Service` suffix will be used with classes that handle specific communication protocol or long-time running operations.
 - `Controller` suffix will be used with classes that address different [MAVLink's microservice](https://mavlink.io/en/services/) messaging interface.
@@ -249,7 +254,7 @@ The path varies by OS:
 - macOS: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
 - Linux: `/opt/android-studio/jbr`
 
-#### Recommended: pre-commit hook
+#### Recommended: Pre-Commit Hook
 
 To have ktlint check your code automatically on every `git commit`, run this once after cloning the repository:
 
@@ -292,7 +297,7 @@ Fixes #42
 
 ## Join The Project Team
 
-As initial team, we are accepting new members that would compromise in improving the development of the presented project. Authorization and roles must be requested by open an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Role,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
+As the initial team, we are accepting new members that would commit in improving the development of the presented project. Authorization and roles must be requested by opening an [Issue](https://github.com/WenuLink/wenu-link-android/issues/new) with the subject: `Request for participation of role: <Role,Maintainer>. For developers, all that you need to do is to create a fork of the repository and Pull Request to the development branch.
 
 ## Attribution
 This guide is based on the **contributing.md**. [Make your own](https://contributing.md/)!
