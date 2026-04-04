@@ -15,7 +15,6 @@ import dji.common.mission.waypoint.WaypointMissionHeadingMode
 import dji.common.mission.waypoint.WaypointMissionState
 import dji.common.mission.waypoint.WaypointMissionUploadEvent
 import dji.sdk.mission.MissionControl
-import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import dji.sdk.mission.waypoint.WaypointMissionOperator
 import dji.sdk.mission.waypoint.WaypointMissionOperatorListener
 import io.getstream.log.taggedLogger
@@ -25,6 +24,7 @@ import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.GimbalPitchAction
 import org.WenuLink.adapters.mission.MissionActionCommand
 import org.WenuLink.adapters.mission.MissionNode
+import org.WenuLink.adapters.mission.PhotoAction
 import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.adapters.mission.StopPhotoAction
 import org.WenuLink.adapters.mission.StopVideoAction
@@ -158,7 +158,7 @@ object MissionManager {
         is GimbalPitchAction ->
             WaypointAction(WaypointActionType.GIMBAL_PITCH, action.angle.roundToInt())
 
-        is ShootPhotoAction ->
+        is PhotoAction ->
             WaypointAction(WaypointActionType.START_TAKE_PHOTO, 0)
 
         is VideoAction ->
@@ -167,7 +167,10 @@ object MissionManager {
         is StopVideoAction, StopPhotoAction ->
             WaypointAction(WaypointActionType.STOP_RECORD, 0)
 
-        else -> WaypointAction(WaypointActionType.STAY, 1000) // fallback
+        else -> {
+            logger.w { "mapAction: unhandled action type ${action::class.simpleName}" }
+            WaypointAction(WaypointActionType.STAY, 1000)
+        }
     }
 
     fun startMission(onResult: (String?) -> Unit) =

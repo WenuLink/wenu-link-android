@@ -194,28 +194,25 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
             val minutes = param3.toInt()
             val seconds = param4.toInt()
 
-            var timeMillis = 0
-            if (delay == -1) {
-                if (hours != -1) timeMillis += hours * 60 * 60
-                if (minutes != -1) timeMillis += minutes * 60
-                if (seconds != -1) timeMillis += seconds
+            val totalSeconds = if (delay != -1) {
+                delay
             } else {
-                timeMillis = delay
+                (if (hours != -1) hours * 3600 else 0) +
+                    (if (minutes != -1) minutes * 60 else 0) +
+                    (if (seconds != -1) seconds else 0)
             }
-            timeMillis *= 1000 // to ms
-            return DelayAction(timeMillis.toLong())
+            return DelayAction(totalSeconds * 1000L)
         }
 
         fun fromCommandLong(command: msg_command_long): DelayAction =
             fromParameters(command.param1, command.param2, command.param3, command.param4)
 
-        fun fromMissionItem(missionItemMsg: msg_mission_item_int): MissionActionCommand =
-            fromParameters(
-                missionItemMsg.param1,
-                missionItemMsg.param2,
-                missionItemMsg.param3,
-                missionItemMsg.param4
-            )
+        fun fromMissionItem(missionItemMsg: msg_mission_item_int): DelayAction = fromParameters(
+            missionItemMsg.param1,
+            missionItemMsg.param2,
+            missionItemMsg.param3,
+            missionItemMsg.param4
+        )
     }
 
     override fun validate(ctx: MissionHandler): String? = if (ctx.state.isActive()) {
@@ -288,7 +285,7 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         fun fromMissionItem(
             missionItemMsg: msg_mission_item_int,
             missionSpeed: Float
-        ): MissionActionCommand {
+        ): RepositionAction {
             // NAV_WAYPOINT
 //            val holdSeconds = missionItemMsg.param1.toInt()
 //            val acceptRadius = missionItemMsg.param2.toInt()
@@ -332,7 +329,7 @@ data class RotateAction(
     }
 ) {
     companion object {
-        fun fromCommandLong(commandLongMsg: msg_command_long): MissionActionCommand {
+        fun fromCommandLong(commandLongMsg: msg_command_long): RotateAction {
             // CONDITION_YAW
             var angle = commandLongMsg.param1 // [0, 360] deg
             var angularSpeed = commandLongMsg.param2 // deg/s
