@@ -13,7 +13,6 @@ import org.WenuLink.commands.IHandler
 import org.WenuLink.sdk.AircraftManager
 import org.WenuLink.sdk.FCManager
 import org.WenuLink.sdk.RCManager
-import org.WenuLink.sdk.SignalQuality
 import org.WenuLink.sdk.SimManager
 
 class TelemetryHandler : IHandler<TelemetryHandler> {

@@ -27,7 +27,7 @@ import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import org.WenuLink.adapters.MessageUtils
-import org.WenuLink.adapters.RequestReposition
+import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
@@ -35,6 +35,7 @@ import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionHandler
 import org.WenuLink.adapters.mission.MissionNode
+import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -299,16 +300,9 @@ class NavigationController(override val client: MAVLinkClient) : IController {
     }
 
     fun processDoReposition(commandIntMsg: msg_command_int, handler: WenuLinkHandler) {
-        val latitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.x)
-        val longitude = MessageUtils.coordinateMAVLink2DJI(commandIntMsg.y)
-        val coordinate = Coordinates3D(latitude, longitude, commandIntMsg.z)
-
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestReposition(
-                    coordinate,
-                    if (commandIntMsg.param1 != -1f) commandIntMsg.param1 else null
-                )
+                RequestMissionAction(RepositionAction.fromCommandInt(commandIntMsg))
             )
         )
 

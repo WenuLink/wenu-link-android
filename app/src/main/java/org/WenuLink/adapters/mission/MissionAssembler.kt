@@ -29,10 +29,10 @@ class MissionAssembler {
         nWaypoints += 1
     }
 
-    fun addActionToLast(action: MissionAction) {
+    fun addActionToLast(missionAction: MissionActionCommand) {
         (nodes.lastOrNull() as? MissionNode.Waypoint)
             ?.actions
-            ?.add(action)
+            ?.add(missionAction)
     }
 
     fun setRTLWhenFinish() {

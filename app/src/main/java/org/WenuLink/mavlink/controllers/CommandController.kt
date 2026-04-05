@@ -9,13 +9,18 @@ import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.RequestGoHome
 import org.WenuLink.adapters.RequestLand
+import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.TakeoffCommand
+import org.WenuLink.adapters.mission.DelayAction
+import org.WenuLink.adapters.mission.ReturnAction
+import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -43,18 +48,13 @@ class CommandController(override var client: MAVLinkClient) : IController {
         if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
 
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_DO_SET_MODE ->
-                setMode(commandLongMsg, handler)
-
-            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM ->
-                processArmDisarm(commandLongMsg, handler)
-
-            MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
-                processTakeoff(commandLongMsg, handler)
-
-            MAV_CMD.MAV_CMD_NAV_LAND ->
-                processLanding(commandLongMsg, handler)
-
+            MAV_CMD.MAV_CMD_DO_SET_MODE -> setMode(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM -> processArmDisarm(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_NAV_TAKEOFF -> processTakeoff(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_NAV_LAND -> processLanding(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH -> processReturn(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_NAV_DELAY -> processDelay(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_CONDITION_YAW -> processYaw(commandLongMsg, handler)
             else -> return false
         }
         return true
@@ -162,8 +162,44 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     fun processLanding(commandMsg: msg_command_long, handler: WenuLinkHandler) {
         logger.d { "processLanding: $commandMsg" }
-        handler.dispatchCommand(WenuLinkCommand.Request(RequestLand(true))) { landError ->
-            logger.d { "processLanding: $landError" }
+        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isSuccess) {
+            MAV_RESULT.MAV_RESULT_ACCEPTED
+        } else {
+            MAV_RESULT.MAV_RESULT_DENIED
+        }
+        sendCommandAck(commandMsg.command, result)
+    }
+
+    fun processReturn(commandMsg: msg_command_long, handler: WenuLinkHandler) {
+        logger.d { "processReturn: $commandMsg" }
+        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isSuccess) {
+            MAV_RESULT.MAV_RESULT_ACCEPTED
+        } else {
+            MAV_RESULT.MAV_RESULT_DENIED
+        }
+        sendCommandAck(commandMsg.command, result)
+    }
+
+    fun processDelay(commandMsg: msg_command_long, handler: WenuLinkHandler) {
+        logger.d { "processDelay: $commandMsg" }
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestMissionAction(DelayAction.fromCommandLong(commandMsg))
+            )
+        ) { error ->
+            logger.d { "processDelay: $error" }
+        }
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+    }
+
+    fun processYaw(commandMsg: msg_command_long, handler: WenuLinkHandler) {
+        logger.d { "processYaw: $commandMsg" }
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestMissionAction(RotateAction.fromCommandLong(commandMsg))
+            )
+        ) { error ->
+            logger.d { "processYaw: $error" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }

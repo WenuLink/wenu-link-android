@@ -222,3 +222,5 @@ data class Quaternion(val w: Double, val x: Double, val y: Double, val z: Double
         z.toFloat()
     )
 }
+
+data class SignalQuality(val downlink: Int?, val uplink: Int?)
