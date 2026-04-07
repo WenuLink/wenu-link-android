@@ -244,14 +244,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     suspend fun waitArmTransition(mustArm: Boolean, timeout: Long): Boolean {
-        fun motorsMatchTarget(): Boolean = mustArm == state.isArmed()
-
-        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::motorsMatchTarget)
+        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout) { mustArm == state.isArmed() }
 
         if (motorsUpdated) {
-            logger.i { "Aircraft armed" }
+            logger.i { if (mustArm) "Aircraft armed" else "Aircraft in standby" }
         } else {
-            logger.i { "Aircraft in standby" }
+            logger.w { "Timeout: ${if (mustArm) "armed" else "disarmed"} state not reached" }
         }
 
         return motorsUpdated
