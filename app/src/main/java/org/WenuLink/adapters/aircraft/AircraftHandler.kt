@@ -124,11 +124,10 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         enforceModeConsistency()
     }
 
-    suspend fun loadParameters(): Boolean {
+    suspend fun loadParameters(timeout: Long = 5000L): Boolean {
         logger.i { "Waiting for parameters" }
         parameters.load()
-        AsyncUtils.waitReady(1000L, parameters::isLoaded)
-        return parameters.isLoaded()
+        return AsyncUtils.waitTimeout(timeout, 1000L, parameters::isLoaded)
     }
 
     suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
@@ -206,7 +205,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
 
-        if (!loadParameters()) return "No parameters"
+        if (!loadParameters(timeout)) return "No parameters"
         logger.d { "\tLoading parameters: OK" }
 
         if (!startTelemetry(timeout)) return "No telemetry"
@@ -276,10 +275,16 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return flyingStateUpdated
     }
 
-    suspend fun waitAndConfirmLanding() {
+    suspend fun waitAndConfirmLanding(timeout: Long = 30_000L) {
         // https://developer.dji.com/api-reference/android-api/Components/FlightController/DJIFlightController.html#djiflightcontroller_confirmlanding_inline
         logger.d { "\tWaiting altitude of 0.3m" }
-        AsyncUtils.waitReady(100L, FCManager::needLandingConfirmation)
+        val confirmationNeeded = AsyncUtils.waitTimeout(
+            timeout,
+            100L,
+            FCManager::needLandingConfirmation
+        )
+
+        if (!confirmationNeeded) logger.w { "Landing confirmation timeout, attempting anyway" }
 
         FCManager.confirmLanding {
             logger.d { "\tLanding confirm" }
