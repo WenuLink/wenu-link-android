@@ -151,7 +151,10 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     fun processTakeoff(commandMsg: msg_command_long, handler: WenuLinkHandler) {
         logger.d { "processTakeoff: $commandMsg" }
-        handler.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand())) { error ->
+        handler.dispatchCommand(
+            // TODO: also handle param4 (yaw), param5 (lat), and param6 (long)
+            WenuLinkCommand.Aircraft(TakeoffCommand(commandMsg.param7))
+        ) { error ->
             logger.d { "processTakeoff: $error" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)

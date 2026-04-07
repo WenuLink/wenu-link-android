@@ -1,14 +1,19 @@
 package org.WenuLink.adapters.aircraft
 
+import dji.common.model.LocationCoordinate2D
+import dji.sdk.mission.timeline.actions.GoToAction
 import io.getstream.log.taggedLogger
+import kotlin.coroutines.resume
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParameterRegistry
 import org.WenuLink.sdk.FCManager
+import org.WenuLink.sdk.MissionActionManager
 
 class AircraftHandler : CommandHandler<AircraftHandler>() {
     companion object {
@@ -270,6 +275,42 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun takeOff() {
         logger.d { "Aircraft taking off" }
         FCManager.startTakeoff()
+    }
+
+    suspend fun goToAltitude(altitude: Float, speed: Float = 2f): String? {
+        val location = FCManager.fcInstance?.state?.aircraftLocation
+            ?: return "No aircraft location"
+
+        return suspendCancellableCoroutine { cont ->
+            MissionActionManager.clear() // ok since takeoff happens before any mission
+
+            val action = GoToAction(
+                LocationCoordinate2D(location.latitude, location.longitude),
+                altitude
+            )
+                .apply { flightSpeed = speed }
+
+            val error = MissionActionManager.schedule(action)
+            if (error != null) {
+                cont.resume("GoTo failed: ${error.description}")
+                return@suspendCancellableCoroutine
+            }
+
+            val key = MissionActionManager.onFinish(GoToAction::class) {
+                cont.resume(null)
+            }
+
+            MissionActionManager.startListener { errorMsg ->
+                cont.resume("GoTo error: $errorMsg")
+            }
+
+            MissionActionManager.start()
+
+            cont.invokeOnCancellation {
+                MissionActionManager.removeCallback(key)
+                MissionActionManager.stop()
+            }
+        }
     }
 
     suspend fun awaitFlightState(takingOff: Boolean): Boolean {

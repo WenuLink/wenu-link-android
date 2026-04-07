@@ -76,7 +76,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(TakeoffTransition)
-        ctx.takeOff() // ctx.takeOff(initialAltitude)
+        ctx.takeOff()
         val isFlying = ctx.awaitFlightState(true)
 
         if (!isFlying) {
@@ -84,7 +84,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
             return "Unable to takeoff"
         }
 
-        return null
+        return ctx.goToAltitude(initialAltitude)
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
