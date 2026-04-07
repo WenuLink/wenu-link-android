@@ -31,7 +31,6 @@ sealed interface RequestCommand : ICommand<WenuLinkHandler> {
 }
 
 open class RequestTransition(open val transition: StateTransition) : RequestCommand {
-
     override fun validate(ctx: WenuLinkHandler): String? =
         ctx.aircraft.canDispatchTransition(transition)
 
@@ -48,7 +47,6 @@ open class RequestTransition(open val transition: StateTransition) : RequestComm
 
 data class RequestLand(val withLandingConfirmation: Boolean = true) :
     RequestTransition(LandTransition) {
-
     override suspend fun execute(ctx: WenuLinkHandler): String? {
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError

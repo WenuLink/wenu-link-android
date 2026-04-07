@@ -32,7 +32,6 @@ data class UploadMissionCommand(
     private val assembler: MissionAssembler,
     private val flightSpeed: Float = 5f
 ) : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         ctx.state.canCreateMission() -> null
         else -> "Upload not ready"
@@ -53,7 +52,6 @@ data class UploadMissionCommand(
 }
 
 data object StartWaypointMission : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         ctx.state.canCreateMission() -> "No mission found"
         ctx.state.isActive() -> "Already started"
@@ -76,7 +74,6 @@ data object StartWaypointMission : MissionCommand {
 }
 
 data object PauseWaypointMission : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         ctx.state.canPauseMission() -> null
         else -> "Not started"
@@ -97,7 +94,6 @@ data object PauseWaypointMission : MissionCommand {
 }
 
 data object ResumeWaypointMission : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         ctx.state.canResumeMission() -> null
         else -> "Already in execution"
@@ -118,7 +114,6 @@ data object ResumeWaypointMission : MissionCommand {
 }
 
 data object StopWaypointMission : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         !ctx.state.canCreateMission() -> null
         else -> "Nothing to stop"
@@ -139,7 +134,6 @@ data object StopWaypointMission : MissionCommand {
 }
 
 data object PauseActionCommand : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         !MissionActionManager.isRunning -> "Timeline not running"
         else -> null
@@ -154,7 +148,6 @@ data object PauseActionCommand : MissionCommand {
 }
 
 data object ResumeActionCommand : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = when {
         MissionActionManager.isRunning -> "Timeline already running"
         else -> null
@@ -169,7 +162,6 @@ data object ResumeActionCommand : MissionCommand {
 }
 
 interface MissionActionCommand : MissionCommand {
-
     override fun validate(ctx: MissionHandler): String? = if (MissionActionManager.isRunning) {
         "Busy"
     } else {
@@ -180,7 +172,6 @@ interface MissionActionCommand : MissionCommand {
 }
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
-
     companion object {
         fun fromParameters(
             param1: Float,
@@ -230,7 +221,6 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
 }
 
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
-
     override suspend fun execute(ctx: MissionHandler): String? =
         suspendCancellableCoroutine { cont ->
             MissionActionManager.clear()
