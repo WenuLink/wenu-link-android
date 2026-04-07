@@ -30,7 +30,7 @@ sealed interface MissionCommand : ICommand<MissionHandler> {
 
 data class UploadMissionCommand(
     private val assembler: MissionAssembler,
-    private val flightSpeed: Float = 5.0f
+    private val flightSpeed: Float = 5f
 ) : MissionCommand {
 
     override fun validate(ctx: MissionHandler): String? = when {

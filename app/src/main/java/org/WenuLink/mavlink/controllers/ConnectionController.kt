@@ -20,7 +20,6 @@ import com.MAVLink.enums.MAV_SYS_STATUS_SENSOR
 import com.MAVLink.enums.MAV_TYPE
 import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
-import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import org.WenuLink.adapters.MessageUtils
@@ -212,9 +211,9 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
         msg.airspeed = sqrt(
-            telemetryData.velocityX.toDouble().pow(2.0) +
-                telemetryData.velocityY.toDouble().pow(2.0)
-        ).toFloat()
+            telemetryData.velocityX * telemetryData.velocityX +
+                telemetryData.velocityY * telemetryData.velocityY
+        )
         // Mavlink: Current ground speed in m/s. For now, just echoing airspeed.
         msg.groundspeed = msg.airspeed
         // yaw angle

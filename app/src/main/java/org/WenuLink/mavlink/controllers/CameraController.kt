@@ -188,7 +188,7 @@ class CameraController(
         handler: WenuLinkHandler,
         cameraInfo: CameraMetadata
     ) {
-        val intervalMillis = (commandLongMsg.param2 * 1000).toLong() // milliseconds
+        val intervalMillis = commandLongMsg.param2.toLong() * 1000 // milliseconds
         val totalPhotos = commandLongMsg.param3.toInt()
         val initSequence = commandLongMsg.param4.toInt()
 
@@ -394,10 +394,10 @@ class CameraController(
             storage_id = 1
             storage_count = 1
             status = STORAGE_STATUS.STORAGE_STATUS_READY.toShort()
-            total_capacity = 4096F // MB
-            used_capacity = 0F // MB
-            read_speed = 0F // MB/s
-            write_speed = 0F // MB/s
+            total_capacity = 4096f // MB
+            used_capacity = 0f // MB
+            read_speed = 0f // MB/s
+            write_speed = 0f // MB/s
             type = STORAGE_TYPE.STORAGE_TYPE_MICROSD.toShort()
             name = "FakeSDCard".toByteArray()
             storage_usage = STORAGE_USAGE_FLAG.STORAGE_USAGE_FLAG_PHOTO.toShort()
@@ -422,7 +422,7 @@ class CameraController(
             image_interval = imageInterval
             recording_time_ms = videoTime
             // TODO: read true value
-            available_capacity = 4000F
+            available_capacity = 4000f
             image_count = 0
             camera_device_id = cameraInfo.id.toShort()
         }

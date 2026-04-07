@@ -128,7 +128,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
-        val perSensorTime = (timeout.toFloat() / 3).roundToLong()
+        val perSensorTime = (timeout / 3f).roundToLong()
         logger.i { "Waiting sensors data" }
 
         if (!AsyncUtils.waitTimeout(100L, timeout, telemetry::isReadingSensors)) {
