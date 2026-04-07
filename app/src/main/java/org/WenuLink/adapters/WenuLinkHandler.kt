@@ -124,7 +124,9 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                         cameraHooks()
                     }
 
-                    launch { safetyChecks() }
+                    launch {
+                        safetyChecks()
+                    }
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
