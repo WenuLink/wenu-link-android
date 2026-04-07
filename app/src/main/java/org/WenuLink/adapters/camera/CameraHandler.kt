@@ -5,6 +5,7 @@ import com.MAVLink.enums.CAMERA_MODE
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.CameraManager
@@ -26,10 +27,13 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     val availableCameras: MutableList<CameraMetadata> = mutableListOf()
     var photoSeqIndex: Int = 0
     var captureTimestamp: Long = System.currentTimeMillis()
-    val lastCaptureMillis
-        get() = System.currentTimeMillis() - captureTimestamp
     var wasInitialized = false
         private set
+
+    val captureCount: StateFlow<Int>
+        get() = CameraManager.captureCount
+
+    private var lastSeenCaptureCount: Int = 0
 
     override fun registerScope(scope: CoroutineScope) {
         scope.launch {
@@ -42,6 +46,7 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     override fun unload() {
         availableCameras.clear()
         photoSeqIndex = 0
+        lastSeenCaptureCount = 0
         super.unload()
     }
 
@@ -94,6 +99,14 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         getCamera(cameraIdx)?.let {
             availableCameras.set(cameraIdx, it.copy(state = newState))
         }
+    }
+
+    fun consumeCaptureEvent(): Boolean {
+        val current = captureCount.value
+        if (current <= lastSeenCaptureCount) return false
+        lastSeenCaptureCount = current
+        photoSeqIndex += 1
+        return true
     }
 
     fun updateCaptureStatus(newStatus: CameraCaptureStatus, cameraIdx: Int = 0) {

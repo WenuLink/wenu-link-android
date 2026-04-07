@@ -9,6 +9,7 @@ import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
+import org.WenuLink.adapters.camera.ImageMetadata
 import org.WenuLink.mavlink.controllers.CameraController
 import org.WenuLink.mavlink.controllers.CommandController
 import org.WenuLink.mavlink.controllers.ConnectionController
@@ -46,6 +47,9 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
     private val telemetryController: TelemetryController
         get() = controllers.filterIsInstance<TelemetryController>().first()
 
+    private val cameraController: CameraController
+        get() = controllers.filterIsInstance<CameraController>().first()
+
     fun attachClient(client: MAVLinkClient) {
         this.client = client
         // Initialize controllers
@@ -56,6 +60,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         controllers += NavigationController(client)
         controllers += TelemetryController(client)
         controllers += CameraController(client, telemetryController::setMessageRate)
+        registerCameraHooks()
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
@@ -227,5 +232,18 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
     private fun unhandledRequest(label: String, id: Int) {
         logger.w { "Unhandled $label ID: $id" }
         client.sendMessage(MessageUtils.msgRequestAck())
+    }
+
+    private fun registerCameraHooks() {
+        handler.onImageCaptured = { cameraId, seqIndex ->
+            val telemetry = handler.aircraft.telemetry.getData()
+            if (telemetry != null) {
+                client.sendMessage(
+                    cameraController.msgImageCaptured(
+                        ImageMetadata(seqIndex, true, cameraId, telemetry)
+                    )
+                )
+            }
+        }
     }
 }

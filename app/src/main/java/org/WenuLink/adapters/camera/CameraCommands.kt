@@ -1,6 +1,7 @@
 package org.WenuLink.adapters.camera
 
 import com.MAVLink.enums.CAMERA_MODE
+import dji.common.camera.SettingsDefinitions
 import org.WenuLink.commands.ICommand
 import org.WenuLink.sdk.CameraManager
 
@@ -110,6 +111,49 @@ data class StopRecordCommand(val cameraIdx: Int) : CameraCommand {
         val error = CameraManager.requestStopVideoRecording()
         if (error == null) {
             // mark IDLE back
+            ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+        }
+        return error
+    }
+}
+
+data class StartIntervalShootCommand(val cameraIdx: Int, val intervalSeconds: Int) : CameraCommand {
+    override fun validate(ctx: CameraHandler): String? = when {
+        !ctx.isPhotoMode(cameraIdx) -> "Not in photo mode!"
+        !ctx.captureIdle(cameraIdx) -> "Busy"
+        else -> null
+    }
+
+    override suspend fun execute(ctx: CameraHandler): String? {
+        val modeError = CameraManager.setCaptureMode(SettingsDefinitions.ShootPhotoMode.INTERVAL)
+        if (modeError != null) return modeError
+
+        val intervalError = CameraManager.setIntervalSeconds(intervalSeconds)
+        if (intervalError != null) return intervalError
+
+        ctx.updateCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraIdx)
+        return CameraManager.requestStartIntervalShoot()
+    }
+
+    override suspend fun onStop(ctx: CameraHandler) {
+        CameraManager.requestStopIntervalShoot()
+        ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+    }
+}
+
+data class StopIntervalShootCommand(val cameraIdx: Int) : CameraCommand {
+    override fun validate(ctx: CameraHandler): String? = when {
+        !ctx.isPhotoMode(cameraIdx) -> "Not in photo mode!"
+
+        !ctx.checkCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraIdx) ->
+            "Interval shoot not started"
+
+        else -> null
+    }
+
+    override suspend fun execute(ctx: CameraHandler): String? {
+        val error = CameraManager.requestStopIntervalShoot()
+        if (error == null) {
             ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
         }
         return error

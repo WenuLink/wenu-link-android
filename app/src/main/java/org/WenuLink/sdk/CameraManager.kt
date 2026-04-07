@@ -12,6 +12,9 @@ import dji.sdk.codec.DJICodecManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AsyncUtils
 
@@ -37,6 +40,9 @@ object CameraManager {
     var fwVersion: String? = null
     var cameraMode = SettingsDefinitions.CameraMode.UNKNOWN
     var captureMode = SettingsDefinitions.ShootPhotoMode.UNKNOWN
+    private val _captureCount = MutableStateFlow(0)
+    val captureCount: StateFlow<Int> = _captureCount.asStateFlow()
+    private var wasStoringPhoto = false
 
     @Synchronized
     fun init(camera: Camera) {
@@ -57,6 +63,13 @@ object CameraManager {
             .toFloat()
 
         logger.i { toString() }
+
+        camera.setSystemStateCallback { state ->
+            if (state.isStoringPhoto && !wasStoringPhoto) {
+                _captureCount.value += 1
+            }
+            wasStoringPhoto = state.isStoringPhoto
+        }
     }
 
     fun createCompletionCallback(
@@ -296,13 +309,8 @@ object CameraManager {
 
         // Launch capture
         return suspendCancellableCoroutine { cont ->
-
             camera.startRecordVideo { error ->
-                if (error != null) {
-                    cont.resume(error.description)
-                } else {
-                    cont.resume(null)
-                }
+                cont.resume(error?.description)
             }
 
             cont.invokeOnCancellation {
@@ -318,17 +326,44 @@ object CameraManager {
         return suspendCancellableCoroutine { cont ->
             camera.stopRecordVideo(
                 SDKUtils.createCompletionCallback { error ->
-                    if (error != null) {
-                        cont.resume(error)
-                    } else {
-                        cont.resume(null)
-                    }
+                    cont.resume(error)
                 }
             )
 
             cont.invokeOnCancellation {
                 // Add SDK cancel if available
             }
+        }
+    }
+
+    suspend fun setIntervalSeconds(seconds: Int): String? = suspendCancellableCoroutine { cont ->
+        mInstance?.setPhotoTimeIntervalSettings(
+            SettingsDefinitions.PhotoTimeIntervalSettings(255, seconds),
+            SDKUtils.createCompletionCallback { error ->
+                if (cont.isActive) cont.resume(error)
+            }
+        ) ?: cont.resume("Camera instance is null")
+    }
+
+    suspend fun requestStartIntervalShoot(): String? {
+        val camera = mInstance ?: return "Camera instance is null"
+        return suspendCancellableCoroutine { cont ->
+            camera.startShootPhoto(
+                SDKUtils.createCompletionCallback { error ->
+                    if (cont.isActive) cont.resume(error)
+                }
+            )
+        }
+    }
+
+    suspend fun requestStopIntervalShoot(): String? {
+        val camera = mInstance ?: return "Camera instance is null"
+        return suspendCancellableCoroutine { cont ->
+            camera.stopShootPhoto(
+                SDKUtils.createCompletionCallback { error ->
+                    if (cont.isActive) cont.resume(error)
+                }
+            )
         }
     }
 }
