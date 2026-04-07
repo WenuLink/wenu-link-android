@@ -8,7 +8,6 @@ import dji.common.model.LocationCoordinate2D
 import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
-import kotlin.getValue
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.IMUState as AppIMUState
 import org.WenuLink.adapters.aircraft.SensorState as AppSensorState

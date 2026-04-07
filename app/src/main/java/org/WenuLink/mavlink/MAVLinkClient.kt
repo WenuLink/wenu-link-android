@@ -1,6 +1,5 @@
 package org.WenuLink.mavlink
 
-import com.MAVLink.MAVLinkPacket
 import com.MAVLink.Messages.MAVLinkMessage
 import com.MAVLink.Parser
 import com.MAVLink.enums.MAV_COMPONENT.MAV_COMP_ID_AUTOPILOT1

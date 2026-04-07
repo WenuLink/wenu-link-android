@@ -3,7 +3,6 @@ package org.WenuLink.adapters.camera
 import com.MAVLink.enums.CAMERA_CAP_FLAGS
 import com.MAVLink.enums.CAMERA_MODE
 import io.getstream.log.taggedLogger
-import kotlin.getValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
