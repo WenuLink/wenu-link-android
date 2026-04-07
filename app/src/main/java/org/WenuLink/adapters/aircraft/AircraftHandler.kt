@@ -262,20 +262,20 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         FCManager.startTakeoff()
     }
 
-    suspend fun awaitFlightState(takingOff: Boolean): Boolean {
+    suspend fun waitFlightState(takingOff: Boolean, timeout: Long): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
-        fun flyingMatchesTarget(): Boolean = takingOff == state.isFlying()
-        AsyncUtils.waitReady(100L, ::flyingMatchesTarget)
 
-        if (takingOff && state.isFlying()) {
-            logger.d { "Aircraft flying" }
+        val flyingStateUpdated = AsyncUtils.waitTimeout(100L, timeout) {
+            takingOff == state.isFlying()
         }
 
-        if (!takingOff && !state.isFlying()) {
-            logger.d { "Aircraft on the ground" }
+        if (flyingStateUpdated) {
+            logger.i { if (takingOff) "Aircraft flying" else "Aircraft on the ground" }
+        } else {
+            logger.w { "Timeout: ${if (takingOff) "takeoff" else "landing"} state not reached" }
         }
 
-        return flyingMatchesTarget()
+        return flyingStateUpdated
     }
 
     suspend fun waitAndConfirmLanding() {
