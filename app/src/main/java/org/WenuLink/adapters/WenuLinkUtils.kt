@@ -43,7 +43,7 @@ object MessageUtils {
     fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
 
     // deg E7 to float
-    fun coordinateMAVLink2DJI(value: Int): Double = value.toDouble() / 10_000_000.0
+    fun coordinateMAVLink2DJI(value: Int): Double = value / 10_000_000.0
 
     // meters to millimeters
     fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()

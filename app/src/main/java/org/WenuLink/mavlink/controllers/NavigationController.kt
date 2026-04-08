@@ -31,7 +31,6 @@ import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
-import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.adapters.mission.MissionHandler
 import org.WenuLink.adapters.mission.MissionNode

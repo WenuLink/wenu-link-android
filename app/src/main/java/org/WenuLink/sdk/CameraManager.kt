@@ -12,7 +12,6 @@ import dji.sdk.codec.DJICodecManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
-import kotlin.getValue
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AsyncUtils
 

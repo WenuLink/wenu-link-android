@@ -75,7 +75,7 @@ object SimManager {
         }
 
         // compute velocities
-        val dT = (data.timestamp - previousData.timestamp).toFloat() / 1000f // to seconds
+        val dT = (data.timestamp - previousData.timestamp) / 1000f // to seconds
         return data.copy(
             flightTime = (landStamp - takeOffStamp).toInt(),
             velocityX = (data.positionX - previousData.positionX) / dT,
@@ -87,7 +87,7 @@ object SimManager {
     fun run(
         lat: Double = -8.066478642777481,
         long: Double = -34.98744367551871,
-        alt: Float = 24.0f,
+        alt: Float = 24f,
         updateFrequency: Int = 10,
         satelliteCount: Int = 8,
         onResult: (String?) -> Unit

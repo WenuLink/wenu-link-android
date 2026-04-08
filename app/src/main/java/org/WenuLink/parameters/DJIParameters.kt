@@ -239,7 +239,6 @@ class DJIYawModeControlModeParameter(
  */
 
 class DJIParametersProvider(private val fc: FlightController) : ParameterProvider {
-
     override fun provide(): List<ParameterSpec> = listOf(
         DJIBooleanParameter(
             "DJI_SPIN_ENABLED",

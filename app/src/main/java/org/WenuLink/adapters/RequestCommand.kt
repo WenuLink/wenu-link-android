@@ -5,7 +5,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.AircraftCommand
 import org.WenuLink.adapters.aircraft.ArmTransition
 import org.WenuLink.adapters.aircraft.ControlAuthorityType
-import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.FlyingTransition
 import org.WenuLink.adapters.aircraft.LandTransition
@@ -14,7 +13,6 @@ import org.WenuLink.adapters.camera.CameraCommand
 import org.WenuLink.adapters.mission.LandAction
 import org.WenuLink.adapters.mission.MissionActionCommand
 import org.WenuLink.adapters.mission.MissionCommand
-import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.adapters.mission.ReturnAction
 import org.WenuLink.adapters.mission.StartWaypointMission
 import org.WenuLink.commands.ICommand
@@ -33,7 +31,6 @@ sealed interface RequestCommand : ICommand<WenuLinkHandler> {
 }
 
 open class RequestTransition(open val transition: StateTransition) : RequestCommand {
-
     override fun validate(ctx: WenuLinkHandler): String? =
         ctx.aircraft.canDispatchTransition(transition)
 
@@ -50,7 +47,6 @@ open class RequestTransition(open val transition: StateTransition) : RequestComm
 
 data class RequestLand(val withLandingConfirmation: Boolean = true) :
     RequestTransition(LandTransition) {
-
     override suspend fun execute(ctx: WenuLinkHandler): String? {
         val transitionError = super.execute(ctx)
         if (transitionError != null) return transitionError

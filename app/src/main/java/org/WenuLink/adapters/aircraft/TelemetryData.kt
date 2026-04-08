@@ -1,7 +1,6 @@
 package org.WenuLink.adapters.aircraft
 
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
-import kotlin.Int
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import org.WenuLink.adapters.MessageUtils
@@ -83,11 +82,11 @@ data class RCData(
 ) {
     private fun stickValue2Percent(value: Int): Int =
         // transform from DJI range [-660, 660] => [0, 100]
-        (((value + 660).toFloat() / 1320f) * 100).roundToInt()
+        (((value + 660) / 1320f) * 100).roundToInt()
 
     private fun stickValue2RcValue(value: Int): Int =
         // transform from DJI range [-660, 660] => [1000, 2000]
-        ((value.toFloat() / 660) * 500).roundToInt() + 1500
+        ((value / 660f) * 500).roundToInt() + 1500
 
     fun toMAVLink(): RCData = this.copy(
         throttleSetting = stickValue2Percent(this.throttleSetting),
@@ -173,14 +172,14 @@ object BatteryMapper {
                 UNKNOWN_INT
             },
             temperature = source.temperature
-                ?.let { (it * 100.0).toInt().toShort() }
+                ?.let { (it * 100).toInt().toShort() }
                 ?: UNKNOWN_SHORT,
             voltages = source.voltageCells ?: emptyList(),
             currentBattery = source.current
                 ?.let { (it * 10).toShort() }
                 ?: UNKNOWN_INT.toShort(),
             batteryRemaining = if (fullCharge != null && remaining != null) {
-                (remaining.toFloat() / fullCharge * 100f).toInt().toByte()
+                ((remaining * 100f) / fullCharge).toInt().toByte()
             } else {
                 UNKNOWN_INT.toByte()
             },

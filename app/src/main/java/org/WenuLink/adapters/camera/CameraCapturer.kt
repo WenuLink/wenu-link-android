@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.MediaFormat
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
-import kotlin.math.round
+import kotlin.math.roundToInt
 import org.WenuLink.sdk.CameraManager
 import org.WenuLink.webrtc.utils.videoBuffer2VideoFrame
 import org.webrtc.CapturerObserver
@@ -34,7 +34,7 @@ class CameraCapturer : VideoCapturer {
                     cameraName,
                     CameraManager.frameWidth,
                     CameraManager.frameHeight,
-                    round(CameraManager.frameRate).toInt()
+                    CameraManager.frameRate.roundToInt()
                 )
             }
         }

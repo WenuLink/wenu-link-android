@@ -200,7 +200,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
                 1_000_000
             } // Hz to micro seconds if must start
             else {
-                ((1.0 / timeInterval.toFloat()) * 1_000_000).roundToInt()
+                ((1.0 / timeInterval) * 1_000_000).roundToInt()
             }
         }
 

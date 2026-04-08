@@ -76,7 +76,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
-    var flightSpeed = 5.0f
+    var flightSpeed = 5f
         private set
     var state = MissionState()
         private set
@@ -196,7 +196,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
         // Delay (seconds)
         if (delay > 0) {
-            state.assembler.addActionToLast(DelayAction(delay.toLong() * 1000))
+            state.assembler.addActionToLast(DelayAction(delay * 1000L))
         }
 
         // Yaw
