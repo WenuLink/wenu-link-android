@@ -277,42 +277,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         FCManager.startTakeoff()
     }
 
-    suspend fun goToAltitude(altitude: Float, speed: Float = 2f): String? {
-        val location = FCManager.fcInstance?.state?.aircraftLocation
-            ?: return "No aircraft location"
-
-        return suspendCancellableCoroutine { cont ->
-            MissionActionManager.clear() // ok since takeoff happens before any mission
-
-            val action = GoToAction(
-                LocationCoordinate2D(location.latitude, location.longitude),
-                altitude
-            )
-                .apply { flightSpeed = speed }
-
-            val error = MissionActionManager.schedule(action)
-            if (error != null) {
-                cont.resume("GoTo failed: ${error.description}")
-                return@suspendCancellableCoroutine
-            }
-
-            val key = MissionActionManager.onFinish(GoToAction::class) {
-                cont.resume(null)
-            }
-
-            MissionActionManager.startListener { errorMsg ->
-                cont.resume("GoTo error: $errorMsg")
-            }
-
-            MissionActionManager.start()
-
-            cont.invokeOnCancellation {
-                MissionActionManager.removeCallback(key)
-                MissionActionManager.stop()
-            }
-        }
-    }
-
     suspend fun awaitFlightState(takingOff: Boolean): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
         fun flyingMatchesTarget(): Boolean = takingOff == state.isFlying()

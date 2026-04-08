@@ -69,7 +69,7 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
 }
 
-data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
+data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
         ctx.canDispatchTransition(TakeoffTransition)
 
@@ -84,7 +84,7 @@ data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
             return "Unable to takeoff"
         }
 
-        return ctx.goToAltitude(initialAltitude)
+        return null
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
