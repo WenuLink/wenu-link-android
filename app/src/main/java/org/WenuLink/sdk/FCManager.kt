@@ -137,7 +137,9 @@ object FCManager {
 
     fun isFlying(): Boolean = fcInstance?.state?.isFlying == true
 
-    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
+    fun needLandingConfirmation(): Boolean = fcInstance?.state?.isLandingConfirmationNeeded == true
+
+    fun getAltitude(): Float = fcInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
 
     fun startTakeoff() = fcInstance?.startTakeoff { }
 

@@ -275,19 +275,18 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return flyingStateUpdated
     }
 
-    suspend fun waitAndConfirmLanding(timeout: Long = 30_000L) {
+    suspend fun waitAndConfirmLanding() {
         // https://developer.dji.com/api-reference/android-api/Components/FlightController/DJIFlightController.html#djiflightcontroller_confirmlanding_inline
         logger.d { "\tWaiting altitude of 0.3m" }
-        val confirmationNeeded = AsyncUtils.waitTimeout(
-            timeout,
-            100L,
-            FCManager::needLandingConfirmation
-        )
+        AsyncUtils.waitReady(100L) {
+            FCManager.needLandingConfirmation() ||
+                FCManager.getAltitude() < 0.5f
+        }
 
-        if (!confirmationNeeded) logger.w { "Landing confirmation timeout, attempting anyway" }
-
-        FCManager.confirmLanding {
-            logger.d { "\tLanding confirm" }
+        if (FCManager.needLandingConfirmation()) {
+            FCManager.confirmLanding { logger.d { "\tLanding confirmed" } }
+        } else {
+            logger.w { "Landing confirmation skipped: aircraft already on ground" }
         }
     }
 }
