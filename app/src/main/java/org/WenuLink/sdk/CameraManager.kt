@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.SurfaceTexture
 import android.media.MediaFormat
 import dji.common.camera.SettingsDefinitions
+import dji.common.camera.SystemState
 import dji.common.error.DJIError
 import dji.common.util.CommonCallbacks
 import dji.sdk.camera.Camera
@@ -12,9 +13,6 @@ import dji.sdk.codec.DJICodecManager
 import io.getstream.log.taggedLogger
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AsyncUtils
 
@@ -40,9 +38,6 @@ object CameraManager {
     var fwVersion: String? = null
     var cameraMode = SettingsDefinitions.CameraMode.UNKNOWN
     var captureMode = SettingsDefinitions.ShootPhotoMode.UNKNOWN
-    private val _captureCount = MutableStateFlow(0)
-    val captureCount: StateFlow<Int> = _captureCount.asStateFlow()
-    private var wasStoringPhoto = false
 
     @Synchronized
     fun init(camera: Camera) {
@@ -56,20 +51,14 @@ object CameraManager {
         frameWidth = resolution[0].toInt()
         frameHeight = resolution[1].toInt()
 
-        frameRate = camera.capabilities.videoResolutionAndFrameRateRange()[0].frameRate.toString()
+        frameRate = camera.capabilities.videoResolutionAndFrameRateRange()[0].frameRate
+            .toString()
             .replace("FRAME_RATE_", "")
             .replace("_FPS", "")
             .replace("_DOT_", ".")
             .toFloat()
 
         logger.i { toString() }
-
-        camera.setSystemStateCallback { state ->
-            if (state.isStoringPhoto && !wasStoringPhoto) {
-                _captureCount.value += 1
-            }
-            wasStoringPhoto = state.isStoringPhoto
-        }
     }
 
     fun createCompletionCallback(
@@ -205,6 +194,11 @@ object CameraManager {
 
     fun isCodecStarted(): Boolean = codecManager != null
 
+    fun registerStateCallback(callback: (SystemState) -> Unit) =
+        mInstance?.setSystemStateCallback(callback)
+
+    fun unregisterStateCallback() = mInstance?.setSystemStateCallback(null)
+
     private suspend fun setCameraMode(mode: SettingsDefinitions.CameraMode): String? =
         suspendCancellableCoroutine { cont ->
             if (cameraMode == mode) {
@@ -290,13 +284,8 @@ object CameraManager {
 
         // Launch capture
         return suspendCancellableCoroutine { cont ->
-
             camera.startShootPhoto { error ->
-                if (error != null) {
-                    cont.resume(error.description)
-                } else {
-                    cont.resume(null)
-                }
+                cont.resume(error?.description)
             }
 
             cont.invokeOnCancellation {
@@ -325,9 +314,7 @@ object CameraManager {
         // stop capture
         return suspendCancellableCoroutine { cont ->
             camera.stopRecordVideo(
-                SDKUtils.createCompletionCallback { error ->
-                    cont.resume(error)
-                }
+                SDKUtils.createCompletionCallback(cont::resume)
             )
 
             cont.invokeOnCancellation {

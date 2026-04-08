@@ -39,9 +39,21 @@ import org.WenuLink.mavlink.MAVLinkClient
  */
 class CameraController(
     override val client: MAVLinkClient,
-    private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit
+    private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit,
+    handler: WenuLinkHandler
 ) : IController {
     private val logger by taggedLogger(CameraController::class.java.simpleName)
+
+    init {
+        handler.onImageCaptured = fun(cameraId, seqIndex) {
+            val telemetry = handler.aircraft.telemetry.getData() ?: return
+            client.sendMessage(
+                msgImageCaptured(
+                    ImageMetadata(seqIndex, true, cameraId, telemetry)
+                )
+            )
+        }
+    }
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
