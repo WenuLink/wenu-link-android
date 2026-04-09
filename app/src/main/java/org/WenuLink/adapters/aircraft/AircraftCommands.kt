@@ -69,14 +69,14 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
 }
 
-data class TakeoffCommand(val initialAltitude: Float = 2f) : AircraftCommand {
+data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): String? =
         ctx.canDispatchTransition(TakeoffTransition)
 
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(TakeoffTransition)
-        ctx.takeOff() // ctx.takeOff(initialAltitude)
+        ctx.takeOff()
         val isFlying = ctx.awaitFlightState(true)
 
         if (!isFlying) {

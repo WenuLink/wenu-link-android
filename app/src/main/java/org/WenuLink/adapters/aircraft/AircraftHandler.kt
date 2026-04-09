@@ -31,6 +31,10 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
+    val currentCoordinates: Coordinates3D?
+        get() = telemetry.getData()?.let {
+            Coordinates3D(it.latitude, it.longitude, it.relativeAltitude)
+        }
     var isPowerOff = true
     val parameters by lazy {
         ParameterRegistry(
@@ -251,20 +255,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         }
 
         return motorsUpdated
-    }
-
-    fun getCurrentCoordinates(): Coordinates3D? {
-        logger.d { "getCurrentCoordinates" }
-
-        val location = FCManager.fcInstance?.state?.aircraftLocation ?: return null
-        val takeoffAltitude = FCManager.fcInstance?.state?.takeoffLocationAltitude
-
-        logger.d {
-            "getCurrentCoordinates: currentAltitude: ${location.altitude}, " +
-                "takeoffAltitude: $takeoffAltitude"
-        }
-
-        return Coordinates3D(location.longitude, location.latitude, location.altitude)
     }
 
     fun takeOff() {

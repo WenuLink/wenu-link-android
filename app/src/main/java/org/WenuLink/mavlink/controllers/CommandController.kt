@@ -10,12 +10,12 @@ import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.RequestMissionAction
+import org.WenuLink.adapters.RequestTakeoff
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand
-import org.WenuLink.adapters.aircraft.TakeoffCommand
 import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.mavlink.MAVLinkClient
@@ -151,7 +151,7 @@ class CommandController(override var client: MAVLinkClient) : IController {
 
     fun processTakeoff(commandMsg: msg_command_long, handler: WenuLinkHandler) {
         logger.d { "processTakeoff: $commandMsg" }
-        handler.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand())) { error ->
+        handler.dispatchCommand(WenuLinkCommand.Request(RequestTakeoff())) { error ->
             logger.d { "processTakeoff: $error" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
