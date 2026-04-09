@@ -55,7 +55,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         controllers += ParameterController(client)
         controllers += NavigationController(client)
         controllers += TelemetryController(client)
-        controllers += CameraController(client, telemetryController::setMessageRate, handler)
+        controllers += CameraController(client, telemetryController::setMessageRate)
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html

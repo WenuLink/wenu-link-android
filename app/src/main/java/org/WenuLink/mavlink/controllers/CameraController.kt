@@ -39,21 +39,9 @@ import org.WenuLink.mavlink.MAVLinkClient
  */
 class CameraController(
     override val client: MAVLinkClient,
-    private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit,
-    handler: WenuLinkHandler
+    private val onSetMessageRate: (messageId: Int, intervalMs: Long) -> Unit
 ) : IController {
     private val logger by taggedLogger(CameraController::class.java.simpleName)
-
-    init {
-        handler.onImageCaptured = fun(cameraId, seqIndex) {
-            val telemetry = handler.aircraft.telemetry.getData() ?: return
-            client.sendMessage(
-                msgImageCaptured(
-                    ImageMetadata(seqIndex, true, cameraId, telemetry)
-                )
-            )
-        }
-    }
 
     override fun processCommandLong(
         commandLongMsg: msg_command_long,
@@ -214,6 +202,12 @@ class CameraController(
 
         handler.camera.photoSeqIndex = initSequence
 
+        // register callback for the duration of this capture session
+        handler.onImageCaptured = fun(cameraId, seqIndex) {
+            val telemetry = handler.aircraft.telemetry.getData() ?: return
+            client.sendMessage(msgImageCaptured(ImageMetadata(seqIndex, true, cameraId, telemetry)))
+        }
+
         val command = if (totalPhotos == 1) {
             WenuLinkCommand.Camera(TakePhotoCommand(cameraInfo.id))
         } else {
@@ -229,6 +223,7 @@ class CameraController(
 
         handler.dispatchCommand(command) { error ->
             if (error != null) logger.w { "requestStartCapture error: $error" }
+            if (totalPhotos == 1) handler.onImageCaptured = null
         }
     }
 
@@ -249,7 +244,7 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
+        handler.onImageCaptured = null
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopIntervalShootCommand(cameraInfo.id))
         ) { error ->
