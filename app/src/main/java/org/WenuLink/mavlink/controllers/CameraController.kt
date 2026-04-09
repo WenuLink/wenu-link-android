@@ -24,7 +24,9 @@ import org.WenuLink.adapters.camera.CameraCaptureStatus
 import org.WenuLink.adapters.camera.CameraMetadata
 import org.WenuLink.adapters.camera.ImageMetadata
 import org.WenuLink.adapters.camera.SetModeCommand
+import org.WenuLink.adapters.camera.StartIntervalShootCommand
 import org.WenuLink.adapters.camera.StartRecordCommand
+import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
@@ -183,63 +185,33 @@ class CameraController(
         return cameraInfo
     }
 
-    private fun requestShootPhoto(
-        commandLongMsg: msg_command_long,
-        handler: WenuLinkHandler,
-        cameraInfo: CameraMetadata
-    ) {
-        val intervalMillis = commandLongMsg.param2.toLong() * 1000 // milliseconds
+    private fun requestStartCapture(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
+        val cameraInfo = getCamera(commandLongMsg.param1.toInt(), handler) ?: run {
+            client.sendMessage(
+                MessageUtils.msgCommandAck(
+                    commandLongMsg.msgid,
+                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
+                )
+            )
+            return
+        }
+
+        val intervalSeconds = commandLongMsg.param2.toInt()
         val totalPhotos = commandLongMsg.param3.toInt()
         val initSequence = commandLongMsg.param4.toInt()
 
-        fun mustCapture() = if (totalPhotos == 0) {
-            handler.camera.photoSeqIndex != -1
-        } else {
-            handler.camera.photoSeqIndex <= totalPhotos
-        }
-
         handler.camera.photoSeqIndex = initSequence
 
-        while (mustCapture()) {
-            if (totalPhotos != 1 && handler.camera.lastCaptureMillis < intervalMillis) {
-                continue
-            }
-            if (!handler.camera.captureIdle(cameraInfo.id)) {
-                continue
-            }
-
-            handler.dispatchCommand(
-                WenuLinkCommand.Camera(
-                    TakePhotoCommand(cameraInfo.id)
-                )
-            ) { error ->
-                val captureOk = error == null
-                if (!captureOk) {
-                    logger.w { "Error in shootPhoto: $error" }
-                }
-                val photoData = ImageMetadata(
-                    handler.camera.photoSeqIndex,
-                    captureOk,
-                    cameraInfo.id,
-                    handler.aircraft.telemetry.getData()!!
-                )
-
-                client.sendMessage(msgImageCaptured(photoData))
-            }
+        // register callback for the duration of this capture session
+        handler.onImageCaptured = fun(cameraId, seqIndex) {
+            val telemetry = handler.aircraft.telemetry.getData() ?: return
+            client.sendMessage(msgImageCaptured(ImageMetadata(seqIndex, true, cameraId, telemetry)))
         }
-    }
 
-    private fun requestStartCapture(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), handler)
-
-        if (cameraInfo == null) {
-            client.sendMessage(
-                MessageUtils.msgCommandAck(
-                    commandLongMsg.msgid,
-                    MAV_RESULT.MAV_RESULT_UNSUPPORTED
-                )
-            )
-            return
+        val command = if (totalPhotos == 1) {
+            WenuLinkCommand.Camera(TakePhotoCommand(cameraInfo.id))
+        } else {
+            WenuLinkCommand.Camera(StartIntervalShootCommand(cameraInfo.id, intervalSeconds))
         }
 
         client.sendMessage(
@@ -249,13 +221,14 @@ class CameraController(
             )
         )
 
-        requestShootPhoto(commandLongMsg, handler, cameraInfo)
+        handler.dispatchCommand(command) { error ->
+            if (error != null) logger.w { "requestStartCapture error: $error" }
+            if (totalPhotos == 1) handler.onImageCaptured = null
+        }
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param1.toInt(), handler)
-
-        if (cameraInfo == null) {
+        val cameraInfo = getCamera(commandLongMsg.param1.toInt(), handler) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -271,8 +244,12 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
-        handler.camera.photoSeqIndex = -1
+        handler.onImageCaptured = null
+        handler.dispatchCommand(
+            WenuLinkCommand.Camera(StopIntervalShootCommand(cameraInfo.id))
+        ) { error ->
+            if (error != null) logger.w { "requestStopCapture error: $error" }
+        }
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {

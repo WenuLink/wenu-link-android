@@ -16,10 +16,9 @@ import org.WenuLink.mavlink.MAVLinkClient
 interface IController {
     val client: MAVLinkClient
 
-    fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
+    fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean =
         // TODO: centralize client sending answer messages
-        return false
-    }
+        false
 
     fun processCommandLong(commandLongMsg: msg_command_long, handler: WenuLinkHandler): Boolean =
         false

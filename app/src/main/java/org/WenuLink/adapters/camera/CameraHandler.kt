@@ -5,6 +5,9 @@ import com.MAVLink.enums.CAMERA_MODE
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.sdk.CameraManager
@@ -26,23 +29,37 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     val availableCameras: MutableList<CameraMetadata> = mutableListOf()
     var photoSeqIndex: Int = 0
     var captureTimestamp: Long = System.currentTimeMillis()
-    val lastCaptureMillis
-        get() = System.currentTimeMillis() - captureTimestamp
     var wasInitialized = false
         private set
+    private val _captureCount = MutableStateFlow(0)
+    val captureCount: StateFlow<Int> = _captureCount.asStateFlow()
+    private var wasStoringPhoto = false
+    private var lastSeenCaptureCount: Int = 0
 
     override fun registerScope(scope: CoroutineScope) {
         scope.launch {
-            initCameras()
+            if (initCameras()) {
+                registerCameraState()
+            }
             wasInitialized = true
         }
         startCommandProcessor(scope, this@CameraHandler, logger)
     }
 
     override fun unload() {
+        CameraManager.unregisterStateCallback()
         availableCameras.clear()
         photoSeqIndex = 0
+        lastSeenCaptureCount = 0
+        wasStoringPhoto = false
         super.unload()
+    }
+
+    private fun registerCameraState() = CameraManager.registerStateCallback { state ->
+        if (state.isStoringPhoto && !wasStoringPhoto) {
+            _captureCount.value += 1
+        }
+        wasStoringPhoto = state.isStoringPhoto
     }
 
     suspend fun initCameras(): Boolean {
@@ -94,6 +111,14 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         getCamera(cameraIdx)?.let {
             availableCameras.set(cameraIdx, it.copy(state = newState))
         }
+    }
+
+    fun consumeCaptureEvent(): Boolean {
+        val current = captureCount.value
+        if (current <= lastSeenCaptureCount) return false
+        lastSeenCaptureCount = current
+        photoSeqIndex += 1
+        return true
     }
 
     fun updateCaptureStatus(newStatus: CameraCaptureStatus, cameraIdx: Int = 0) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.SurfaceTexture
 import android.media.MediaFormat
 import dji.common.camera.SettingsDefinitions
+import dji.common.camera.SystemState
 import dji.common.error.DJIError
 import dji.common.util.CommonCallbacks
 import dji.sdk.camera.Camera
@@ -50,7 +51,8 @@ object CameraManager {
         frameWidth = resolution[0].toInt()
         frameHeight = resolution[1].toInt()
 
-        frameRate = camera.capabilities.videoResolutionAndFrameRateRange()[0].frameRate.toString()
+        frameRate = camera.capabilities.videoResolutionAndFrameRateRange()[0].frameRate
+            .toString()
             .replace("FRAME_RATE_", "")
             .replace("_FPS", "")
             .replace("_DOT_", ".")
@@ -192,6 +194,11 @@ object CameraManager {
 
     fun isCodecStarted(): Boolean = codecManager != null
 
+    fun registerStateCallback(callback: (SystemState) -> Unit) =
+        mInstance?.setSystemStateCallback(callback)
+
+    fun unregisterStateCallback() = mInstance?.setSystemStateCallback(null)
+
     private suspend fun setCameraMode(mode: SettingsDefinitions.CameraMode): String? =
         suspendCancellableCoroutine { cont ->
             if (cameraMode == mode) {
@@ -277,13 +284,8 @@ object CameraManager {
 
         // Launch capture
         return suspendCancellableCoroutine { cont ->
-
             camera.startShootPhoto { error ->
-                if (error != null) {
-                    cont.resume(error.description)
-                } else {
-                    cont.resume(null)
-                }
+                cont.resume(error?.description)
             }
 
             cont.invokeOnCancellation {
@@ -296,13 +298,8 @@ object CameraManager {
 
         // Launch capture
         return suspendCancellableCoroutine { cont ->
-
             camera.startRecordVideo { error ->
-                if (error != null) {
-                    cont.resume(error.description)
-                } else {
-                    cont.resume(null)
-                }
+                cont.resume(error?.description)
             }
 
             cont.invokeOnCancellation {
@@ -317,18 +314,43 @@ object CameraManager {
         // stop capture
         return suspendCancellableCoroutine { cont ->
             camera.stopRecordVideo(
-                SDKUtils.createCompletionCallback { error ->
-                    if (error != null) {
-                        cont.resume(error)
-                    } else {
-                        cont.resume(null)
-                    }
-                }
+                SDKUtils.createCompletionCallback(cont::resume)
             )
 
             cont.invokeOnCancellation {
                 // Add SDK cancel if available
             }
+        }
+    }
+
+    suspend fun setIntervalSeconds(seconds: Int): String? = suspendCancellableCoroutine { cont ->
+        mInstance?.setPhotoTimeIntervalSettings(
+            SettingsDefinitions.PhotoTimeIntervalSettings(255, seconds),
+            SDKUtils.createCompletionCallback { error ->
+                if (cont.isActive) cont.resume(error)
+            }
+        ) ?: cont.resume("Camera instance is null")
+    }
+
+    suspend fun requestStartIntervalShoot(): String? {
+        val camera = mInstance ?: return "Camera instance is null"
+        return suspendCancellableCoroutine { cont ->
+            camera.startShootPhoto(
+                SDKUtils.createCompletionCallback { error ->
+                    if (cont.isActive) cont.resume(error)
+                }
+            )
+        }
+    }
+
+    suspend fun requestStopIntervalShoot(): String? {
+        val camera = mInstance ?: return "Camera instance is null"
+        return suspendCancellableCoroutine { cont ->
+            camera.stopShootPhoto(
+                SDKUtils.createCompletionCallback { error ->
+                    if (cont.isActive) cont.resume(error)
+                }
+            )
         }
     }
 }

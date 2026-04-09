@@ -63,6 +63,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         camera.wasInitialized &&
         monitorJob != null
     val availableCameras: List<CameraMetadata> get() = camera.availableCameras.toList()
+    var onImageCaptured: ((cameraId: Int, seqIndex: Int) -> Unit)? = null
 
     override fun registerScope(scope: CoroutineScope) {
         aircraft.registerScope(scope)
@@ -78,6 +79,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             monitorJob?.cancel()
             monitorJob = null
         }
+        onImageCaptured = null
         super.unload()
     }
 
@@ -118,7 +120,13 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                         missionHooks()
                     }
 
-                    launch { safetyChecks() }
+                    launch {
+                        cameraHooks()
+                    }
+
+                    launch {
+                        safetyChecks()
+                    }
                 } catch (e: Exception) {
                     logger.e { "Guard loop error: ${e.message}" }
                     // emergency land? manual control?
@@ -257,5 +265,13 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
         mission.state.unvisitedSequence -> mission.processNode()
         else -> {}
+    }
+
+    private fun cameraHooks() {
+        if (!camera.wasInitialized) return
+        if (camera.consumeCaptureEvent()) {
+            val cameraId = camera.availableCameras.firstOrNull()?.id ?: return
+            onImageCaptured?.invoke(cameraId, camera.photoSeqIndex)
+        }
     }
 }
