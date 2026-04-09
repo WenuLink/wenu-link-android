@@ -1,19 +1,14 @@
 package org.WenuLink.adapters.aircraft
 
-import dji.common.model.LocationCoordinate2D
-import dji.sdk.mission.timeline.actions.GoToAction
 import io.getstream.log.taggedLogger
-import kotlin.coroutines.resume
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParameterRegistry
 import org.WenuLink.sdk.FCManager
-import org.WenuLink.sdk.MissionActionManager
 
 class AircraftHandler : CommandHandler<AircraftHandler>() {
     companion object {
@@ -36,6 +31,10 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
+    val currentCoordinates: Coordinates3D?
+        get() = telemetry.getData()?.let {
+            Coordinates3D(it.latitude, it.longitude, it.relativeAltitude)
+        }
     var isPowerOff = true
     val parameters by lazy {
         ParameterRegistry(
@@ -256,20 +255,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         }
 
         return motorsUpdated
-    }
-
-    fun getCurrentCoordinates(): Coordinates3D? {
-        logger.d { "getCurrentCoordinates" }
-
-        val location = FCManager.fcInstance?.state?.aircraftLocation ?: return null
-        val takeoffAltitude = FCManager.fcInstance?.state?.takeoffLocationAltitude
-
-        logger.d {
-            "getCurrentCoordinates: currentAltitude: ${location.altitude}, " +
-                "takeoffAltitude: $takeoffAltitude"
-        }
-
-        return Coordinates3D(location.longitude, location.latitude, location.altitude)
     }
 
     fun takeOff() {

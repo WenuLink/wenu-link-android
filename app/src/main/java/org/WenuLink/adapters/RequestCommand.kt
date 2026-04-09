@@ -90,12 +90,13 @@ data class RequestTakeoff(
                     cont.resume(error)
                     return@dispatchCommand
                 }
+
+                val coordinates = ctx.aircraft.currentCoordinates
+                    ?: return@dispatchCommand cont.resume("No aircraft position available")
+
                 ctx.dispatchCommand(
                     WenuLinkCommand.Mission(
-                        RepositionAction(
-                            ctx.aircraft.getCurrentCoordinates()!!.copy(alt = altitude),
-                            speed
-                        )
+                        RepositionAction(coordinates.copy(alt = altitude), speed)
                     ),
                     cont::resume
                 )
