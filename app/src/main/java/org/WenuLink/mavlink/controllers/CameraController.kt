@@ -30,6 +30,12 @@ import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.params.ImageStartCaptureParams
+import org.WenuLink.mavlink.params.ImageStopCaptureParams
+import org.WenuLink.mavlink.params.RequestCameraInformationParams
+import org.WenuLink.mavlink.params.SetCameraModeParams
+import org.WenuLink.mavlink.params.VideoStartCaptureParams
+import org.WenuLink.mavlink.params.VideoStopCaptureParams
 
 /**
  * MAVLinkController class to deal with the camera protocol v2's messages.
@@ -101,9 +107,8 @@ class CameraController(
     }
 
     private fun handleCameraInformation(commandLongMsg: msg_command_long) {
-        if (commandLongMsg.param1 != 1f) return
-
-        reportCameras()
+        val params = RequestCameraInformationParams.from(commandLongMsg)
+        if (params.capabilities == true) reportCameras()
     }
 
     private fun reportSettings() {
@@ -126,15 +131,12 @@ class CameraController(
     }
 
     private fun handleSetCameraMode(commandLongMsg: msg_command_long) {
-        sendCommandAck(
-            commandLongMsg.command,
-            MAV_RESULT.MAV_RESULT_IN_PROGRESS,
-            0
-        )
-        val index = commandLongMsg.param1.toInt()
-        val mode = commandLongMsg.param2.toInt()
+        sendCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_IN_PROGRESS, 0)
+        val params = SetCameraModeParams.from(commandLongMsg)
 
-        handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { result ->
+        handler.dispatchCommand(
+            WenuLinkCommand.Camera(SetModeCommand(params.mode, params.id))
+        ) { result ->
             sendCommandAck(
                 commandLongMsg.command,
                 if (result.isOk) {
@@ -214,7 +216,8 @@ class CameraController(
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long) {
-        val cameraInfo = getCamera(commandLongMsg.param1.toInt()) ?: run {
+        val params = ImageStopCaptureParams.from(commandLongMsg)
+        val cameraInfo = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -243,7 +246,8 @@ class CameraController(
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt())
+        val params = VideoStartCaptureParams.from(commandLongMsg)
+        val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -261,9 +265,6 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
-        val streamID = commandLongMsg.param1.toInt()
-        val statusFreq = commandLongMsg.param2 // Hz
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StartRecordCommand(cameraInfo.id))
@@ -274,14 +275,15 @@ class CameraController(
                 // setting messages frequency
                 onSetMessageRate(
                     msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
-                    ((1f / statusFreq) * 1000).roundToLong()
+                    ((1f / params.statusFreqHz) * 1000).roundToLong()
                 )
             }
         }
     }
 
     private fun requestStopRecording(commandLongMsg: msg_command_long) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt())
+        val params = VideoStopCaptureParams.from(commandLongMsg)
+        val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -299,8 +301,6 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
-        val streamID = commandLongMsg.param1.toInt()
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopRecordCommand(cameraInfo.id))

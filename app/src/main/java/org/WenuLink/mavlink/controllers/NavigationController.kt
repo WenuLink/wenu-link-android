@@ -34,6 +34,7 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.params.MissionStartParams
 
 /**
  * MAVLinkController class to deal with the handler.mission service and related MAVLink messages.
@@ -260,11 +261,12 @@ class NavigationController(
 
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
+        val params = MissionStartParams.from(commandLongMsg)
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(
-                    commandLongMsg.param1.toInt(),
-                    commandLongMsg.param2.toInt()
+                    params.firstItem,
+                    params.lastItem
                 )
             )
         )

@@ -6,9 +6,14 @@ import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.commands.UnitResult
+import org.WenuLink.mavlink.params.ConditionYawParams
+import org.WenuLink.mavlink.params.ImageStartCaptureParams
+import org.WenuLink.mavlink.params.NavDelayParams
+import org.WenuLink.mavlink.params.NavTakeoffParams
+import org.WenuLink.mavlink.params.NavWaypointParams
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -139,23 +144,21 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         logger.d { "Append mission item." }
 
         when (itemMsg.command) {
-            MAV_CMD.MAV_CMD_NAV_TAKEOFF ->
-                state.assembler.addTakeoff(
-                    MessageUtils.xyzMAVLink2Coordinates(itemMsg.x, itemMsg.y, itemMsg.z)
-                )
+            MAV_CMD.MAV_CMD_NAV_TAKEOFF -> assembleTakeoffNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
-            MAV_CMD.MAV_CMD_NAV_DELAY ->
-                state.assembler.addActionToLast(DelayAction.fromMissionItem(itemMsg))
+            MAV_CMD.MAV_CMD_NAV_DELAY -> state.assembler.addActionToLast(
+                DelayAction.fromParameters(NavDelayParams.from(itemMsg))
+            )
 
-            MAV_CMD.MAV_CMD_CONDITION_YAW ->
-                state.assembler.addActionToLast(RotateAction(itemMsg.param1))
+            MAV_CMD.MAV_CMD_CONDITION_YAW -> state.assembler.addActionToLast(
+                RotateAction.fromParameters(ConditionYawParams.from(itemMsg))
+            )
 
-            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE ->
-                state.assembler.addActionToLast(
-                    PhotoAction(itemMsg.param3.toInt(), itemMsg.param2.toInt())
-                )
+            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> state.assembler.addActionToLast(
+                PhotoAction.fromParameters(ImageStartCaptureParams.from(itemMsg))
+            )
 
             MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE ->
                 state.assembler.addActionToLast(StopPhotoAction)
@@ -175,11 +178,17 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         return true
     }
 
+    private fun assembleTakeoffNode(itemMsg: msg_mission_item_int) {
+        val params = NavTakeoffParams.from(itemMsg)
+        state.assembler.addTakeoff(
+            Coordinates3D(params.latitude, params.longitude, params.altitude)
+        )
+    }
+
     private fun assembleWaypointNode(itemMsg: msg_mission_item_int) {
+        val params = NavWaypointParams.from(itemMsg)
         // Assumes Global only
-        val coordinates = MessageUtils.xyzMAVLink2Coordinates(itemMsg.x, itemMsg.y, itemMsg.z)
-        val delay = itemMsg.param1.toInt()
-        val deg = itemMsg.param4
+        val coordinates = Coordinates3D(params.latitude, params.longitude, params.altitude)
 
         // TODO: airframe check
 //         val frameReference = itemMsg.frame.toInt()
@@ -195,16 +204,16 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         state.assembler.addWaypoint(coordinates)
 
         // Delay (seconds)
-        if (delay > 0) {
-            state.assembler.addActionToLast(DelayAction(delay * 1000L))
+        if (params.holdTimeSec > 0f) {
+            state.assembler.addActionToLast(DelayAction((params.holdTimeSec * 1000).toLong()))
         }
 
         // Yaw
-        if (deg != 0f) {
-            state.assembler.addActionToLast(RotateAction(deg))
+        if (params.yaw != 0f) {
+            state.assembler.addActionToLast(RotateAction(params.yaw))
         }
 
-        logger.d { "Waypoint: ($coordinates) (Yaw=$deg deg) (Delay=$delay)" }
+        logger.d { "Waypoint: ($coordinates) (Yaw=${params.yaw}°) (Delay=${params.holdTimeSec}s)" }
     }
 
     fun uploadWaypoints(onResult: (UnitResult) -> Unit) =

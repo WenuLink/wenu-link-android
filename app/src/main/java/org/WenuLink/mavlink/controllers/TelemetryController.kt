@@ -36,6 +36,7 @@ import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.MessageRate
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.params.SetMessageIntervalParams
 
 class TelemetryController(
     override val client: MAVLinkClient,
@@ -214,9 +215,10 @@ class TelemetryController(
 
     @Synchronized
     fun processMessageInterval(commandMsg: msg_command_long) {
-        val mavlinkMsgID = commandMsg.param1.toInt()
-        val interval = commandMsg.param2.toLong() // already in micro seconds
-        setMessageRate(mavlinkMsgID, interval)
+        logger.d { "processMessageInterval" }
+
+        val params = SetMessageIntervalParams.from(commandMsg)
+        setMessageRate(params.messageId, params.intervalUs)
 
         client.sendMessage(
             MessageUtils.msgCommandAck(

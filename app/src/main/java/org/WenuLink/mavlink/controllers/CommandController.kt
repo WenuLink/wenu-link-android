@@ -19,6 +19,10 @@ import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.params.ComponentArmDisarmParams
+import org.WenuLink.mavlink.params.ConditionYawParams
+import org.WenuLink.mavlink.params.DoSetModeParams
+import org.WenuLink.mavlink.params.NavDelayParams
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
@@ -103,10 +107,11 @@ class CommandController(override var client: MAVLinkClient, override val handler
         }
     )
 
-    fun setMode(commandMsg: msg_command_long) {
-        val requestedMode = commandMsg.param2.toLong()
-        logger.d { "FlightMode requested: $requestedMode" }
-        val customMode = ArduCopterFlightMode.from(requestedMode)
+    fun setMode(commandMsg: msg_command_long, handler: WenuLinkHandler) {
+        val params = DoSetModeParams.from(commandMsg)
+
+        logger.d { "FlightMode requested: ${params.customMode}" }
+        val customMode = ArduCopterFlightMode.from(params.customMode)
 
         if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
@@ -121,21 +126,21 @@ class CommandController(override var client: MAVLinkClient, override val handler
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {
-        val action = when (commandMsg.param1) {
-            1f -> true
-            0f -> false
-            else -> null
-        }
+        val params = ComponentArmDisarmParams.from(commandMsg)
 
-        if (action == null) {
-            logger.d { "Invalid arm/disarm request: ${commandMsg.param1}" }
+        if (params.arm == null) {
+            logger.d { "Invalid arm/disarm request" }
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
             return
         }
 
-        logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
-
-        val command = if (action) ArmCommand() else DisarmCommand()
+        val command = if (params.arm) {
+            logger.d { "Requesting to arm motors" }
+            ArmCommand()
+        } else {
+            logger.d { "Requesting to disarm motors" }
+            DisarmCommand()
+        }
         handler.dispatchCommand(WenuLinkCommand.Aircraft(command)) { result ->
             logger.d { "processTakeoff: $result" }
         }
@@ -173,7 +178,9 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processDelay: $commandMsg" }
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestMissionAction(DelayAction.fromCommandLong(commandMsg))
+                RequestMissionAction(
+                    DelayAction.fromParameters(NavDelayParams.from(commandMsg))
+                )
             )
         ) { result ->
             logger.d { "processDelay: $result" }
@@ -185,7 +192,9 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processYaw: $commandMsg" }
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestMissionAction(RotateAction.fromCommandLong(commandMsg))
+                RequestMissionAction(
+                    RotateAction.fromParameters(ConditionYawParams.from(commandMsg))
+                )
             )
         ) { result ->
             logger.d { "processYaw: $result" }

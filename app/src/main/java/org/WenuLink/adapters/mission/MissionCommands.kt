@@ -1,8 +1,6 @@
 package org.WenuLink.adapters.mission
 
 import com.MAVLink.common.msg_command_int
-import com.MAVLink.common.msg_command_long
-import com.MAVLink.common.msg_mission_item_int
 import dji.common.gimbal.Attitude
 import dji.common.model.LocationCoordinate2D
 import dji.sdk.mission.timeline.actions.AircraftYawAction
@@ -16,11 +14,14 @@ import dji.sdk.mission.timeline.actions.ShootPhotoAction
 import kotlin.coroutines.resume
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
+import org.WenuLink.mavlink.params.ConditionYawParams
+import org.WenuLink.mavlink.params.DoRepositionParams
+import org.WenuLink.mavlink.params.ImageStartCaptureParams
+import org.WenuLink.mavlink.params.NavDelayParams
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -174,37 +175,16 @@ interface MissionActionCommand : MissionCommand {
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
     companion object {
-        fun fromParameters(
-            param1: Float,
-            param2: Float,
-            param3: Float,
-            param4: Float
-        ): DelayAction {
-            // NAV_DELAY
-            val delay = param1.toInt()
-            val hours = param2.toInt()
-            val minutes = param3.toInt()
-            val seconds = param4.toInt()
-
-            val totalSeconds = if (delay != -1) {
-                delay
+        fun fromParameters(params: NavDelayParams): DelayAction {
+            val totalSeconds = if (params.delaySec != -1) {
+                params.delaySec
             } else {
-                (if (hours != -1) hours * 3600 else 0) +
-                    (if (minutes != -1) minutes * 60 else 0) +
-                    (if (seconds != -1) seconds else 0)
+                (if (params.hours != -1) params.hours * 3600 else 0) +
+                    (if (params.minutes != -1) params.minutes * 60 else 0) +
+                    (if (params.seconds != -1) params.seconds else 0)
             }
             return DelayAction(totalSeconds * 1000L)
         }
-
-        fun fromCommandLong(command: msg_command_long): DelayAction =
-            fromParameters(command.param1, command.param2, command.param3, command.param4)
-
-        fun fromMissionItem(missionItemMsg: msg_mission_item_int): DelayAction = fromParameters(
-            missionItemMsg.param1,
-            missionItemMsg.param2,
-            missionItemMsg.param3,
-            missionItemMsg.param4
-        )
     }
 
     override fun validate(ctx: MissionHandler): UnitResult = when {
@@ -260,34 +240,11 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
     ) {
     companion object {
         fun fromCommandInt(commandIntMsg: msg_command_int): RepositionAction {
-            // DO_REPOSITION
-            val targetCoordinates = MessageUtils.xyzMAVLink2Coordinates(
-                commandIntMsg.x,
-                commandIntMsg.y,
-                commandIntMsg.z
+            val params = DoRepositionParams.from(commandIntMsg)
+            return RepositionAction(
+                Coordinates3D(params.latitude, params.longitude, params.altitude),
+                if (params.speed == -1f) 1f else params.speed
             )
-            val flightSpeed = if (commandIntMsg.param1 == -1f) 1f else commandIntMsg.param1
-
-            return RepositionAction(targetCoordinates, flightSpeed)
-        }
-
-        fun fromMissionItem(
-            missionItemMsg: msg_mission_item_int,
-            missionSpeed: Float
-        ): RepositionAction {
-            // NAV_WAYPOINT
-//            val holdSeconds = missionItemMsg.param1.toInt()
-//            val acceptRadius = missionItemMsg.param2.toInt()
-//            val passRadius = missionItemMsg.param3.toInt()
-//            val yawRel = missionItemMsg.param4.toInt()
-            val targetCoordinates =
-                MessageUtils.xyzMAVLink2Coordinates(
-                    missionItemMsg.x,
-                    missionItemMsg.y,
-                    missionItemMsg.z
-                )
-
-            return RepositionAction(targetCoordinates, missionSpeed)
         }
     }
 }
@@ -318,20 +275,19 @@ data class RotateAction(
     }
 ) {
     companion object {
-        fun fromCommandLong(commandLongMsg: msg_command_long): RotateAction {
-            // CONDITION_YAW
-            var angle = commandLongMsg.param1 // [0, 360] deg
-            var angularSpeed = commandLongMsg.param2 // deg/s
-            val clockwiseDir = commandLongMsg.param3.toInt() == 1
-            val absolute = commandLongMsg.param4.toInt() == 0
-
+        fun fromParameters(params: ConditionYawParams): RotateAction {
             // convert to compatible intervals
-            angle = ((angle + 180) % 360) - 180
-            if (absolute) return RotateAction(angle, null, true)
+            val angle = ((params.angleDeg + 180) % 360) - 180 // [0, 360] deg
 
-            // clip angular speed
-            angularSpeed = angularSpeed.coerceIn(0f..100f)
-            return RotateAction(angle, angularSpeed, false)
+            val relative = params.relative
+                ?: throw IllegalArgumentException("Invalid value for param4: expected 0 or 1")
+
+            return if (relative) {
+                // clip angular speed
+                RotateAction(angle, params.angularSpeedDegS.coerceIn(0f..100f), false)
+            } else {
+                RotateAction(angle, null, true)
+            }
         }
     }
 }
@@ -350,7 +306,12 @@ data class PhotoAction(private val number: Int, private val intervalSeconds: Int
             0 -> ShootPhotoAction.newShootIntervalPhotoAction(Int.MAX_VALUE, intervalSeconds)
             else -> ShootPhotoAction.newShootIntervalPhotoAction(number, intervalSeconds)
         }
-    )
+    ) {
+    companion object {
+        fun fromParameters(params: ImageStartCaptureParams): PhotoAction =
+            PhotoAction(params.totalImages, params.intervalSec.toInt())
+    }
+}
 
 data object StopPhotoAction : ActionCommand(
     ShootPhotoAction.newStopIntervalPhotoAction()
