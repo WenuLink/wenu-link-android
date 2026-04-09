@@ -16,28 +16,30 @@ import org.WenuLink.parameters.ParameterSpec
  * MAVLinkController class to deal with the parameters service and related MAVLink messages.
  * https://mavlink.io/en/services/parameter.html
  */
-class ParameterController(override val client: MAVLinkClient) : IController {
+class ParameterController(
+    override val client: MAVLinkClient,
+    override val handler: WenuLinkHandler
+) : IController {
     private val logger by taggedLogger(ParameterController::class.java.simpleName)
+
     var wasRequested = false
         private set
 
-    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
         when (msg.msgid) {
-            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList(handler)
-            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg, handler)
-            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg, handler)
+            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList()
+            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg)
+            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg)
             else -> return false
         }
         return true
     }
 
-    fun requestList(handler: WenuLinkHandler) {
+    fun requestList() {
         handler.aircraft.parameters.all().forEach { param ->
             param.spec.read { value ->
-                if (value !=
-                    null
-                ) {
-                    sendParameter(param.spec, value, handler.aircraft.parameters.size())
+                if (value != null) {
+                    sendParameter(param.spec, value)
                 }
             }
         }
@@ -45,13 +47,13 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         logger.d { "Parameters list requested: $wasRequested" }
     }
 
-    fun msgParam(spec: ParameterSpec, value: ParamValue, count: Int): msg_param_value {
+    private fun msgParam(spec: ParameterSpec, value: ParamValue): msg_param_value {
         val pValue = spec.toMavlink(value)
         return msg_param_value().apply {
             param_Id = spec.name
             param_value = pValue.toFloat()
             param_type = spec.type.toShort()
-            param_count = count
+            param_count = handler.aircraft.parameters.size()
             param_index = if (spec.index == -1) {
                 65535
             } else {
@@ -60,13 +62,13 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         }
     }
 
-    fun sendParameter(spec: ParameterSpec, value: ParamValue, count: Int) {
-        val msg = msgParam(spec, value, count)
+    fun sendParameter(spec: ParameterSpec, value: ParamValue) {
+        val msg = msgParam(spec, value)
         logger.d { "Sending parameter $spec=${msg.param_value.toInt()}" }
         client.sendMessage(msg)
     }
 
-    fun requestRead(msg: MAVLinkMessage, handler: WenuLinkHandler) {
+    fun requestRead(msg: MAVLinkMessage) {
         val paramMsg = msg as msg_param_request_read
         val param = handler.aircraft.parameters.getByIndex(paramMsg.param_index.toInt())
             ?: handler.aircraft.parameters.getByName(paramMsg.param_Id)
@@ -77,11 +79,13 @@ class ParameterController(override val client: MAVLinkClient) : IController {
         }
 
         param.spec.read { value ->
-            if (value != null) sendParameter(param.spec, value, handler.aircraft.parameters.size())
+            if (value != null) {
+                sendParameter(param.spec, value)
+            }
         }
     }
 
-    fun requestUpdate(msg: MAVLinkMessage, handler: WenuLinkHandler) {
+    fun requestUpdate(msg: MAVLinkMessage) {
         val paramMsg = msg as msg_param_set
         val param = handler.aircraft.parameters.getByName(paramMsg.param_Id)
         if (param == null) {
@@ -93,7 +97,7 @@ class ParameterController(override val client: MAVLinkClient) : IController {
 
         param.spec.write(value) { error ->
             if (error == null) {
-                sendParameter(param.spec, value, handler.aircraft.parameters.size())
+                sendParameter(param.spec, value)
             }
         }
     }
