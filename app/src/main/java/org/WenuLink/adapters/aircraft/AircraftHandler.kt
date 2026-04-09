@@ -124,11 +124,10 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         enforceModeConsistency()
     }
 
-    suspend fun loadParameters(): Boolean {
+    suspend fun loadParameters(timeout: Long = 5000L): Boolean {
         logger.i { "Waiting for parameters" }
         parameters.load()
-        AsyncUtils.waitReady(1000L, parameters::isLoaded)
-        return parameters.isLoaded()
+        return AsyncUtils.waitTimeout(timeout, 1000L, parameters::isLoaded)
     }
 
     suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
@@ -206,7 +205,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
 
-        if (!loadParameters()) return "No parameters"
+        if (!loadParameters(timeout)) return "No parameters"
         logger.d { "\tLoading parameters: OK" }
 
         if (!startTelemetry(timeout)) return "No telemetry"
@@ -244,14 +243,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     suspend fun waitArmTransition(mustArm: Boolean, timeout: Long): Boolean {
-        fun motorsMatchTarget(): Boolean = mustArm == state.isArmed()
-
-        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout, isReady = ::motorsMatchTarget)
+        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout) { mustArm == state.isArmed() }
 
         if (motorsUpdated) {
-            logger.i { "Aircraft armed" }
+            logger.i { if (mustArm) "Aircraft armed" else "Aircraft in standby" }
         } else {
-            logger.i { "Aircraft in standby" }
+            logger.w { "Timeout: ${if (mustArm) "armed" else "disarmed"} state not reached" }
         }
 
         return motorsUpdated
@@ -262,29 +259,36 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         FCManager.startTakeoff()
     }
 
-    suspend fun awaitFlightState(takingOff: Boolean): Boolean {
+    suspend fun waitFlightState(takingOff: Boolean, timeout: Long): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
-        fun flyingMatchesTarget(): Boolean = takingOff == state.isFlying()
-        AsyncUtils.waitReady(100L, ::flyingMatchesTarget)
 
-        if (takingOff && state.isFlying()) {
-            logger.d { "Aircraft flying" }
+        val flyingStateUpdated = AsyncUtils.waitTimeout(100L, timeout) {
+            takingOff == state.isFlying()
         }
 
-        if (!takingOff && !state.isFlying()) {
-            logger.d { "Aircraft on the ground" }
+        if (flyingStateUpdated) {
+            logger.i { if (takingOff) "Aircraft flying" else "Aircraft on the ground" }
+        } else {
+            logger.w { "Timeout: ${if (takingOff) "takeoff" else "landing"} state not reached" }
         }
 
-        return flyingMatchesTarget()
+        return flyingStateUpdated
     }
 
     suspend fun waitAndConfirmLanding() {
         // https://developer.dji.com/api-reference/android-api/Components/FlightController/DJIFlightController.html#djiflightcontroller_confirmlanding_inline
         logger.d { "\tWaiting altitude of 0.3m" }
-        AsyncUtils.waitReady(100L, FCManager::needLandingConfirmation)
+        AsyncUtils.waitReady(100L) { FCManager.getAltitude() < 0.5f }
+        val confirmationNeeded = AsyncUtils.waitTimeout(
+            100L,
+            5000L,
+            FCManager::needLandingConfirmation
+        )
 
-        FCManager.confirmLanding {
-            logger.d { "\tLanding confirm" }
+        if (confirmationNeeded) {
+            FCManager.confirmLanding { logger.d { "\tLanding confirmed" } }
+        } else {
+            logger.w { "Landing confirmation timeout" }
         }
     }
 }
