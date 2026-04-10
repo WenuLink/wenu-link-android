@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -207,6 +208,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         logger.d { "Waypoint: ($coordinates) (Yaw=$deg deg) (Delay=$delay)" }
     }
 
-    fun uploadWaypoints(onResult: (String?) -> Unit) =
+    fun uploadWaypoints(onResult: (UnitResult) -> Unit) =
         dispatchCommand(UploadMissionCommand(state.assembler, flightSpeed), onResult)
 }
