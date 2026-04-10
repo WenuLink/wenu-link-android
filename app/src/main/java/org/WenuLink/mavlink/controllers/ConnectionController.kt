@@ -25,7 +25,6 @@ import kotlin.math.sqrt
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.BatteryMapper
-import org.WenuLink.adapters.aircraft.TelemetryHandler
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -34,7 +33,10 @@ import org.WenuLink.mavlink.MAVLinkClient
  *
  * https://mavlink.io/en/services/heartbeat.html
  */
-class ConnectionController(override val client: MAVLinkClient) : IController {
+class ConnectionController(
+    override val client: MAVLinkClient,
+    override val handler: WenuLinkHandler
+) : IController {
     private var gcsLastTimestamp = 0L
     val isGCSPresent: Boolean
         get() {
@@ -77,43 +79,40 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
 
-    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
         when (msg.msgid) {
             msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> processHeartbeatGCS()
-            msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg, handler)
+            msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg)
             msg_timesync.MAVLINK_MSG_ID_TIMESYNC -> processTimeSync(msg)
             else -> return false
         }
         return true
     }
 
-    override fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? =
-        when (messageID) {
-            msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat(handler)
+    override fun createMessage(messageID: Int): MAVLinkMessage? = when (messageID) {
+        msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> msgHeartbeat()
 
-            msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus(handler.aircraft.telemetry)
+        msg_sys_status.MAVLINK_MSG_ID_SYS_STATUS -> msgSysStatus()
 
-            msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude(handler.aircraft.telemetry)
+        msg_attitude.MAVLINK_MSG_ID_ATTITUDE -> msgAttitude()
 
-            msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude(handler.aircraft.telemetry)
+        msg_altitude.MAVLINK_MSG_ID_ALTITUDE -> msgAltitude()
 
-            msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
+        msg_vibration.MAVLINK_MSG_ID_VIBRATION -> msgVibration()
 
-            msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD(handler.aircraft.telemetry)
+        msg_vfr_hud.MAVLINK_MSG_ID_VFR_HUD -> msgHUD()
 
-            msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS ->
-                msgRadioStatus(handler.aircraft.telemetry)
+        msg_radio_status.MAVLINK_MSG_ID_RADIO_STATUS -> msgRadioStatus()
 
-            msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
+        msg_power_status.MAVLINK_MSG_ID_POWER_STATUS -> msgPowerStatus()
 
-            msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS ->
-                msgBatteryStatus(handler.aircraft.telemetry)
+        msg_battery_status.MAVLINK_MSG_ID_BATTERY_STATUS -> msgBatteryStatus()
 
-            msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys(handler)
+        msg_extended_sys_state.MAVLINK_MSG_ID_EXTENDED_SYS_STATE -> msgExtendedSys()
 
-            //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
-            else -> null
-        }
+        //            msg_mag_cal_report.MAVLINK_MSG_ID_MAG_CAL_REPORT -> msgMagCal()
+        else -> null
+    }
 
     fun processHeartbeatGCS() {
         gcsLastTimestamp = System.currentTimeMillis()
@@ -133,7 +132,7 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         client.sendMessage(outMsg)
     }
 
-    fun msgSystemTime(handler: WenuLinkHandler): MAVLinkMessage {
+    fun msgSystemTime(): MAVLinkMessage {
         val currentStamp = System.currentTimeMillis()
         val msg = msg_system_time()
         msg.time_unix_usec = currentStamp * 1_000
@@ -141,10 +140,9 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun processSystemTime(msg: MAVLinkMessage, handler: WenuLinkHandler) =
-        client.sendMessage(msgSystemTime(handler))
+    fun processSystemTime(msg: MAVLinkMessage) = client.sendMessage(msgSystemTime())
 
-    fun msgHeartbeat(handler: WenuLinkHandler): MAVLinkMessage {
+    fun msgHeartbeat(): MAVLinkMessage {
         val heartbeat = msg_heartbeat()
         heartbeat.type = MAV_TYPE.MAV_TYPE_QUADROTOR.toShort()
         heartbeat.autopilot = MAV_AUTOPILOT.MAV_AUTOPILOT_ARDUPILOTMEGA.toShort()
@@ -157,8 +155,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return heartbeat
     }
 
-    fun msgSysStatus(telemetry: TelemetryHandler): MAVLinkMessage {
-        val battery = BatteryMapper.toMavlink(telemetry.getAircraftBattery())
+    fun msgSysStatus(): MAVLinkMessage {
+        val battery = BatteryMapper.toMavlink(handler.aircraft.telemetry.getAircraftBattery())
         val msg = msg_sys_status()
 
 //        if (!aircraft.preArmCheckOk) sensorsHealth = sensorsHealth and
@@ -175,8 +173,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgAttitude(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getData() ?: return null
+    fun msgAttitude(): MAVLinkMessage? {
+        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
 
         val msg = msg_attitude()
         // TODO: this next line causes an exception
@@ -191,8 +189,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgAltitude(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val data = telemetry.getData() ?: return null
+    fun msgAltitude(): MAVLinkMessage? {
+        val data = handler.aircraft.telemetry.getData() ?: return null
         val msg = msg_altitude()
         msg.altitude_relative = data.altitude
 //        client.sendMessage(msg)
@@ -204,9 +202,9 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg_vibration()
     }
 
-    fun msgHUD(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getData() ?: return null
-        val rcData = telemetry.getRCData()?.toMAVLink() ?: return null
+    fun msgHUD(): MAVLinkMessage? {
+        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
+        val rcData = handler.aircraft.telemetry.getRCData()?.toMAVLink() ?: return null
         val msg = msg_vfr_hud()
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
@@ -229,8 +227,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgRadioStatus(telemetry: TelemetryHandler): MAVLinkMessage {
-        val airlinkSignal = telemetry.getAirlinkSignal()
+    fun msgRadioStatus(): MAVLinkMessage {
+        val airlinkSignal = handler.aircraft.telemetry.getAirlinkSignal()
         val msg = msg_radio_status()
         // DJI represent the signal quality in percent with range [0, 100], where 100 is the best
         // quality. MAVLink uses [0, 254] as uint8_t
@@ -246,8 +244,8 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
 
     fun msgPowerStatus(): MAVLinkMessage = msg_power_status()
 
-    fun msgBatteryStatus(telemetry: TelemetryHandler): MAVLinkMessage {
-        val battery = BatteryMapper.toMavlink(telemetry.getAircraftBattery())
+    fun msgBatteryStatus(): MAVLinkMessage {
+        val battery = BatteryMapper.toMavlink(handler.aircraft.telemetry.getAircraftBattery())
         val msg = msg_battery_status()
         msg.current_consumed = battery.currentConsumed
         msg.temperature = battery.temperature
@@ -258,7 +256,7 @@ class ConnectionController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgExtendedSys(handler: WenuLinkHandler): MAVLinkMessage {
+    fun msgExtendedSys(): MAVLinkMessage {
         val msg = msg_extended_sys_state()
         msg.landed_state = handler.aircraftState.landed.toShort()
         msg.vtol_state = MAV_VTOL_STATE.MAV_VTOL_STATE_MC.toShort()

@@ -15,20 +15,18 @@ import org.WenuLink.mavlink.MAVLinkClient
  */
 interface IController {
     val client: MAVLinkClient
+    val handler: WenuLinkHandler
 
-    fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean =
-        // TODO: centralize client sending answer messages
-        false
+    /** TODO: centralize client sending answer messages */
+    fun processMessage(msg: MAVLinkMessage): Boolean = false
 
-    fun processCommandLong(commandLongMsg: msg_command_long, handler: WenuLinkHandler): Boolean =
-        false
+    fun processCommandLong(commandLongMsg: msg_command_long): Boolean = false
 
-    fun processCommandInt(commandIntMsg: msg_command_int, handler: WenuLinkHandler): Boolean = false
+    fun processCommandInt(commandIntMsg: msg_command_int): Boolean = false
 
-    fun processRequestInt(commandIntMsg: msg_command_int, handler: WenuLinkHandler): Boolean = false
+    fun processRequestInt(commandIntMsg: msg_command_int): Boolean = false
 
-    fun processRequestLong(commandLongMsg: msg_command_long, handler: WenuLinkHandler): Boolean =
-        false
+    fun processRequestLong(commandLongMsg: msg_command_long): Boolean = false
 
-    fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? = null
+    fun createMessage(messageID: Int): MAVLinkMessage? = null
 }

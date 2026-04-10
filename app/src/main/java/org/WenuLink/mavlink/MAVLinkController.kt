@@ -50,12 +50,12 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         this.client = client
         // Initialize controllers
         controllers.clear()
-        controllers += ConnectionController(client)
-        controllers += CommandController(client)
-        controllers += ParameterController(client)
-        controllers += NavigationController(client)
-        controllers += TelemetryController(client)
-        controllers += CameraController(client, telemetryController::setMessageRate)
+        controllers += ConnectionController(client, handler)
+        controllers += CommandController(client, handler)
+        controllers += ParameterController(client, handler)
+        controllers += NavigationController(client, handler)
+        controllers += TelemetryController(client, handler)
+        controllers += CameraController(client, handler, telemetryController::setMessageRate)
     }
 
     // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html
@@ -67,7 +67,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         }
 
         // Process message with registered Controllers
-        val processed = controllers.any { it.processMessage(msg, handler) }
+        val processed = controllers.any { it.processMessage(msg) }
         if (processed) return
 
         when (msg.msgid) {
@@ -93,7 +93,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
         val processed = controllers.any {
-            it.processCommandLong(commandMsg, handler)
+            it.processCommandLong(commandMsg)
         }
         if (processed) return
 
@@ -115,7 +115,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
         val processed = controllers.any {
-            it.processCommandInt(commandMsg, handler)
+            it.processCommandInt(commandMsg)
         }
         if (processed) return
 
@@ -131,7 +131,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
         val requestID = commandMsg.param1.toInt()
         logger.d { "\t- REQUEST_LONG ID: $requestID" }
-        val processed = controllers.any { it.processRequestLong(commandMsg, handler) }
+        val processed = controllers.any { it.processRequestLong(commandMsg) }
         if (processed) return
 
         when (requestID) {
@@ -151,7 +151,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
         val requestID = commandMsg.param1.toInt()
         logger.d { "\t- REQUEST_INT ID: $requestID" }
-        val processed = controllers.any { it.processRequestInt(commandMsg, handler) }
+        val processed = controllers.any { it.processRequestInt(commandMsg) }
         if (processed) return
 
         when (requestID) {
@@ -161,7 +161,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
     @Synchronized
     fun sendMessages() {
-        telemetryController.sendMessages(controllers, handler)
+        telemetryController.sendMessages(controllers)
     }
 
     fun notifySystemReady() {
@@ -210,7 +210,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (!isHomeSet) return false
 
         // Send origin coordinates
-        client.sendMessage(navigationController.msgGpsGlobalOrigin(handler)!!)
+        client.sendMessage(navigationController.msgGpsGlobalOrigin()!!)
         // update message rate of HOME_POSITION
         telemetryController.setMessageRate(
             msg_home_position.MAVLINK_MSG_ID_HOME_POSITION,

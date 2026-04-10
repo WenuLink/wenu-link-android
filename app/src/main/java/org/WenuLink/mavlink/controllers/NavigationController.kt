@@ -31,92 +31,65 @@ import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
-import org.WenuLink.adapters.aircraft.TelemetryHandler
-import org.WenuLink.adapters.mission.MissionHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
- * MAVLinkController class to deal with the mission service and related MAVLink messages.
+ * MAVLinkController class to deal with the handler.mission service and related MAVLink messages.
  *
- * https://mavlink.io/en/services/mission.html
+ * https://mavlink.io/en/services/handler.mission.html
  *
  * https://developer.dji.com/api-reference/android-api/Components/Missions/DJIWaypointMissionOperator.html
  * https://developer.dji.com/api-reference/android-api/Components/Missions/DJIMissionControl.html
  *
  */
-class NavigationController(override val client: MAVLinkClient) : IController {
+class NavigationController(
+    override val client: MAVLinkClient,
+    override val handler: WenuLinkHandler
+) : IController {
     private val logger by taggedLogger(NavigationController::class.java.simpleName)
+
     private var maxRetryTimes = 5
     private var currentRetryTimes = 0
     private var numberOfExpectedItems = -1
     var wasRequested = false
         private set
 
-    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
         when (msg.msgid) {
-            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST ->
-                sendMissionCount(handler.mission)
-
-            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT ->
-                createNewMission(msg, handler.mission)
-
-            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT ->
-                processMissionItem(msg, handler.mission)
-
-            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT ->
-                sendMissionItem(msg, handler.mission)
-
-            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL ->
-                sendMissionClear(handler)
-
+            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST -> sendMissionCount()
+            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT -> createNewMission(msg)
+            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT -> processMissionItem(msg)
+            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT -> sendMissionItem(msg)
+            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL -> sendMissionClear()
             msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
-
             else -> return false
         }
         return true
     }
 
-    override fun processCommandLong(
-        commandLongMsg: msg_command_long,
-        handler: WenuLinkHandler
-    ): Boolean {
+    override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
         when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg, handler)
+            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg)
             else -> return false
         }
         return true
     }
 
-    override fun createMessage(messageID: Int, handler: WenuLinkHandler): MAVLinkMessage? =
-        when (messageID) {
-            msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT ->
-                msgMissionCurrent(handler.mission)
+    override fun createMessage(messageID: Int): MAVLinkMessage? = when (messageID) {
+        msg_mission_current.MAVLINK_MSG_ID_MISSION_CURRENT -> msgMissionCurrent()
+        msg_home_position.MAVLINK_MSG_ID_HOME_POSITION -> msgHomePosition()
+        msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT -> msgRawGPSInt()
+        msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT -> msgGlobalPositionInt()
+        msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed()
+        msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN -> msgGpsGlobalOrigin()
+        else -> null
+    }
 
-            msg_home_position.MAVLINK_MSG_ID_HOME_POSITION ->
-                msgHomePosition(handler)
-
-            msg_gps_raw_int.MAVLINK_MSG_ID_GPS_RAW_INT ->
-                msgRawGPSInt(handler.aircraft.telemetry)
-
-            msg_global_position_int.MAVLINK_MSG_ID_GLOBAL_POSITION_INT ->
-                msgGlobalPositionInt(handler.aircraft.telemetry)
-
-            msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed(handler)
-
-            msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN ->
-                msgGpsGlobalOrigin(handler)
-
-            else -> null
-        }
-
-    override fun processCommandInt(
-        commandIntMsg: msg_command_int,
-        handler: WenuLinkHandler
-    ): Boolean {
+    override fun processCommandInt(commandIntMsg: msg_command_int): Boolean {
         when (commandIntMsg.command) {
-            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg, handler)
+            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg)
 
             // 192
             else -> return false
@@ -143,8 +116,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun node2MissionItemMsg(nIdx: Int, mission: MissionHandler): msg_mission_item_int {
-        val node = mission.getWaypointNode(nIdx)
+    fun node2MissionItemMsg(nIdx: Int): msg_mission_item_int {
+        val node = handler.mission.getWaypointNode(nIdx)
         val coordinates = node.coordinates3D
         val command = when (node) {
             is MissionNode.Takeoff -> MAV_CMD.MAV_CMD_NAV_TAKEOFF
@@ -161,10 +134,10 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    fun sendAckAnswer(type: Int, mission: MissionHandler) {
+    fun sendAckAnswer(type: Int) {
         val msg = msg_mission_ack()
         msg.type = type.toShort()
-        msg.opaque_id = mission.state.id.toLong()
+        msg.opaque_id = handler.mission.state.id.toLong()
         client.sendMessage(msg)
     }
 
@@ -174,28 +147,28 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         logger.d { "ACK type: ${ackMsg.type} missionType ${ackMsg.mission_type}" }
     }
 
-    fun sendMissionCount(mission: MissionHandler) {
+    fun sendMissionCount() {
         val msg = msg_mission_count()
         msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        msg.count = mission.state.totalNodes()
-        msg.opaque_id = mission.state.id.toLong()
+        msg.count = handler.mission.state.totalNodes()
+        msg.opaque_id = handler.mission.state.id.toLong()
         logger.d { "sendMissionCount: ${msg.count}" }
         client.sendMessage(msg)
     }
 
-    fun sendMissionItem(msg: MAVLinkMessage, mission: MissionHandler) {
+    fun sendMissionItem(msg: MAVLinkMessage) {
         val itemMsg = msg as msg_mission_request_int
         val idx = itemMsg.seq
         logger.d { "sendMissionItem #$idx" }
-        if (mission.hasWaypointNodes()) {
-            val itemMsg = node2MissionItemMsg(idx, mission)
+        if (handler.mission.hasWaypointNodes()) {
+            val itemMsg = node2MissionItemMsg(idx)
             client.sendMessage(itemMsg)
         }
     }
 
-    fun sendMissionClear(handler: WenuLinkHandler) {
+    fun sendMissionClear() {
         handler.missionClear()
-        sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, handler.mission)
+        sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
     }
 
     fun requestMissionItem(seq: Int) {
@@ -206,20 +179,20 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         client.sendMessage(msg)
     }
 
-    fun createNewMission(msg: MAVLinkMessage, mission: MissionHandler) {
+    fun createNewMission(msg: MAVLinkMessage) {
         logger.d { "createNewMission" }
         val missionMsg = msg as msg_mission_count
 
-        if (!mission.state.canCreateMission()) return
+        if (!handler.mission.state.canCreateMission()) return
 
-        // TODO: Stop mission execution first if needed
+        // TODO: Stop handler.mission execution first if needed
         numberOfExpectedItems = missionMsg.count
 
-        // Only creates a new mission if has elements on it
+        // Only creates a new handler.mission if has elements on it
         if (numberOfExpectedItems > 0) {
             // ask for the first item an iterate over count
-            logger.d { "Creating new mission with ${missionMsg.count} items" }
-            // Request first mission item...
+            logger.d { "Creating new handler.mission with ${missionMsg.count} items" }
+            // Request first handler.mission item...
             requestMissionItem(0)
             // TODO: timeout waiting start?
         }
@@ -232,12 +205,12 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         client.sendMessage(msg)
     }
 
-    fun processMissionItem(msg: MAVLinkMessage, mission: MissionHandler) {
+    fun processMissionItem(msg: MAVLinkMessage) {
         logger.d { "processMissionItem" }
         val itemMsg = msg as msg_mission_item_int
         logger.d { "\t$itemMsg" }
         // Validate sequence
-        val expectedSeq = mission.state.totalNodes()
+        val expectedSeq = handler.mission.state.totalNodes()
         if (itemMsg.seq != expectedSeq) {
             logger.e { "Received item #${itemMsg.seq} instead #$expectedSeq, re-requesting..." }
             if (currentRetryTimes < maxRetryTimes) {
@@ -249,25 +222,25 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 
             return
         }
-        // Store item and request next or upload the mission
-        mission.addWaypointNode(itemMsg)
+        // Store item and request next or upload the handler.mission
+        handler.mission.addWaypointNode(itemMsg)
         ackReceivedItem(expectedSeq)
 
         if (itemMsg.seq < numberOfExpectedItems - 1) {
-            // request next mission item
+            // request next handler.mission item
             requestMissionItem(expectedSeq + 1)
         } else {
-            // reached the end of the mission items
-            mission.uploadWaypoints { error ->
+            // reached the end of the handler.mission items
+            handler.mission.uploadWaypoints { error ->
                 if (error != null) sendStatusText(error, MAV_SEVERITY.MAV_SEVERITY_ERROR)
             }
-            sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED, mission)
+            sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
         }
     }
 
-    fun sendMissionCurrent(sequence: Int, mission: MissionHandler) {
+    fun sendMissionCurrent(sequence: Int) {
         logger.d { "sendCurrentMission" }
-        val msg = msgMissionCurrent(mission)
+        val msg = msgMissionCurrent()
         msg.seq = sequence
         client.sendMessage(msg)
     }
@@ -280,8 +253,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         client.sendMessage(msg)
     }
 
-    fun missionStart(commandLongMsg: msg_command_long, handler: WenuLinkHandler) {
-        // TODO: Process init seq to custom first mission element
+    fun missionStart(commandLongMsg: msg_command_long) {
+        // TODO: Process init seq to custom first handler.mission element
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(
@@ -298,7 +271,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         )
     }
 
-    fun processDoReposition(commandIntMsg: msg_command_int, handler: WenuLinkHandler) {
+    fun processDoReposition(commandIntMsg: msg_command_int) {
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestMissionAction(RepositionAction.fromCommandInt(commandIntMsg))
@@ -319,7 +292,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 //        val reset = msg.param2 == 1f
 //        val requestedSeq = msg.param1.toInt()
 //
-//        // TODO; stop first if must, update currentItemSequence, and current mission in aircraft(?)
+//        // TODO; stop first if must, update currentItemSequence, and current handler.mission in aircraft(?)
 //
 //        currentItemSequence = if (requestedSeq == -1 || reset) 0 else requestedSeq
 //        startMission { error ->
@@ -333,17 +306,17 @@ class NavigationController(override val client: MAVLinkClient) : IController {
 //        }
 //    }
 
-    fun msgMissionCurrent(mission: MissionHandler): msg_mission_current {
+    fun msgMissionCurrent(): msg_mission_current {
         val msg = msg_mission_current()
-        msg.seq = mission.state.currentSequence ?: 0
-        msg.mission_id = mission.state.id.toLong()
-        msg.mission_state = mission.state.mavlink.toShort()
+        msg.seq = handler.mission.state.currentSequence ?: 0
+        msg.mission_id = handler.mission.state.id.toLong()
+        msg.mission_state = handler.mission.state.mavlink.toShort()
         return msg
     }
 
     // TODO: start, pause, and resume procedures
 
-    fun msgHomePosition(handler: WenuLinkHandler): MAVLinkMessage? {
+    fun msgHomePosition(): MAVLinkMessage? {
         val coordinates = handler.aircraft.state.homeCoordinates ?: return null
         val msg = msg_home_position()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
@@ -352,8 +325,8 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgGlobalPositionInt(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getData() ?: return null
+    fun msgGlobalPositionInt(): MAVLinkMessage? {
+        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
         val msg = msg_global_position_int()
         msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
@@ -373,11 +346,11 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgRawGPSInt(telemetry: TelemetryHandler): MAVLinkMessage? {
-        val telemetryData = telemetry.getData() ?: return null
+    fun msgRawGPSInt(): MAVLinkMessage? {
+        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
 
         val msg = msg_gps_raw_int()
-        if (telemetry.isSimulationActive) {
+        if (handler.aircraft.telemetry.isSimulationActive) {
             msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
             return msg
         }
@@ -403,7 +376,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgLocalPositionNed(handler: WenuLinkHandler): MAVLinkMessage? {
+    fun msgLocalPositionNed(): MAVLinkMessage? {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
         val msg = msg_local_position_ned()
         msg.time_boot_ms = handler.systemBootTime
@@ -416,7 +389,7 @@ class NavigationController(override val client: MAVLinkClient) : IController {
         return msg
     }
 
-    fun msgGpsGlobalOrigin(handler: WenuLinkHandler): MAVLinkMessage? {
+    fun msgGpsGlobalOrigin(): MAVLinkMessage? {
         val homeLoc = handler.aircraft.state.homeCoordinates ?: return null
         val msg = msg_gps_global_origin()
         msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)

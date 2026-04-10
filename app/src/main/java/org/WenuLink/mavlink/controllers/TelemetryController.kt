@@ -37,7 +37,10 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.MessageRate
 import org.WenuLink.mavlink.MAVLinkClient
 
-class TelemetryController(override val client: MAVLinkClient) : IController {
+class TelemetryController(
+    override val client: MAVLinkClient,
+    override val handler: WenuLinkHandler
+) : IController {
     private val logger by taggedLogger(TelemetryController::class.java.simpleName)
 
     private var broadcastSuppressed = true
@@ -112,20 +115,18 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
 
-    override fun processMessage(msg: MAVLinkMessage, handler: WenuLinkHandler): Boolean {
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
         when (msg.msgid) {
-            msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM ->
-                processDataStreamRequest(msg)
+            msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM -> processDataStreamRequest(
+                msg
+            )
 
             else -> return false
         }
         return true
     }
 
-    override fun processCommandLong(
-        commandLongMsg: msg_command_long,
-        handler: WenuLinkHandler
-    ): Boolean {
+    override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL -> processMessageInterval(commandLongMsg)
             else -> return false
@@ -133,7 +134,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
         return true
     }
 
-    fun sendMessages(controllers: List<IController>, handler: WenuLinkHandler) {
+    fun sendMessages(controllers: List<IController>) {
         if (!client.mustProcessMessages()) {
             logger.w { "MAVLink client is not ready!" }
             return
@@ -152,7 +153,7 @@ class TelemetryController(override val client: MAVLinkClient) : IController {
 
             // create the message from controllers definitions
             val message = controllers.asSequence()
-                .mapNotNull { it.createMessage(rate.messageID, handler) }
+                .mapNotNull { it.createMessage(rate.messageID) }
                 .firstOrNull()
 
             if (message == null) {
