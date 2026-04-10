@@ -11,11 +11,11 @@ import kotlinx.coroutines.launch
 
 open class CommandHandler<T : IHandler<T>> : IHandler<T> {
     private var requestJob: Job? = null
-    private var commandJob: Deferred<String?>? = null
+    private var commandJob: Deferred<UnitResult>? = null
     var currentCommand: ICommand<T>? = null
         private set
     private val commandChannel =
-        Channel<Pair<ICommand<T>, (String?) -> Unit>>(Channel.UNLIMITED)
+        Channel<Pair<ICommand<T>, (UnitResult) -> Unit>>(Channel.UNLIMITED)
 
     fun startCommandProcessor(scope: CoroutineScope, handler: T, logger: TaggedLogger) {
         requestJob?.cancel()
@@ -26,9 +26,9 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
                 currentCommand = cmd
 
                 try {
-                    val validationError = cmd.validate(handler)
-                    if (validationError != null) {
-                        onResult(validationError)
+                    val validationResult = cmd.validate(handler)
+                    if (validationResult is CommandResult.Failure) {
+                        onResult(validationResult)
                         continue
                     }
 
@@ -40,13 +40,13 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
 
                     val result = deferred.await()
                     onResult(result)
-                } catch (e: CancellationException) {
+                } catch (_: CancellationException) {
                     logger.w { "Command cancelled: ${cmd::class.simpleName}" }
                     cmd.onStop(handler)
-                    onResult(null)
+                    onResult(CommandResult.ok)
                 } catch (e: Exception) {
                     logger.d { "Command failed: ${cmd::class.simpleName}" }
-                    onResult(e.message)
+                    onResult(CommandResult.error(e.message ?: "Unknown error"))
                 } finally {
                     commandJob = null
                     currentCommand = null
@@ -57,18 +57,16 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
 
     override fun registerScope(scope: CoroutineScope) { } // nothing to do
 
-    fun dispatchCommand(cmd: ICommand<T>, onResult: (String?) -> Unit = {}) {
+    fun dispatchCommand(cmd: ICommand<T>, onResult: (UnitResult) -> Unit = {}) {
         val result = commandChannel.trySend(cmd to onResult)
         if (result.isFailure) {
-            onResult("Failed to enqueue command: ${cmd::class.java.simpleName}")
+            onResult(
+                CommandResult.error("Failed to enqueue command: ${cmd::class.java.simpleName}")
+            )
         }
     }
 
-    fun stopCommand(): String? {
-        val job = commandJob ?: return "No running command"
-        job.cancel(CancellationException("Stopped by user"))
-        return null
-    }
+    fun stopCommand() = commandJob?.cancel(CancellationException("Stopped by user"))
 
     override fun unload() {
         // Stop ongoing processes

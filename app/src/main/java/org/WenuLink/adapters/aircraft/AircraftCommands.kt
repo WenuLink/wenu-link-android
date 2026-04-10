@@ -1,23 +1,27 @@
 package org.WenuLink.adapters.aircraft
 
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
+import org.WenuLink.commands.UnitResult
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
-    override fun validate(ctx: AircraftHandler): String?
-    override suspend fun execute(ctx: AircraftHandler): String?
+    override fun validate(ctx: AircraftHandler): UnitResult
+    override suspend fun execute(ctx: AircraftHandler): UnitResult
     override suspend fun onStop(ctx: AircraftHandler)
 }
 
 data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? {
-        if (!ctx.isPowerOff) return "Already booted"
-        return ctx.canDispatchTransition(BootTransition)
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        !ctx.isPowerOff -> CommandResult.error("Already booted")
+        else -> ctx.canDispatchTransition(BootTransition)
     }
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(BootTransition)
         return ctx.boot(timeout)
+            ?.let { CommandResult.error(it) }
+            ?: CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
@@ -26,26 +30,27 @@ data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
 }
 
 data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? {
-        if (!ctx.sensorsHealthy) return "Sensors failing"
-        return ctx.canDispatchTransition(ArmTransition)
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        !ctx.sensorsHealthy -> CommandResult.error("Sensors failing")
+        else -> ctx.canDispatchTransition(ArmTransition)
     }
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(ArmTransition)
         // TODO: update according to each mode
         // https://ardupilot.org/copter/docs/arming_the_motors.html
-        val armed = if (ctx.state.flightMode == ArduCopterFlightMode.STABILIZE) {
+        if (ctx.state.flightMode == ArduCopterFlightMode.STABILIZE) {
             // Manual takeoff
             ctx.armMotors()
-            ctx.waitArmTransition(true, timeout)
+            if (!ctx.waitArmTransition(true, timeout)) {
+                return CommandResult.error("Unable to arm motors")
+            }
         } else {
-            // Automatic takeoff only must wait for state changes
-            true
+            // Automatic takeoff only. Must wait for state changes
         }
 
-        return if (armed) null else "Unable to arm motors"
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
@@ -54,37 +59,37 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 }
 
 data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
+    override fun validate(ctx: AircraftHandler): UnitResult =
         ctx.canDispatchTransition(StandbyTransition)
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(StandbyTransition)
         ctx.disarmMotors()
-        val disarmed = ctx.waitArmTransition(false, timeout)
-
-        return if (disarmed) null else "Unable to disarm motors"
+        return if (ctx.waitArmTransition(false, timeout)) {
+            CommandResult.ok
+        } else {
+            CommandResult.error("Unable to disarm motors")
+        }
     }
 
     override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
 }
 
 data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? =
+    override fun validate(ctx: AircraftHandler): UnitResult =
         ctx.canDispatchTransition(TakeoffTransition)
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(TakeoffTransition)
         ctx.takeOff()
-        val isFlying = ctx.awaitFlightState(true)
-
-        if (!isFlying) {
+        return if (ctx.waitFlightState(true, timeout)) {
+            CommandResult.ok
+        } else {
             ctx.dispatchCommand(DisarmCommand())
-            return "Unable to takeoff"
+            CommandResult.error("Unable to takeoff")
         }
-
-        return null
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
@@ -93,16 +98,18 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
 }
 
 data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCommand {
-    override fun validate(ctx: AircraftHandler): String? = when {
-        ctx.isPowerOff -> "Already power off"
-        !withTransitionCheck -> null
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        ctx.isPowerOff -> CommandResult.error("Already power off")
+        !withTransitionCheck -> CommandResult.ok
         else -> ctx.canDispatchTransition(PowerOffTransition)
     }
 
-    override suspend fun execute(ctx: AircraftHandler): String? {
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         if (withTransitionCheck) ctx.dispatchTransition(PowerOffTransition)
         return ctx.shutdown()
+            ?.let { CommandResult.error(it) }
+            ?: CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {

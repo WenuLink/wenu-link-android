@@ -18,13 +18,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
 sealed interface MissionCommand : ICommand<MissionHandler> {
-    override fun validate(ctx: MissionHandler): String?
-    override suspend fun execute(ctx: MissionHandler): String?
+    override fun validate(ctx: MissionHandler): UnitResult
+    override suspend fun execute(ctx: MissionHandler): UnitResult
     override suspend fun onStop(ctx: MissionHandler)
 }
 
@@ -32,15 +34,15 @@ data class UploadMissionCommand(
     private val assembler: MissionAssembler,
     private val flightSpeed: Float = 5f
 ) : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        ctx.state.canCreateMission() -> null
-        else -> "Upload not ready"
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        ctx.state.canCreateMission() -> CommandResult.ok
+        else -> CommandResult.error("Upload not ready")
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
-            MissionManager.uploadMission(assembler.build(), flightSpeed) { success, error ->
-                cont.resume(error)
+            MissionManager.uploadMission(assembler.build(), flightSpeed) { _, error ->
+                cont.resume(if (error == null) CommandResult.ok else CommandResult.error(error))
             }
 
             cont.invokeOnCancellation {
@@ -52,17 +54,17 @@ data class UploadMissionCommand(
 }
 
 data object StartWaypointMission : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        ctx.state.canCreateMission() -> "No mission found"
-        ctx.state.isActive() -> "Already started"
-        ctx.state.canStartMission() -> null
-        else -> "Not ready"
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        ctx.state.canCreateMission() -> CommandResult.error("No mission found")
+        ctx.state.isActive() -> CommandResult.error("Already started")
+        ctx.state.canStartMission() -> CommandResult.ok
+        else -> CommandResult.error("Not ready")
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
             MissionManager.startMission { error ->
-                cont.resume(error)
+                cont.resume(if (error == null) CommandResult.ok else CommandResult.error(error))
             }
 
             cont.invokeOnCancellation {
@@ -74,15 +76,15 @@ data object StartWaypointMission : MissionCommand {
 }
 
 data object PauseWaypointMission : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        ctx.state.canPauseMission() -> null
-        else -> "Not started"
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        ctx.state.canPauseMission() -> CommandResult.ok
+        else -> CommandResult.error("Not started")
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
             MissionManager.pauseMission { error ->
-                cont.resume(error)
+                cont.resume(if (error == null) CommandResult.ok else CommandResult.error(error))
             }
 
             cont.invokeOnCancellation {
@@ -94,15 +96,15 @@ data object PauseWaypointMission : MissionCommand {
 }
 
 data object ResumeWaypointMission : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        ctx.state.canResumeMission() -> null
-        else -> "Already in execution"
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        ctx.state.canResumeMission() -> CommandResult.ok
+        else -> CommandResult.error("Already in execution")
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
             MissionManager.resumeMission { error ->
-                cont.resume(error)
+                cont.resume(if (error == null) CommandResult.ok else CommandResult.error(error))
             }
 
             cont.invokeOnCancellation {
@@ -114,15 +116,15 @@ data object ResumeWaypointMission : MissionCommand {
 }
 
 data object StopWaypointMission : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        !ctx.state.canCreateMission() -> null
-        else -> "Nothing to stop"
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        !ctx.state.canCreateMission() -> CommandResult.ok
+        else -> CommandResult.error("Nothing to stop")
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
             MissionManager.stopMission { error ->
-                cont.resume(error)
+                cont.resume(if (error == null) CommandResult.ok else CommandResult.error(error))
             }
 
             cont.invokeOnCancellation {
@@ -134,38 +136,37 @@ data object StopWaypointMission : MissionCommand {
 }
 
 data object PauseActionCommand : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        !MissionActionManager.isRunning -> "Timeline not running"
-        else -> null
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        !MissionActionManager.isRunning -> CommandResult.error("Timeline not running")
+        else -> CommandResult.ok
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? {
+    override suspend fun execute(ctx: MissionHandler): UnitResult {
         MissionActionManager.pause()
-        return null
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: MissionHandler) { }
 }
 
 data object ResumeActionCommand : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = when {
-        MissionActionManager.isRunning -> "Timeline already running"
-        else -> null
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        MissionActionManager.isRunning -> CommandResult.error("Timeline already running")
+        else -> CommandResult.ok
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? {
+    override suspend fun execute(ctx: MissionHandler): UnitResult {
         MissionActionManager.resume()
-        return null
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: MissionHandler) { }
 }
 
 interface MissionActionCommand : MissionCommand {
-    override fun validate(ctx: MissionHandler): String? = if (MissionActionManager.isRunning) {
-        "Busy"
-    } else {
-        null
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        MissionActionManager.isRunning -> CommandResult.error("Busy")
+        else -> CommandResult.ok
     }
 
     override suspend fun onStop(ctx: MissionHandler) = MissionActionManager.stop()
@@ -206,39 +207,38 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
         )
     }
 
-    override fun validate(ctx: MissionHandler): String? = if (ctx.state.isActive()) {
-        "Busy"
-    } else {
-        null
+    override fun validate(ctx: MissionHandler): UnitResult = when {
+        ctx.state.isActive() -> CommandResult.error("Busy")
+        else -> CommandResult.ok
     }
 
-    override suspend fun execute(ctx: MissionHandler): String? {
+    override suspend fun execute(ctx: MissionHandler): UnitResult {
         delay(timeMillis)
-        return null
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: MissionHandler) { }
 }
 
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
-    override suspend fun execute(ctx: MissionHandler): String? =
+    override suspend fun execute(ctx: MissionHandler): UnitResult =
         suspendCancellableCoroutine { cont ->
             MissionActionManager.clear()
 
             val error = MissionActionManager.schedule(action)
 
             if (error != null) {
-                cont.resume("Error in $action: ${error.description}")
+                cont.resume(CommandResult.error("Error in $action: ${error.description}"))
                 return@suspendCancellableCoroutine
             }
 
             val actionKey = MissionActionManager.onFinish(action::class) {
-                cont.resume(null)
+                cont.resume(CommandResult.ok)
             }
 
             MissionActionManager.startListener {
                 // onError
-                cont.resume("Action failed: $it")
+                cont.resume(CommandResult.error("Action failed: $it"))
             }
 
             MissionActionManager.start()
