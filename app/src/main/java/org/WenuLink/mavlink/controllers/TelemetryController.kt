@@ -212,7 +212,6 @@ class TelemetryController(
 
     @Synchronized
     fun processMessageInterval(commandMsg: msg_command_long) {
-        logger.d { "processMessageInterval" }
         val mavlinkMsgID = commandMsg.param1.toInt()
         val interval = commandMsg.param2.toLong() // already in micro seconds
         setMessageRate(mavlinkMsgID, interval)

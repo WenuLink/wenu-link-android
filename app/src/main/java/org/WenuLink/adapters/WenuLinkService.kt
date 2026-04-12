@@ -40,7 +40,6 @@ class WenuLinkService : Service() {
 
         // create the aircraft instance
         handler = WenuLinkHandler.getInstance()
-        handler.registerScope(serviceScope)
 
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady()) {
@@ -105,18 +104,6 @@ class WenuLinkService : Service() {
 
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
-
-        // Wait Aircraft to boot
-        serviceScope.launch {
-            val bootError = handler.bootAircraft()
-            if (bootError != null) {
-                // No aircraft -> No service
-                terminate()
-                onDestroy()
-            } else {
-                thisApp.isAircraftBoot.value = true
-            }
-        }
 
         return START_STICKY // The service will continue running
     }
@@ -214,8 +201,5 @@ class WenuLinkService : Service() {
         val mavlinkStopJob = stopMAVLinkService()
         webRTCStopJob?.join()
         mavlinkStopJob?.join()
-        handler.unload()
-        AsyncUtils.waitTimeout(1000L, 20000L) { !handler.isAircraftPowerOn }
-        thisApp.isAircraftBoot.value = false
     }
 }

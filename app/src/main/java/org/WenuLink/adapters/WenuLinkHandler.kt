@@ -4,9 +4,8 @@ import io.getstream.log.taggedLogger
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.AircraftHandler
@@ -56,7 +55,6 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     val aircraftState: AircraftState get() = aircraft.state
     val aircraftModel: String get() = aircraft.telemetry.getAircraftModelName()
     val isTelemetryActive: Boolean get() = aircraft.telemetry.isActive()
-    val telemetryStateFlow: StateFlow<Boolean> get() = aircraft.telemetry.isBroadcasting
     val hasActiveJoystickInput: Boolean
         get() = aircraft.telemetry.getRCData()?.hasCenteredJoystick() == false
     val isAircraftPowerOn: Boolean get() = !aircraft.isPowerOff &&
@@ -67,19 +65,11 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     override fun registerScope(scope: CoroutineScope) {
         aircraft.registerScope(scope)
-        mission.registerScope(scope)
-        camera.registerScope(scope)
-        startMonitorJob(scope)
         startCommandProcessor(scope, this@WenuLinkHandler, logger)
     }
 
     override fun unload() {
-        aircraft.dispatchCommand(ShutdownCommand(false)) {
-            // Stop monitor
-            monitorJob?.cancel()
-            monitorJob = null
-        }
-        onImageCaptured = null
+        aircraft.unload()
         super.unload()
     }
 
@@ -105,10 +95,12 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     private fun startMonitorJob(scope: CoroutineScope) {
         monitorJob?.cancel()
+        var lastLoop = System.currentTimeMillis()
 
         monitorJob = scope.launch {
-            while (isActive) {
-                try {
+            logger.d { "Starting monitor job" }
+            while (!aircraft.isPowerOff) try {
+                coroutineScope {
                     // --- Sync real aircraft state ---
                     launch {
                         aircraft.syncState()
@@ -127,14 +119,25 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                     launch {
                         safetyChecks()
                     }
-                } catch (e: Exception) {
-                    logger.e { "Guard loop error: ${e.message}" }
-                    // emergency land? manual control?
-                }
-
+                }.join()
+            } catch (e: Exception) {
+                logger.e { "Monitor loop error: ${e.message}" }
+                // emergency land? manual control?
+            } finally {
                 delay(200L) // tune this (100–500ms is reasonable)
+                val loopTime = System.currentTimeMillis() - lastLoop
+                logger.d { "Monitor loop time: ${loopTime}ms" }
+                lastLoop = System.currentTimeMillis()
             }
+            logger.d { "Monitor job ended" }
         }
+    }
+
+    private fun stopMonitor() {
+        logger.d { "Stop monitor job" }
+        // Stop monitor
+        monitorJob?.cancel()
+        monitorJob = null
     }
 
     fun dispatchCommand(cmd: WenuLinkCommand, onResult: (String?) -> Unit = {}) {
@@ -155,13 +158,29 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             }
         }
 
-    suspend fun bootAircraft(): String? {
-        val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10000L)))
+    suspend fun loadComponents(scope: CoroutineScope): String? {
+        // prevent cancel command when manualControl() after boot
+        dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
+        val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(30000L)))
         if (bootError == null) {
             manualControl()
             startTimestamp = System.currentTimeMillis()
+            // Register listeners
+            mission.registerScope(scope)
+            camera.registerScope(scope)
+            startMonitorJob(scope)
         }
         return bootError
+    }
+
+    suspend fun unloadComponents(strictTransition: Boolean = false): String? {
+        stopAllCommands()
+        mission.unload()
+        camera.unload()
+        onImageCaptured = null
+        stopMonitor()
+        val shutdownError = dispatchAndAwait(WenuLinkCommand.Aircraft(ShutdownCommand(strictTransition)))
+        return shutdownError
     }
 
     fun setAuthority(authority: ControlAuthorityType): ControlAuthority {
@@ -224,13 +243,14 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun missionStop() {
-        logger.d { "Stop mission" }
         when {
             controlAuthority.isWaypoint() -> mission.dispatchCommand(StopWaypointMission) { error ->
-                if (error != null) logger.i { "Unable to stop the mission: $error" }
+                if (error != null) logger.w { "Unable to stop the mission: $error" }
             }
 
-            controlAuthority.isCommand() -> mission.stopCommand()
+            controlAuthority.isCommand() -> mission.stopCommand()?.let {
+                logger.w { "Unable to stop command: $it" }
+            }
         }
     }
 
@@ -240,7 +260,6 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun stopAllCommands() {
-        logger.d { "Attempting to cancel active command" }
         aircraft.stopCommand()
         missionStop()
         camera.stopCommand()

@@ -96,7 +96,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     @Synchronized
     fun syncState() {
         state = state.fromMissionManager()
-        logger.d { "updateMissionState: $state" }
     }
 
     @Synchronized

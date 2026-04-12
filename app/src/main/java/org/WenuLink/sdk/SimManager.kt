@@ -7,7 +7,9 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import dji.sdk.flightcontroller.Simulator
 import io.getstream.log.taggedLogger
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.TelemetryData
+import kotlin.coroutines.resume
 
 object SimManager {
     private val logger by taggedLogger(SimManager::class.java.simpleName)
@@ -84,17 +86,16 @@ object SimManager {
         )
     }
 
-    fun run(
+    suspend fun run(
         lat: Double = -8.066478642777481,
         long: Double = -34.98744367551871,
         alt: Float = 24f,
         updateFrequency: Int = 10,
-        satelliteCount: Int = 8,
-        onResult: (String?) -> Unit
-    ) {
+        satelliteCount: Int = 8
+    ) = suspendCancellableCoroutine { cont ->
         if (isActive()) {
-            onResult(null)
-            return
+            cont.resume(null)
+            return@suspendCancellableCoroutine
         }
         logger.d { "Simulation start." }
         this.satelliteCount = satelliteCount
@@ -107,16 +108,16 @@ object SimManager {
                 updateFrequency,
                 satelliteCount
             ),
-            SDKUtils.createCompletionCallback(onResult)
+            SDKUtils.createCompletionCallback(cont::resume)
         )
     }
 
-    fun stop(onResult: (String?) -> Unit) {
+    suspend fun stop() = suspendCancellableCoroutine { cont ->
         if (!isActive()) {
-            onResult(null)
-            return
+            cont.resume(null)
+            return@suspendCancellableCoroutine
         }
         logger.d { "Simulation stop." }
-        simInstance?.stop(SDKUtils.createCompletionCallback(onResult))
+        simInstance?.stop(SDKUtils.createCompletionCallback(cont::resume))
     }
 }

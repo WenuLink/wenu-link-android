@@ -77,7 +77,7 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(TakeoffTransition)
         ctx.takeOff()
-        val isFlying = ctx.awaitFlightState(true)
+        val isFlying = ctx.waitFlightState(true, 5_000)
 
         if (!isFlying) {
             ctx.dispatchCommand(DisarmCommand())
@@ -102,7 +102,9 @@ data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCo
     override suspend fun execute(ctx: AircraftHandler): String? {
         // TODO: check if compatible with CancellableCoroutine
         if (withTransitionCheck) ctx.dispatchTransition(PowerOffTransition)
-        return ctx.shutdown()
+        ctx.shutdown()
+        ctx.dispatchTransition(InitialTransition)
+        return null
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
