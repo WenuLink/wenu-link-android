@@ -156,7 +156,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         }
 
     suspend fun bootAircraft(): String? {
-        val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10000L)))
+        val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10_000L)))
         if (bootError == null) {
             manualControl()
             startTimestamp = System.currentTimeMillis()

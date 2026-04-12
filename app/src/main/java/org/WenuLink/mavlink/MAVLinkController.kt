@@ -180,7 +180,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         return isStationConnected()
     }
 
-    suspend fun waitServicesRequest(timeout: Long = 30000L): Boolean {
+    suspend fun waitServicesRequest(timeout: Long = 30_000L): Boolean {
         // https://docs.qgroundcontrol.com/master/en/qgc-dev-guide/communication_flow.html
         if (!isStationConnected()) return false
 
@@ -205,7 +205,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
     suspend fun waitHomePosition(): Boolean {
         // Wait for home position to send GPS_GLOBAL_ORIGIN and periodic HOME_POSITION
-        val isHomeSet = handler.aircraft.waitHomeSet(360000) // 5min
+        val isHomeSet = handler.aircraft.waitHomeSet(360_000L) // 6min
 
         if (!isHomeSet) return false
 

@@ -8,7 +8,7 @@ class MissionAssembler {
     var nWaypoints = 0
         private set
 
-    fun getNode(nId: Int) = nodes[nId]
+    fun getNode(nId: Int): MissionNode = nodes[nId]
 
     fun hasNodes() = !nodes.isEmpty()
 

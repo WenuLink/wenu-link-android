@@ -82,9 +82,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         stateMachine.updateFlightMode(fallbackMode)
     }
 
-    fun canDispatchTransition(transition: StateTransition) = stateMachine.canDispatch(transition)
+    fun canDispatchTransition(transition: StateTransition): String? =
+        stateMachine.canDispatch(transition)
 
-    fun dispatchTransition(transition: StateTransition) = stateMachine.dispatch(transition)
+    fun dispatchTransition(transition: StateTransition): AircraftState =
+        stateMachine.dispatch(transition)
 
     suspend fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
         if (isPowerOff) return
@@ -130,7 +132,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return AsyncUtils.waitTimeout(timeout, 1000L, parameters::isLoaded)
     }
 
-    suspend fun sensorChecks(timeout: Long = 10000L): Boolean {
+    suspend fun sensorChecks(timeout: Long = 10_000L): Boolean {
         val perSensorTime = (timeout / 3f).roundToLong()
         logger.i { "Waiting sensors data" }
 
@@ -177,7 +179,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return state.isHomeSet()
     }
 
-    suspend fun waitHomeSet(timeout: Long = 10000L): Boolean {
+    suspend fun waitHomeSet(timeout: Long = 10_000L): Boolean {
         if (state.isHomeSet()) return true
 
         return AsyncUtils.waitTimeout(

@@ -135,7 +135,7 @@ class ConnectionController(
     fun msgSystemTime(): MAVLinkMessage {
         val currentStamp = System.currentTimeMillis()
         val msg = msg_system_time()
-        msg.time_unix_usec = currentStamp * 1_000
+        msg.time_unix_usec = currentStamp * 1000
         msg.time_boot_ms = currentStamp - handler.startTimestamp
         return msg
     }

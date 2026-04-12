@@ -215,8 +215,9 @@ Code style is enforced via **ktlint**, additionally the following conventions ar
 
 #### Type Inference
 
-- Omit explicit types when they are obvious from the right-hand side.
-- Keep type annotations where they improve readability or clarity.
+- Omit explicit attribute types when they are obvious from the right-hand side.
+- Keep attribute type annotations where they improve readability or clarity.
+- Always declare function return types explicitly unless they are of type `Unit` or very basic Boolean expressions
 
 #### Null Safety
 

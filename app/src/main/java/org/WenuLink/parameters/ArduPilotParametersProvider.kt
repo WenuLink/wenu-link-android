@@ -25,25 +25,25 @@ object ArduPilotParametersProvider : ParameterProvider {
             cb(null)
         }
 
-        fun intParam(name: String, initial: Int) = numberParam(
+        fun intParam(name: String, initial: Int): SimpleParameter = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT32,
             SemanticType.INT
         ) { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
 
-        fun floatParam(name: String, initial: Float) = numberParam(
+        fun floatParam(name: String, initial: Float): SimpleParameter = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_REAL32,
             SemanticType.FLOAT
         ) { cb -> cb(values[name] ?: ParamValue.FloatVal(initial)) }
 
-        fun int8Param(name: String, initial: Int) = numberParam(
+        fun int8Param(name: String, initial: Int): SimpleParameter = numberParam(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_INT8,
             SemanticType.INT
         ) { cb -> cb(values[name] ?: ParamValue.IntVal(initial)) }
 
-        fun boolParam(name: String, initial: Boolean) = SimpleParameter(
+        fun boolParam(name: String, initial: Boolean): SimpleParameter = SimpleParameter(
             name,
             MAV_PARAM_TYPE.MAV_PARAM_TYPE_UINT8,
             SemanticType.BOOL,

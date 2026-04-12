@@ -40,14 +40,14 @@ class MAVLinkService(handler: WenuLinkHandler) {
         groundControlStation = ServiceAddress(ip, port.toInt(), "UDP")
     }
 
-    fun clientExists(): Boolean = client != null
+    fun clientExists() = client != null
 
-    fun isServiceRunning(): Boolean =
-        clientExists() && (listeningJob?.isActive == true || sendingJob?.isActive == true)
+    fun isServiceRunning() = clientExists() &&
+        (listeningJob?.isActive == true || sendingJob?.isActive == true)
 
-    fun clientCanStart(): Boolean = clientExists() && !isServiceRunning()
+    fun clientCanStart() = clientExists() && !isServiceRunning()
 
-    fun isServiceStop(): Boolean = listeningJob == null && sendingJob == null
+    fun isServiceStop() = listeningJob == null && sendingJob == null
 
     fun createClient() {
         if (clientExists()) {
@@ -101,7 +101,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         }
 
         // Wait for station's heartbeat or shutdown if no received after a while
-        val currentStationConnected = controller.waitGroundStation(30000L)
+        val currentStationConnected = controller.waitGroundStation(30_000L)
         if (!currentStationConnected) {
             onResult("No ground control station found, stoping")
             stopService()
@@ -118,7 +118,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         // Wait for parameters and mission items request
         messagesScope?.launch {
             // TODO: move timeout to a UserPreference due to user's local network latency
-            isReady = controller.waitServicesRequest(30000L)
+            isReady = controller.waitServicesRequest(30_000L)
 
             logger.d {
                 "MAVLinkService (ready?=$isReady) " +
