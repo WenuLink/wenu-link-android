@@ -56,13 +56,13 @@ data class RequestLand(val withLandingConfirmation: Boolean = true) :
     RequestTransition(LandTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
             ctx.dispatchCommand(WenuLinkCommand.Mission(LandAction(true))) { result ->
-                if (result is CommandResult.Failure) {
+                if (result.hasError) {
                     cont.resume(result)
                     return@dispatchCommand
                 }
@@ -84,13 +84,13 @@ data class RequestTakeoff(
 ) : RequestTransition(TakeoffTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
             ctx.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand(timeout))) { result ->
-                if (result is CommandResult.Failure) {
+                if (result.hasError) {
                     cont.resume(result)
                     return@dispatchCommand
                 }
@@ -128,7 +128,7 @@ data class RequestStartMission(
 ) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
@@ -152,7 +152,7 @@ open class RequestMissionAction(private val action: MissionActionCommand) :
     RequestTransition(FlyingTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
