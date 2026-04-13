@@ -112,13 +112,11 @@ class CommandController(override var client: MAVLinkClient, override val handler
             return
         }
 
-        handler.aircraft.requestMode(customMode)
-            .onSuccess {
-                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-            }
-            .onFailure {
-                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-            }
+        if (handler.aircraft.requestMode(customMode).isOk) {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        } else {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        }
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {
@@ -154,22 +152,20 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun processLanding(commandMsg: msg_command_long) {
         logger.d { "processLanding: $commandMsg" }
-        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isSuccess) {
-            MAV_RESULT.MAV_RESULT_ACCEPTED
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isOk) {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         } else {
-            MAV_RESULT.MAV_RESULT_DENIED
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
         }
-        sendCommandAck(commandMsg.command, result)
     }
 
     fun processReturn(commandMsg: msg_command_long) {
         logger.d { "processReturn: $commandMsg" }
-        val result = if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isSuccess) {
-            MAV_RESULT.MAV_RESULT_ACCEPTED
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isOk) {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         } else {
-            MAV_RESULT.MAV_RESULT_DENIED
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
         }
-        sendCommandAck(commandMsg.command, result)
     }
 
     fun processDelay(commandMsg: msg_command_long) {

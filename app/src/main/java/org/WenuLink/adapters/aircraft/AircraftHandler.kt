@@ -5,6 +5,8 @@ import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParameterRegistry
@@ -47,12 +49,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         )
     }
 
-    fun requestMode(mode: ArduCopterFlightMode): Result<Unit> {
-        if (mode == state.flightMode) return Result.success(Unit)
+    fun requestMode(mode: ArduCopterFlightMode): UnitResult {
+        if (mode == state.flightMode) return CommandResult.ok
 
         if (!stateMachine.isModeAllowed(mode)) {
-            return Result.failure(
-                IllegalStateException("Mode $mode not allowed from ${state.flightMode}")
+            return CommandResult.error(
+                "Mode $mode not allowed from ${state.flightMode}"
             )
         }
 
@@ -60,7 +62,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         stateMachine.updateFlightMode(mode)
 
-        return Result.success(Unit)
+        return CommandResult.ok
     }
 
     private fun enforceModeConsistency() {
@@ -82,7 +84,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         stateMachine.updateFlightMode(fallbackMode)
     }
 
-    fun canDispatchTransition(transition: StateTransition): String? =
+    fun canDispatchTransition(transition: StateTransition): UnitResult =
         stateMachine.canDispatch(transition)
 
     fun dispatchTransition(transition: StateTransition): AircraftState =

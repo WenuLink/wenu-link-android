@@ -29,6 +29,7 @@ import org.WenuLink.mavlink.controllers.TelemetryController
  * - ParameterController: Parameter Protocol
  * - NavigationController: Mission Protocol
  * - TelemetryController: Message Protocol
+ * - CameraController: Camera Protocol
  */
 class MAVLinkController(private val handler: WenuLinkHandler) {
     private val logger by taggedLogger(MAVLinkController::class.java.simpleName)

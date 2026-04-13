@@ -18,7 +18,9 @@ import org.WenuLink.adapters.mission.MissionCommand
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.adapters.mission.ReturnAction
 import org.WenuLink.adapters.mission.StartWaypointMission
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
+import org.WenuLink.commands.UnitResult
 
 sealed interface WenuLinkCommand {
     data class Aircraft(val command: AircraftCommand) : WenuLinkCommand
@@ -28,38 +30,40 @@ sealed interface WenuLinkCommand {
 }
 
 sealed interface RequestCommand : ICommand<WenuLinkHandler> {
-    override fun validate(ctx: WenuLinkHandler): String?
-    override suspend fun execute(ctx: WenuLinkHandler): String?
+    override fun validate(ctx: WenuLinkHandler): UnitResult
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult
     override suspend fun onStop(ctx: WenuLinkHandler)
 }
 
 open class RequestTransition(open val transition: StateTransition) : RequestCommand {
-    override fun validate(ctx: WenuLinkHandler): String? =
+    override fun validate(ctx: WenuLinkHandler): UnitResult =
         ctx.aircraft.canDispatchTransition(transition)
 
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val prevState = ctx.aircraft.state.copy()
         ctx.aircraft.dispatchTransition(transition)
-        return if (prevState == ctx.aircraft.state) "State not changed" else null
+        return if (prevState != ctx.aircraft.state) {
+            CommandResult.ok
+        } else {
+            CommandResult.error("State not changed")
+        }
     }
 
-    override suspend fun onStop(ctx: WenuLinkHandler) {
-        ctx.manualControl()
-    }
+    override suspend fun onStop(ctx: WenuLinkHandler) = ctx.manualControl()
 }
 
 data class RequestLand(val withLandingConfirmation: Boolean = true) :
     RequestTransition(LandTransition) {
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
+        val transitionResult = super.execute(ctx)
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
-            ctx.dispatchCommand(WenuLinkCommand.Mission(LandAction(true))) { error ->
-                if (error != null) {
-                    cont.resume(error)
+            ctx.dispatchCommand(WenuLinkCommand.Mission(LandAction(true))) { result ->
+                if (result.hasError) {
+                    cont.resume(result)
                     return@dispatchCommand
                 }
                 ctx.dispatchCommand(
@@ -78,21 +82,23 @@ data class RequestTakeoff(
     val speed: Float = 2f,
     val timeout: Long = 15_000L
 ) : RequestTransition(TakeoffTransition) {
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
+        val transitionResult = super.execute(ctx)
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
-            ctx.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand(timeout))) { error ->
-                if (error != null) {
-                    cont.resume(error)
+            ctx.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand(timeout))) { result ->
+                if (result.hasError) {
+                    cont.resume(result)
                     return@dispatchCommand
                 }
 
                 val coordinates = ctx.aircraft.currentCoordinates
-                    ?: return@dispatchCommand cont.resume("No aircraft position available")
+                    ?: return@dispatchCommand cont.resume(
+                        CommandResult.error("No aircraft position available")
+                    )
 
                 ctx.dispatchCommand(
                     WenuLinkCommand.Mission(
@@ -120,9 +126,9 @@ data class RequestStartMission(
         ArmTransition
     }
 ) {
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
+        val transitionResult = super.execute(ctx)
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
@@ -144,9 +150,9 @@ data class RequestStartMission(
 
 open class RequestMissionAction(private val action: MissionActionCommand) :
     RequestTransition(FlyingTransition) {
-    override suspend fun execute(ctx: WenuLinkHandler): String? {
-        val transitionError = super.execute(ctx)
-        if (transitionError != null) return transitionError
+    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
+        val transitionResult = super.execute(ctx)
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 

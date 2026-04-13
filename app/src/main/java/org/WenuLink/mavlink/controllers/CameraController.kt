@@ -131,10 +131,10 @@ class CameraController(
         val index = commandLongMsg.param1.toInt()
         val mode = commandLongMsg.param2.toInt()
 
-        handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { error ->
+        handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { result ->
             sendCommandAck(
                 commandLongMsg.command,
-                if (error == null) {
+                if (result.isOk) {
                     MAV_RESULT.MAV_RESULT_ACCEPTED
                 } else {
                     MAV_RESULT.MAV_RESULT_FAILED
@@ -200,8 +200,12 @@ class CameraController(
             )
         )
 
-        handler.dispatchCommand(command) { error ->
-            if (error != null) logger.w { "requestStartCapture error: $error" }
+        handler.dispatchCommand(command) { result ->
+            if (result.hasError) {
+                logger.w {
+                    "requestStartCapture error: ${result.errorReason}"
+                }
+            }
             if (totalPhotos == 1) handler.onImageCaptured = null
         }
     }
@@ -226,8 +230,12 @@ class CameraController(
         handler.onImageCaptured = null
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopIntervalShootCommand(cameraInfo.id))
-        ) { error ->
-            if (error != null) logger.w { "requestStopCapture error: $error" }
+        ) { result ->
+            if (result.hasError) {
+                logger.w {
+                    "requestStopCapture error: ${result.errorReason}"
+                }
+            }
         }
     }
 
@@ -256,10 +264,9 @@ class CameraController(
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StartRecordCommand(cameraInfo.id))
-        ) { error ->
-            val captureOk = error == null
-            if (!captureOk) {
-                logger.w { "Error in requestStartRecording: $error" }
+        ) { result ->
+            if (result.hasError) {
+                logger.w { "Error in requestStartRecording: ${result.errorReason}" }
             } else {
                 // setting messages frequency
                 onSetMessageRate(

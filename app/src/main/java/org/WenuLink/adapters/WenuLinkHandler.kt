@@ -25,6 +25,7 @@ import org.WenuLink.adapters.mission.ResumeActionCommand
 import org.WenuLink.adapters.mission.ResumeWaypointMission
 import org.WenuLink.adapters.mission.StopWaypointMission
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.UnitResult
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     companion object {
@@ -137,7 +138,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         }
     }
 
-    fun dispatchCommand(cmd: WenuLinkCommand, onResult: (String?) -> Unit = {}) {
+    fun dispatchCommand(cmd: WenuLinkCommand, onResult: (UnitResult) -> Unit = {}) {
         when (cmd) {
             is WenuLinkCommand.Aircraft -> aircraft.dispatchCommand(cmd.command, onResult)
             is WenuLinkCommand.Mission -> mission.dispatchCommand(cmd.command, onResult)
@@ -146,7 +147,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         }
     }
 
-    suspend fun dispatchAndAwait(cmd: WenuLinkCommand): String? =
+    suspend fun dispatchAndAwait(cmd: WenuLinkCommand): UnitResult =
         suspendCancellableCoroutine { cont ->
             dispatchCommand(cmd) { result ->
                 if (cont.isActive) {
@@ -155,13 +156,13 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             }
         }
 
-    suspend fun bootAircraft(): String? {
-        val bootError = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10_000L)))
-        if (bootError == null) {
+    suspend fun bootAircraft(): UnitResult {
+        val bootResult = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10_000L)))
+        if (bootResult.isOk) {
             manualControl()
             startTimestamp = System.currentTimeMillis()
         }
-        return bootError
+        return bootResult
     }
 
     fun setAuthority(authority: ControlAuthorityType): ControlAuthority {
@@ -181,28 +182,28 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     fun manualControl() {
         dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
 
-        aircraft.requestMode(ArduCopterFlightMode.STABILIZE)
-            .onFailure {
-                logger.w { "Manual control mode rejected: ${it.message}" }
-            }
+        val result = aircraft.requestMode(ArduCopterFlightMode.STABILIZE)
+        if (result.hasError) {
+            logger.w { "Manual control mode rejected: ${result.errorReason}" }
+        }
     }
 
     fun missionPause() {
         logger.i { "Pause mission" }
         when {
             controlAuthority.isWaypoint() ->
-                mission.dispatchCommand(PauseWaypointMission) { error ->
-                    if (error != null) {
+                mission.dispatchCommand(PauseWaypointMission) { result ->
+                    if (result.hasError) {
                         logger.i {
-                            "Unable to pause the mission at ${mission.state.currentSequence}: $error"
+                            "Unable to pause the mission at ${mission.state.currentSequence}: ${result.errorReason}"
                         }
                     }
                 }
 
             controlAuthority.isCommand() ->
-                mission.dispatchCommand(PauseActionCommand) { error ->
-                    if (error != null) {
-                        logger.i { "Unable to pause the command: $error" }
+                mission.dispatchCommand(PauseActionCommand) { result ->
+                    if (result.hasError) {
+                        logger.i { "Unable to pause the command: ${result.errorReason}" }
                     }
                 }
         }
@@ -212,13 +213,21 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         logger.i { "Resume mission" }
         when {
             controlAuthority.isWaypoint() ->
-                mission.dispatchCommand(ResumeWaypointMission) { error ->
-                    if (error != null) logger.i { "Unable to resume the mission: $error" }
+                mission.dispatchCommand(ResumeWaypointMission) { result ->
+                    if (result.hasError) {
+                        logger.i {
+                            "Unable to resume the mission: ${result.errorReason}"
+                        }
+                    }
                 }
 
             controlAuthority.isCommand() ->
-                mission.dispatchCommand(ResumeActionCommand) { error ->
-                    if (error != null) logger.i { "Unable to resume the command: $error" }
+                mission.dispatchCommand(ResumeActionCommand) { result ->
+                    if (result.hasError) {
+                        logger.i {
+                            "Unable to resume the command: ${result.errorReason}"
+                        }
+                    }
                 }
         }
     }
@@ -226,8 +235,14 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     fun missionStop() {
         logger.d { "Stop mission" }
         when {
-            controlAuthority.isWaypoint() -> mission.dispatchCommand(StopWaypointMission) { error ->
-                if (error != null) logger.i { "Unable to stop the mission: $error" }
+            controlAuthority.isWaypoint() -> mission.dispatchCommand(
+                StopWaypointMission
+            ) { result ->
+                if (result.hasError) {
+                    logger.i {
+                        "Unable to stop the mission: ${result.errorReason}"
+                    }
+                }
             }
 
             controlAuthority.isCommand() -> mission.stopCommand()
@@ -247,7 +262,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         this.stopCommand()
     }
 
-    fun stopAndDispatch(command: RequestCommand, onResult: (String?) -> Unit = {}) {
+    fun stopAndDispatch(command: RequestCommand, onResult: (UnitResult) -> Unit = {}) {
         if (currentCommand == command) return
         missionStop()
         dispatchCommand(command, onResult)
