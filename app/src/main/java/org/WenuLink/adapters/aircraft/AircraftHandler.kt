@@ -4,6 +4,8 @@ import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.parameters.ArduPilotParametersProvider
 import org.WenuLink.parameters.DJIParametersProvider
 import org.WenuLink.parameters.ParameterRegistry
@@ -46,12 +48,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         )
     }
 
-    fun requestMode(mode: ArduCopterFlightMode): Result<Unit> {
-        if (mode == state.flightMode) return Result.success(Unit)
+    fun requestMode(mode: ArduCopterFlightMode): UnitResult {
+        if (mode == state.flightMode) return CommandResult.ok
 
         if (!stateMachine.isModeAllowed(mode)) {
-            return Result.failure(
-                IllegalStateException("Mode $mode not allowed from ${state.flightMode}")
+            return CommandResult.error(
+                "Mode $mode not allowed from ${state.flightMode}"
             )
         }
 
@@ -59,7 +61,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         stateMachine.updateFlightMode(mode)
 
-        return Result.success(Unit)
+        return CommandResult.ok
     }
 
     private fun enforceModeConsistency() {
@@ -81,9 +83,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         stateMachine.updateFlightMode(fallbackMode)
     }
 
-    fun canDispatchTransition(transition: StateTransition) = stateMachine.canDispatch(transition)
+    fun canDispatchTransition(transition: StateTransition): UnitResult =
+        stateMachine.canDispatch(transition)
 
-    fun dispatchTransition(transition: StateTransition) = stateMachine.dispatch(transition)
+    fun dispatchTransition(transition: StateTransition): AircraftState =
+        stateMachine.dispatch(transition)
 
     private fun syncHomePosition() {
         if (state.isHomeSet()) return
@@ -216,12 +220,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         super.unload()
     }
 
-    suspend fun shutdown(): String? {
+    suspend fun shutdown() {
         sensorsHealthy = false
         // Reverse boot sequence
         stopTelemetry(500L)
         isPowerOff = true
-        return null
     }
 
     fun armMotors() {

@@ -20,6 +20,8 @@ import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 
 object APIManager {
     private val logger by taggedLogger(APIManager::class.java.simpleName)
@@ -106,7 +108,7 @@ object APIManager {
     }
 
     fun registerCallbacks(
-        registrationCallback: (String?) -> Unit,
+        registrationCallback: (UnitResult) -> Unit,
         productConnectedCallback: (Boolean) -> Unit,
         activationCallback: (Boolean, String?) -> Unit = { _, _ -> },
         bindingCallback: (Boolean, String?) -> Unit = { _, _ -> }
@@ -119,12 +121,12 @@ object APIManager {
                 if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                     DJISDKManager.getInstance().startConnectionToProduct()
                     loggerC.i { "Successfully registered" }
-                    registrationCallback(null)
+                    registrationCallback(CommandResult.ok)
                 } else {
                     val errorDescription = djiError.description
                     loggerC.i { "Error in registration, $errorDescription" }
                     DJISDKManager.getInstance().destroy()
-                    registrationCallback(errorDescription)
+                    registrationCallback(CommandResult.error(errorDescription))
                 }
                 registrationInProgress = false
             }

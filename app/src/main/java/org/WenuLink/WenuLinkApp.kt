@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.WenuLinkService
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.sdk.APIManager
 
 class WenuLinkApp : Application() {
@@ -173,16 +175,16 @@ class WenuLinkApp : Application() {
         isServiceUp.value = false
     }
 
-    private fun onRegistration(error: String?) {
-        if (error == null) {
-            isRegistered.value = true
-            updateStatus("Registered")
-            updateWorkflow("Waiting for Aircraft")
-        } else {
+    private fun onRegistration(result: UnitResult) {
+        if (result is CommandResult.Failure) {
             isRegistered.value = false
-            updateStatus(error)
+            updateStatus(result.reason)
             updateWorkflow("Error during SDK registration")
+            return
         }
+        isRegistered.value = true
+        updateStatus("Registered")
+        updateWorkflow("Waiting for Aircraft")
     }
 
     private fun initHandler() {
@@ -232,11 +234,11 @@ class WenuLinkApp : Application() {
             updateWorkflow("Connecting to Aircraft")
             // Wait Aircraft to boot
             val bootError = wenuLinkHandler.loadComponents(appScope)
-            if (bootError == null) {
+            if (bootError is CommandResult.Failure) {
+                updateWorkflow("Boot error: $bootError.reason")
+            } else {
                 isAircraftBoot.value = true
                 updateWorkflow("Connected ready for service")
-            } else {
-                updateWorkflow("Boot error: $bootError")
             }
             isConnectingAircraft = false
         }

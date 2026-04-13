@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -158,7 +159,7 @@ class WenuLinkService : Service() {
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 
-    fun startMAVLinkService(onResult: (String?) -> Unit): Job? {
+    fun startMAVLinkService(onResult: (UnitResult) -> Unit): Job? {
         if (!MAVLinkService.isEnabled) {
             logger.i { "Unable to start MAVLink, service not enabled." }
             return null
