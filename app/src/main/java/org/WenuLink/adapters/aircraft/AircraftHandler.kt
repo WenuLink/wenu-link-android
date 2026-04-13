@@ -29,7 +29,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     val stateMachine = AircraftStateMachine()
     val state: AircraftState get() = stateMachine.state
     var sensorsTimestamp = System.currentTimeMillis()
-    var homeTimestamp = sensorsTimestamp
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
@@ -90,21 +89,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
-    suspend fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
+    suspend fun syncState(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
-
-        // Check for home position
-        val homePos = FCManager.getHomePosition()
-        // only allow requests after homeInterval ms
-        if ((currentTimestamp - homeTimestamp) >= homeInterval) {
-            if (homePos == null) {
-                logger.w { "Home position not set" }
-            } else {
-                stateMachine.updateHomePosition(homePos)
-            }
-            homeTimestamp = currentTimestamp
-        }
 
         // only allows check sensors after sensorsInterval ms
         if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
