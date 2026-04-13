@@ -89,8 +89,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
-    fun dispatchTransition(transition: StateTransition): AircraftState =
-        stateMachine.dispatch(transition)
 
     suspend fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
         if (isPowerOff) return
