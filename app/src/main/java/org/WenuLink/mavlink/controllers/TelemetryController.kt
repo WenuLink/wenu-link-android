@@ -150,9 +150,12 @@ class TelemetryController(
                 // skip if deactivated
                 continue
             }
+            if ((currentMicroTime - rate.lastUpdateStamp) <= rate.microSecondsInterval) {
+                // skip if not time-ready
+                continue
+            }
 
             // create the message from controllers definitions
-            logger.i { "Creating MessageID: ${rate.messageID}" }
             val message = controllers.asSequence()
                 .mapNotNull { it.createMessage(rate.messageID) }
                 .firstOrNull()
@@ -164,11 +167,9 @@ class TelemetryController(
                 continue
             }
 
-            // if a message is created, check if must sent and update
-            if ((currentMicroTime - rate.lastUpdateStamp) >= rate.microSecondsInterval) {
-                rate.lastUpdateStamp = currentMicroTime
-                client.sendMessage(message)
-            }
+            // send message and update timestamp
+            client.sendMessage(message)
+            rate.lastUpdateStamp = currentMicroTime
         }
     }
 

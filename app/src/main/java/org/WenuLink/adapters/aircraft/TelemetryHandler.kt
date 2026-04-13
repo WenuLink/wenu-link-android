@@ -178,7 +178,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
             )
 
             FCManager.registerIMUStateCallback { imuState ->
-                logger.i { "setIMUStateCallback: ${imuState.index}" }
+                // logger.i { "setIMUStateCallback: ${imuState.index}" }
                 // The callback is executed one time per sensor, with -1 indicating the list's end
                 if (imuState.index == -1) {
                     // Publish a copy after receiving the entire list

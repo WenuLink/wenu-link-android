@@ -131,7 +131,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                     // avoid delay for those cases where elapsed time > minimumDelay.
                     val dTime = max(0, minimumDelay - (System.currentTimeMillis() - lastLoop))
                     delay(dTime)
-                    logger.d { "Monitor loop time: ${System.currentTimeMillis() - lastLoop}ms" }
+                    // logger.d { "Monitor loop time: ${System.currentTimeMillis() - lastLoop}ms" }
                     lastLoop = System.currentTimeMillis()
                 }
             }

@@ -88,7 +88,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (msg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return
 
         val commandMsg = msg as msg_command_long
-        logger.d { "\t- COMMAND_LONG ID: ${commandMsg.command} - ${commandMsg.name()}" }
+        logger.d { "\t- COMMAND_LONG ID: ${commandMsg.command}" }
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
@@ -110,7 +110,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
         if (msg.msgid != msg_command_int.MAVLINK_MSG_ID_COMMAND_INT) return
 
         val commandMsg = msg as msg_command_int
-        logger.d { "\t- COMMAND_INT ID: ${commandMsg.command} - ${commandMsg.name()}" }
+        logger.d { "\t- COMMAND_INT ID: ${commandMsg.command}" }
 
         if (!isTargetSystem(commandMsg.target_system.toInt())) return
 
