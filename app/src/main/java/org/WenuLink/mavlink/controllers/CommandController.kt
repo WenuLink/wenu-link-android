@@ -18,7 +18,6 @@ import org.WenuLink.adapters.aircraft.ArmCommand
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.RotateAction
-import org.WenuLink.commands.CommandResult
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -113,7 +112,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
             return
         }
 
-        if (handler.aircraft.requestMode(customMode) is CommandResult.Success) {
+        if (handler.aircraft.requestMode(customMode).isOk) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         } else {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
@@ -153,7 +152,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun processLanding(commandMsg: msg_command_long) {
         logger.d { "processLanding: $commandMsg" }
-        if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND) is CommandResult.Success) {
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isOk) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         } else {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
@@ -162,7 +161,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun processReturn(commandMsg: msg_command_long) {
         logger.d { "processReturn: $commandMsg" }
-        if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL) is CommandResult.Success) {
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isOk) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         } else {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)

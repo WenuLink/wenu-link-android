@@ -29,7 +29,6 @@ import org.WenuLink.adapters.camera.StartRecordCommand
 import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
-import org.WenuLink.commands.CommandResult
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -135,7 +134,7 @@ class CameraController(
         handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { result ->
             sendCommandAck(
                 commandLongMsg.command,
-                if (result is CommandResult.Success) {
+                if (result.isOk) {
                     MAV_RESULT.MAV_RESULT_ACCEPTED
                 } else {
                     MAV_RESULT.MAV_RESULT_FAILED
@@ -202,9 +201,9 @@ class CameraController(
         )
 
         handler.dispatchCommand(command) { result ->
-            if (result is CommandResult.Failure) {
+            if (result.hasError) {
                 logger.w {
-                    "requestStartCapture error: ${result.reason}"
+                    "requestStartCapture error: ${result.errorReason}"
                 }
             }
             if (totalPhotos == 1) handler.onImageCaptured = null
@@ -232,9 +231,9 @@ class CameraController(
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopIntervalShootCommand(cameraInfo.id))
         ) { result ->
-            if (result is CommandResult.Failure) {
+            if (result.hasError) {
                 logger.w {
-                    "requestStopCapture error: ${result.reason}"
+                    "requestStopCapture error: ${result.errorReason}"
                 }
             }
         }
@@ -266,8 +265,8 @@ class CameraController(
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StartRecordCommand(cameraInfo.id))
         ) { result ->
-            if (result is CommandResult.Failure) {
-                logger.w { "Error in requestStartRecording: ${result.reason}" }
+            if (result.hasError) {
+                logger.w { "Error in requestStartRecording: ${result.errorReason}" }
             } else {
                 // setting messages frequency
                 onSetMessageRate(

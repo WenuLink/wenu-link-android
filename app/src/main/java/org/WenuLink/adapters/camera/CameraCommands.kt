@@ -49,7 +49,7 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
             else -> CommandResult.ok
         }
 
-        if (setModeResult is CommandResult.Success) {
+        if (setModeResult.isOk) {
             ctx.setMode(newMode, cameraIdx)
         }
         return setModeResult

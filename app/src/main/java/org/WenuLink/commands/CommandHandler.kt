@@ -27,7 +27,7 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
 
                 try {
                     val validationResult = cmd.validate(handler)
-                    if (validationResult is CommandResult.Failure) {
+                    if (validationResult.hasError) {
                         onResult(validationResult)
                         continue
                     }

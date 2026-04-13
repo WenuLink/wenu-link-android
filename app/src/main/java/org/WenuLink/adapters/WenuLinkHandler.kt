@@ -25,7 +25,6 @@ import org.WenuLink.adapters.mission.ResumeActionCommand
 import org.WenuLink.adapters.mission.ResumeWaypointMission
 import org.WenuLink.adapters.mission.StopWaypointMission
 import org.WenuLink.commands.CommandHandler
-import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
@@ -159,7 +158,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     suspend fun bootAircraft(): UnitResult {
         val bootResult = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(10000L)))
-        if (bootResult is CommandResult.Success) {
+        if (bootResult.isOk) {
             manualControl()
             startTimestamp = System.currentTimeMillis()
         }
@@ -184,8 +183,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
 
         val result = aircraft.requestMode(ArduCopterFlightMode.STABILIZE)
-        if (result is CommandResult.Failure) {
-            logger.w { "Manual control mode rejected: ${result.reason}" }
+        if (result.hasError) {
+            logger.w { "Manual control mode rejected: ${result.errorReason}" }
         }
     }
 
@@ -194,17 +193,17 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         when {
             controlAuthority.isWaypoint() ->
                 mission.dispatchCommand(PauseWaypointMission) { result ->
-                    if (result is CommandResult.Failure) {
+                    if (result.hasError) {
                         logger.i {
-                            "Unable to pause the mission at ${mission.state.currentSequence}: ${result.reason}"
+                            "Unable to pause the mission at ${mission.state.currentSequence}: ${result.errorReason}"
                         }
                     }
                 }
 
             controlAuthority.isCommand() ->
                 mission.dispatchCommand(PauseActionCommand) { result ->
-                    if (result is CommandResult.Failure) {
-                        logger.i { "Unable to pause the command: ${result.reason}" }
+                    if (result.hasError) {
+                        logger.i { "Unable to pause the command: ${result.errorReason}" }
                     }
                 }
         }
@@ -215,18 +214,18 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         when {
             controlAuthority.isWaypoint() ->
                 mission.dispatchCommand(ResumeWaypointMission) { result ->
-                    if (result is CommandResult.Failure) {
+                    if (result.hasError) {
                         logger.i {
-                            "Unable to resume the mission: ${result.reason}"
+                            "Unable to resume the mission: ${result.errorReason}"
                         }
                     }
                 }
 
             controlAuthority.isCommand() ->
                 mission.dispatchCommand(ResumeActionCommand) { result ->
-                    if (result is CommandResult.Failure) {
+                    if (result.hasError) {
                         logger.i {
-                            "Unable to resume the command: ${result.reason}"
+                            "Unable to resume the command: ${result.errorReason}"
                         }
                     }
                 }
@@ -239,9 +238,9 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             controlAuthority.isWaypoint() -> mission.dispatchCommand(
                 StopWaypointMission
             ) { result ->
-                if (result is CommandResult.Failure) {
+                if (result.hasError) {
                     logger.i {
-                        "Unable to stop the mission: ${result.reason}"
+                        "Unable to stop the mission: ${result.errorReason}"
                     }
                 }
             }
