@@ -43,7 +43,7 @@ object AircraftManager {
         (!useAirLink || (downlinkQuality != null && uplinkQuality != null))
 
     @Synchronized
-    fun isAircraftConnected(): Boolean = aircraftInstance != null
+    fun isAircraftConnected() = aircraftInstance != null
 
     fun startListeners() {
         startBatteryListeners()

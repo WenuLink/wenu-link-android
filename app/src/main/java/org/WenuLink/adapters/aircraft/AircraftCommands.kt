@@ -3,6 +3,7 @@ package org.WenuLink.adapters.aircraft
 import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
+import org.WenuLink.sdk.FCManager
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
     override fun validate(ctx: AircraftHandler): UnitResult
@@ -115,4 +116,21 @@ data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCo
     override suspend fun onStop(ctx: AircraftHandler) {
         ctx.dispatchTransition(InitialTransition)
     }
+}
+
+data class SetHomePositionCommand(val timeout: Long = 30_000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = CommandResult.ok
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        if (ctx.state.isHomeSet()) return CommandResult.ok
+        if (ctx.waitHomeSet(timeout)) {
+            return CommandResult.error("Home position not acquired after $timeout ms")
+        }
+
+        FCManager.getHomePosition()?.let { ctx.stateMachine.updateHomePosition(it) }
+
+        return CommandResult.ok
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
 }

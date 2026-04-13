@@ -28,7 +28,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     val stateMachine = AircraftStateMachine()
     val state: AircraftState get() = stateMachine.state
     var sensorsTimestamp = System.currentTimeMillis()
-    var homeTimestamp = sensorsTimestamp
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
@@ -53,7 +52,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         val isAllowed = stateMachine.isModeAllowed(mode)
 
-        if (isAllowed is CommandResult.Failure) return isAllowed
+        if (isAllowed.hasError) return CommandResult.error(
+            "Mode $mode not allowed: ${isAllowed.errorReason}"
+        )
 
         logger.d { "Mode change: ${state.flightMode} -> $mode" }
 
@@ -63,7 +64,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     private fun enforceModeConsistency() {
-        if (stateMachine.isModeAllowed(state.flightMode) is CommandResult.Failure) {
+        if (stateMachine.isModeAllowed(state.flightMode).hasError) {
             stateMachine.syncArmState()
             return
         }
@@ -87,31 +88,13 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
-    private fun syncHomePosition() {
-        if (state.isHomeSet()) return
-
-        // Check for home position
-        updateHomeCoordinatesFromAircraft()
-
-        FCManager.getHomePosition()?.let {
-            stateMachine.updateHomePosition(it)
-            logger.i { "Home Location acquired: $it" }
-        }
-    }
-
-    fun syncState(sensorsInterval: Long = 1000L, homeInterval: Long = 5000L) {
+    suspend fun syncState(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
 
-        // only allow requests after homeInterval ms
-        if ((currentTimestamp - homeTimestamp) >= homeInterval) {
-            syncHomePosition()
-            homeTimestamp = currentTimestamp
-        }
-
         // only allows check sensors after sensorsInterval ms
         if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
-            sensorsHealthy = sensorChecks() && state.isHomeSet()
+            sensorsHealthy = sensorChecks(100L)
             sensorsTimestamp = currentTimestamp
         }
 

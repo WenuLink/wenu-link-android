@@ -20,7 +20,7 @@ data class MissionState(
     val assembler: MissionAssembler = MissionAssembler(),
     val unvisitedSequence: Boolean = false
 ) {
-    fun totalNodes() = assembler.size()
+    fun totalNodes(): Int = assembler.size()
 
     fun isActive() = mavlink == MISSION_STATE.MISSION_STATE_ACTIVE
 
@@ -34,18 +34,18 @@ data class MissionState(
 
     fun isComplete() = mavlink == MISSION_STATE.MISSION_STATE_COMPLETE
 
-    fun setStartSequence(sequence: Int) = copy(startSequence = sequence)
+    fun setStartSequence(sequence: Int): MissionState = copy(startSequence = sequence)
 
-    fun updateItemSequence(sequence: Int?) =
+    fun updateItemSequence(sequence: Int?): MissionState =
         copy(currentSequence = sequence, unvisitedSequence = true)
 
-    fun nextItemSequence() = updateItemSequence(currentSequence?.plus(1))
+    fun nextItemSequence(): MissionState = updateItemSequence(currentSequence?.plus(1))
 
-    fun setComplete() = copy(mavlink = MISSION_STATE.MISSION_STATE_COMPLETE)
+    fun setComplete(): MissionState = copy(mavlink = MISSION_STATE.MISSION_STATE_COMPLETE)
 
-    fun markVisited() = copy(unvisitedSequence = false)
+    fun markVisited(): MissionState = copy(unvisitedSequence = false)
 
-    fun fromMissionManager() = copy(
+    fun fromMissionManager(): MissionState = copy(
         mavlink = when {
             MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
             MissionManager.isMissionReady() -> MISSION_STATE.MISSION_STATE_NOT_STARTED
@@ -126,9 +126,9 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         if (speed !in range) logger.w { "Clipped speed $speed to [$range]" }
     }
 
-    fun getWaypointNode(index: Int) = state.assembler.getNode(index)
+    fun getWaypointNode(index: Int): MissionNode = state.assembler.getNode(index)
 
-    fun hasWaypointNodes() = state.assembler.hasNodes()
+    fun hasWaypointNodes(): Boolean = state.assembler.hasNodes()
 
     fun clear() {
         state = state.reset()

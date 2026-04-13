@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
         // Logs
         var logMessages by remember { mutableStateOf(listOf<String>()) }
 
-        fun buttonLabel(isRunning: Boolean) = if (isRunning) "Stop" else "Start"
+        fun buttonLabel(isRunning: Boolean): String = if (isRunning) "Stop" else "Start"
 
         // UI code here using telemetry and status
         Column(

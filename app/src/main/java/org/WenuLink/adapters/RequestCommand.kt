@@ -8,6 +8,7 @@ import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.aircraft.FlyingTransition
 import org.WenuLink.adapters.aircraft.LandTransition
+import org.WenuLink.adapters.aircraft.SetHomePositionCommand
 import org.WenuLink.adapters.aircraft.StateTransition
 import org.WenuLink.adapters.aircraft.TakeoffCommand
 import org.WenuLink.adapters.aircraft.TakeoffTransition
@@ -56,13 +57,13 @@ data class RequestLand(val withLandingConfirmation: Boolean = true) :
     RequestTransition(LandTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
             ctx.dispatchCommand(WenuLinkCommand.Mission(LandAction(true))) { result ->
-                if (result is CommandResult.Failure) {
+                if (result.hasError) {
                     cont.resume(result)
                     return@dispatchCommand
                 }
@@ -84,28 +85,39 @@ data class RequestTakeoff(
 ) : RequestTransition(TakeoffTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return suspendCancellableCoroutine { cont ->
-            ctx.dispatchCommand(WenuLinkCommand.Aircraft(TakeoffCommand(timeout))) { result ->
-                if (result is CommandResult.Failure) {
-                    cont.resume(result)
+            ctx.dispatchCommand(
+                WenuLinkCommand.Aircraft(SetHomePositionCommand(timeout))
+            ) { homeResult ->
+                if (homeResult.hasError) {
+                    cont.resume(homeResult)
                     return@dispatchCommand
                 }
 
-                val coordinates = ctx.aircraft.currentCoordinates
-                    ?: return@dispatchCommand cont.resume(
-                        CommandResult.error("No aircraft position available")
-                    )
-
                 ctx.dispatchCommand(
-                    WenuLinkCommand.Mission(
-                        RepositionAction(coordinates.copy(alt = altitude), speed)
-                    ),
-                    cont::resume
-                )
+                    WenuLinkCommand.Aircraft(TakeoffCommand(timeout))
+                ) { takeoffResult ->
+                    if (takeoffResult.hasError) {
+                        cont.resume(takeoffResult)
+                        return@dispatchCommand
+                    }
+
+                    val coordinates = ctx.aircraft.currentCoordinates
+                        ?: return@dispatchCommand cont.resume(
+                            CommandResult.error("No aircraft position available")
+                        )
+
+                    ctx.dispatchCommand(
+                        WenuLinkCommand.Mission(
+                            RepositionAction(coordinates.copy(alt = altitude), speed)
+                        ),
+                        cont::resume
+                    )
+                }
             }
 
             cont.invokeOnCancellation {
@@ -128,17 +140,26 @@ data class RequestStartMission(
 ) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
         return suspendCancellableCoroutine { cont ->
-
-            ctx.mission.setStartSequence(startSequence)
             ctx.dispatchCommand(
-                WenuLinkCommand.Mission(StartWaypointMission),
-                cont::resume
-            )
+                WenuLinkCommand.Aircraft(SetHomePositionCommand())
+            ) { homeResult ->
+                if (homeResult.hasError) {
+                    cont.resume(homeResult)
+                    return@dispatchCommand
+                }
+
+                ctx.mission.setStartSequence(startSequence)
+
+                ctx.dispatchCommand(
+                    WenuLinkCommand.Mission(StartWaypointMission),
+                    cont::resume
+                )
+            }
 
             cont.invokeOnCancellation {
                 // Add SDK cancel if available
@@ -152,7 +173,7 @@ open class RequestMissionAction(private val action: MissionActionCommand) :
     RequestTransition(FlyingTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val transitionResult = super.execute(ctx)
-        if (transitionResult is CommandResult.Failure) return transitionResult
+        if (transitionResult.hasError) return transitionResult
 
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 

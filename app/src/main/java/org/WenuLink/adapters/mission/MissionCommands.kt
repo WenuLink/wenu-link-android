@@ -323,11 +323,11 @@ data class RotateAction(
             var angle = commandLongMsg.param1 // [0, 360] deg
             var angularSpeed = commandLongMsg.param2 // deg/s
             val clockwiseDir = commandLongMsg.param3.toInt() == 1
-            val relative = commandLongMsg.param4.toInt() == 0
+            val absolute = commandLongMsg.param4.toInt() == 0
 
             // convert to compatible intervals
             angle = ((angle + 180) % 360) - 180
-            if (!relative) return RotateAction(angle, null, true)
+            if (absolute) return RotateAction(angle, null, true)
 
             // clip angular speed
             angularSpeed = angularSpeed.coerceIn(0f..100f)

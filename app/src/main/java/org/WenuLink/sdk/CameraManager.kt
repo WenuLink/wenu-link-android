@@ -104,7 +104,7 @@ object CameraManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean = mInstance != null
+    fun isConnected() = mInstance != null
 
     override fun toString(): String = if (isConnected()) {
         "Managing: $cameraName $frameWidth x $frameHeight @ $frameRate"
@@ -155,7 +155,7 @@ object CameraManager {
         codecManager = null
     }
 
-    fun isCodecStarted(): Boolean = codecManager != null
+    fun isCodecStarted() = codecManager != null
 
     fun registerStateCallback(callback: (SystemState) -> Unit) =
         mInstance?.setSystemStateCallback(callback)

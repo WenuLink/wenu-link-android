@@ -47,7 +47,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
 
     @Synchronized
-    fun hasData(): Boolean = lastTelemetryData != null
+    fun hasData() = lastTelemetryData != null
 
     @Synchronized
     fun getData(): TelemetryData? = lastTelemetryData

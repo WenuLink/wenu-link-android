@@ -32,7 +32,7 @@ object FCManager {
     }
 
     @Synchronized
-    fun isConnected(): Boolean = mInstance != null
+    fun isConnected() = mInstance != null
 
     override fun toString(): String =
         if (isConnected() && serialNumber != null && fwVersion != null) {
@@ -98,9 +98,9 @@ object FCManager {
         }
     }
 
-    fun isFlying(): Boolean = mInstance?.state?.isFlying == true
+    fun isFlying() = mInstance?.state?.isFlying == true
 
-    fun needLandingConfirmation(): Boolean = mInstance?.state?.isLandingConfirmationNeeded == true
+    fun needLandingConfirmation() = mInstance?.state?.isLandingConfirmationNeeded == true
 
     fun getAltitude(): Float = mInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
 
@@ -110,7 +110,7 @@ object FCManager {
         // for somehow these kind of actions does not return anything, possibly is a thread issue.
         mInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
 
-    fun areMotorsArmed(): Boolean = mInstance?.state?.areMotorsOn() == true
+    fun areMotorsArmed() = mInstance?.state?.areMotorsOn() == true
 
     fun armMotors() {
         logger.d { "Arming motors" }

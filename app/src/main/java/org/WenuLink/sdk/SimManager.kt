@@ -29,9 +29,9 @@ object SimManager {
         logger.i { "Simulation init" }
     }
 
-    fun isAvailable(): Boolean = simInstance != null
+    fun isAvailable() = simInstance != null
 
-    fun isActive(): Boolean = simInstance?.isSimulatorActive == true
+    fun isActive() = simInstance?.isSimulatorActive == true
 
     fun registerStateCallback(stateCallback: (SimulatorState) -> Unit) {
         if (hasCallback) unregisterStateCallback()

@@ -7,6 +7,7 @@ import com.MAVLink.common.msg_param_set
 import com.MAVLink.common.msg_param_value
 import io.getstream.log.taggedLogger
 import kotlin.math.round
+import kotlin.math.roundToInt
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.parameters.ParamValue
@@ -93,7 +94,7 @@ class ParameterController(
             return
         }
 
-        val value = param.spec.fromMavlink(round(paramMsg.param_value).toInt())
+        val value = param.spec.fromMavlink(paramMsg.param_value.roundToInt())
 
         param.spec.write(value) { error ->
             if (error == null) {

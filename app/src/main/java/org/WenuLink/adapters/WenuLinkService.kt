@@ -155,7 +155,7 @@ class WenuLinkService : Service() {
         }
     }
 
-    fun isWebRTCUp(): Boolean = if (isWebRTCReady()) webRTC.isServiceUp else false
+    fun isWebRTCUp() = isWebRTCReady() && webRTC.isServiceUp
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 
