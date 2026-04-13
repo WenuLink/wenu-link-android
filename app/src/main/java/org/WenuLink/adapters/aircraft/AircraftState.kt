@@ -186,6 +186,24 @@ object PowerOffTransition : StateTransition {
     )
 }
 
+data class FlightModeTransition(private val flightMode: ArduCopterFlightMode) : StateTransition {
+    private fun flyingMode(from: AircraftState): UnitResult = when {
+        !from.isFlying() -> CommandResult.error("Not flying")
+        else -> CommandResult.ok
+    }
+
+    // TODO: update AircraftState with an attribute for mission state an allow
+    //        ArduCopterFlightMode.AUTO -> from.isFlying() && from.isMissionRunning()
+    override fun canTransition(from: AircraftState): UnitResult = when (flightMode) {
+        ArduCopterFlightMode.LAND, ArduCopterFlightMode.RTL -> flyingMode(from)
+        else -> CommandResult.ok
+    }
+
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
+        flightMode = this.flightMode
+    )
+}
+
 /**
  * Single source of truth for MAVLink + landed state transitions.
  * FSM / Reducer pattern.
@@ -198,14 +216,14 @@ class AircraftStateMachine {
 
     fun dispatch(event: StateTransition): AircraftState {
         state = event.reduce(state)
-        return state
+        return syncArmState()
     }
 
     fun forceSet(target: AircraftState) {
         state = target
     }
 
-    fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
+    fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||
         state.landed != target.landed
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
@@ -214,27 +232,20 @@ class AircraftStateMachine {
     }
 
     fun syncArmState(): AircraftState {
-        var modeFlag = state.flightMode.baseMode
-        if (state.isArmed()) {
-            modeFlag = modeFlag or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
+        val modeFlag = if (state.isArmed()) {
+            state.flightMode.baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
+        } else {
+            state.flightMode.baseMode
         }
         state = state.copy(modeFlag = modeFlag)
         return state
     }
 
-    fun updateFlightMode(mode: ArduCopterFlightMode): AircraftState {
-        state = state.copy(flightMode = mode)
-        return syncArmState()
-    }
+    fun updateFlightMode(mode: ArduCopterFlightMode): AircraftState =
+        dispatch(FlightModeTransition(mode))
 
-    fun isModeAllowed(mode: ArduCopterFlightMode): Boolean = when (mode) {
-        ArduCopterFlightMode.GUIDED -> state.isFlying() || state.isStandBy()
-
-        //        ArduCopterFlightMode.AUTO -> state.isFlying() && mission.isMissionRunning
-        ArduCopterFlightMode.LAND, ArduCopterFlightMode.RTL -> state.isFlying()
-
-        else -> true
-    }
+    fun isModeAllowed(mode: ArduCopterFlightMode): UnitResult =
+        canDispatch(FlightModeTransition(mode))
 }
 
 /**

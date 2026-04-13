@@ -86,7 +86,9 @@ class MAVLinkService(handler: WenuLinkHandler) {
         createClient()
         if (!clientCanStart()) {
             onResult(
-                CommandResult.error("MAVLinkClient not ready, possibly disabled or already running.")
+                CommandResult.error(
+                    "MAVLinkClient not ready, possibly disabled or already running."
+                )
             )
             return
         }

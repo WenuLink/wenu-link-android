@@ -51,11 +51,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun requestMode(mode: ArduCopterFlightMode): UnitResult {
         if (mode == state.flightMode) return CommandResult.ok
 
-        if (!stateMachine.isModeAllowed(mode)) {
-            return CommandResult.error(
-                "Mode $mode not allowed from ${state.flightMode}"
-            )
-        }
+        val isAllowed = stateMachine.isModeAllowed(mode)
+
+        if (isAllowed is CommandResult.Failure) return isAllowed
 
         logger.d { "Mode change: ${state.flightMode} -> $mode" }
 
@@ -65,7 +63,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     private fun enforceModeConsistency() {
-        if (!stateMachine.isModeAllowed(state.flightMode)) {
+        if (stateMachine.isModeAllowed(state.flightMode) is CommandResult.Failure) {
             stateMachine.syncArmState()
             return
         }

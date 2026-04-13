@@ -249,10 +249,10 @@ class WenuLinkApp : Application() {
         appScope.launch {
             if (!::wenuLinkHandler.isInitialized) return@launch
             val shutdownError = wenuLinkHandler.unloadComponents(false)
-            if (shutdownError == null) {
-                isAircraftBoot.value = false
+            if (shutdownError is CommandResult.Failure) {
+                logger.i { "Shutdown error: ${shutdownError.reason}" }
             } else {
-                logger.i { "Shutdown error: $shutdownError" }
+                isAircraftBoot.value = false
             }
             wenuLinkHandler.enableSimulation(false)
         }
