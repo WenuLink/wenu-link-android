@@ -8,8 +8,8 @@ sealed class CommandResult<out T> {
         get() = this is Success
     val hasError: Boolean
         get() = this is Failure
-    val errorReason: String?
-        get() = (this as? Failure)?.reason
+    val errorReason: String
+        get() = (this as? Failure)?.reason ?: "errorReason accessed on Success"
 
     companion object {
         val ok: UnitResult = Success(Unit)

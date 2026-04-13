@@ -33,7 +33,6 @@ import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
-import org.WenuLink.commands.CommandResult
 import org.WenuLink.mavlink.MAVLinkClient
 
 /**
@@ -233,9 +232,9 @@ class NavigationController(
         } else {
             // reached the end of the handler.mission items
             handler.mission.uploadWaypoints { result ->
-                if (result is CommandResult.Failure) {
+                if (result.hasError) {
                     sendStatusText(
-                        result.reason,
+                        result.errorReason,
                         MAV_SEVERITY.MAV_SEVERITY_ERROR
                     )
                 }
