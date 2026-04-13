@@ -116,3 +116,18 @@ data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCo
         ctx.dispatchTransition(InitialTransition)
     }
 }
+
+data class SetHomePositionCommand(val timeout: Long = 30_000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = CommandResult.ok
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        if (ctx.state.isHomeSet()) return CommandResult.ok
+        return if (ctx.waitHomeSet(timeout)) {
+            CommandResult.ok
+        } else {
+            CommandResult.error("Home position not acquired after $timeout ms")
+        }
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
+}

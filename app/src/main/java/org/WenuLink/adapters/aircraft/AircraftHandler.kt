@@ -99,8 +99,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         // only allow requests after homeInterval ms
         if ((currentTimestamp - homeTimestamp) >= homeInterval) {
             if (homePos == null) {
-                val homeSet = waitHomeSet(100L)
-                if (!homeSet) logger.e { "Home Location still not set!" }
+                logger.w { "Home position not set" }
             } else {
                 stateMachine.updateHomePosition(homePos)
             }
@@ -109,7 +108,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         // only allows check sensors after sensorsInterval ms
         if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
-            sensorsHealthy = sensorChecks(100L) && state.isHomeSet()
+            sensorsHealthy = sensorChecks(100L)
             sensorsTimestamp = currentTimestamp
         }
 
