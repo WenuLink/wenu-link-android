@@ -19,10 +19,9 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     val isPermissionsGranted: StateFlow<Boolean> = thisApp.isPermissionsGranted.asStateFlow()
     val workflowStatus: StateFlow<String> = thisApp.workflowStatus.asStateFlow()
     val sdkStatus: StateFlow<String> = thisApp.sdkStatus.asStateFlow()
+
     // SDK related reporting
     val isRegistered: StateFlow<Boolean> = thisApp.isRegistered.asStateFlow()
-//    val bindingString: StateFlow<String> = thisApp.bindingString.asStateFlow()
-//    val activationString: StateFlow<String> = thisApp.activationString.asStateFlow()
     val isAircraftPresent: StateFlow<Boolean> = thisApp.isAircraftPresent.asStateFlow()
     val isSimReady: StateFlow<Boolean> = thisApp.isSimulationReady.asStateFlow()
     val isAircraftBoot: StateFlow<Boolean> = thisApp.isAircraftBoot.asStateFlow()

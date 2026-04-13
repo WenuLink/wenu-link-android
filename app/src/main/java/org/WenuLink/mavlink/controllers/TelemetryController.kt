@@ -152,6 +152,7 @@ class TelemetryController(
             }
 
             // create the message from controllers definitions
+            logger.i { "Creating MessageID: ${rate.messageID}" }
             val message = controllers.asSequence()
                 .mapNotNull { it.createMessage(rate.messageID) }
                 .firstOrNull()

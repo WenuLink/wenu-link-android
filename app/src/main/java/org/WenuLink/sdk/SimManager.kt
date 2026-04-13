@@ -7,9 +7,9 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import dji.sdk.flightcontroller.Simulator
 import io.getstream.log.taggedLogger
+import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.TelemetryData
-import kotlin.coroutines.resume
 
 object SimManager {
     private val logger by taggedLogger(SimManager::class.java.simpleName)

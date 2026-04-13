@@ -8,7 +8,6 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.aircraft.IMUState as AppIMUState
 import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
 import org.WenuLink.adapters.aircraft.TelemetryData
 
@@ -35,15 +34,14 @@ object FCManager {
     @Synchronized
     fun isConnected(): Boolean = mInstance != null
 
-    override fun toString(): String {
-        return if (isConnected() && serialNumber != null && fwVersion != null) {
+    override fun toString(): String =
+        if (isConnected() && serialNumber != null && fwVersion != null) {
             "FlightController SN: $serialNumber - FW: $fwVersion"
         } else if (isConnected()) {
             "Reading FlightController"
         } else {
             "No FlightController"
         }
-    }
 
     fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
         roll = state.attitude.roll,
@@ -152,16 +150,16 @@ object FCManager {
 
     fun unregisterIMUStateCallback() = mInstance?.setIMUStateCallback(null)
 
-    fun compassOk(): Boolean {
-        val nSensors = mInstance?.compassCount ?: 0
+    fun getCompassCount(): Int = mInstance?.compassCount ?: 0
 
-        if (nSensors <= 0) {
+    fun compassOk(): Boolean {
+        if (getCompassCount() <= 0) {
             logger.i { "No Compass sensor found!" }
             return false
         }
 
-        val compass = mInstance?.compass
-        return compass?.hasError() != true &&
-            compass?.calibrationState == CompassCalibrationState.NOT_CALIBRATING
+        return mInstance?.compass?.let {
+            !it.hasError() && it.calibrationState == CompassCalibrationState.NOT_CALIBRATING
+        } ?: false
     }
 }

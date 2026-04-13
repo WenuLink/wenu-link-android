@@ -44,6 +44,7 @@ class CameraController(
 ) : IController {
     private val logger by taggedLogger(CameraController::class.java.simpleName)
 
+    // TODO: Unhandled COMMAND_LONG ID: 2504 MAV_CMD_REQUEST_VIDEO_STREAM_INFORMATION
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
         when (commandLongMsg.command) {
             MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> handleCameraInformation(commandLongMsg)
@@ -57,6 +58,7 @@ class CameraController(
         return true
     }
 
+    // TODO: Unhandled REQUEST_LONG ID: 269 VIDEO_STREAM_INFORMATION
     override fun processRequestLong(commandLongMsg: msg_command_long): Boolean {
         val requestID = commandLongMsg.param1.toInt()
         when (requestID) {

@@ -8,8 +8,8 @@ import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
 import dji.sdk.base.BaseComponent
 import io.getstream.log.taggedLogger
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 object SDKUtils {
     private val logger by taggedLogger(SDKUtils::class.java.simpleName)

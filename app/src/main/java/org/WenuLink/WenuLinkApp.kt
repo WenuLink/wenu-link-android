@@ -13,8 +13,6 @@ import androidx.core.content.ContextCompat
 import androidx.multidex.MultiDex
 import com.cySdkyc.clx.Helper
 import io.getstream.log.AndroidStreamLogger
-import io.getstream.log.StreamLog
-import io.getstream.log.TaggedLogger
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,10 +37,12 @@ class WenuLinkApp : Application() {
     private var isContextAttached = false
     private var isConnectingAircraft = false
     var wenuLinkService: WenuLinkService? = null
+
     // Basic status reporting
     val isPermissionsGranted = MutableStateFlow(false)
     val workflowStatus = MutableStateFlow("Idle")
     val sdkStatus = MutableStateFlow("Idle")
+
     // SDK state handling
     val isRegistered = MutableStateFlow(false)
     val bindingString = MutableStateFlow("Idle")
@@ -207,7 +207,7 @@ class WenuLinkApp : Application() {
     private suspend fun waitComponentsAndStartHandler() {
         updateWorkflow("Waiting for components")
         val allComponentsPresent =
-            AsyncUtils.waitTimeout(100L, 30_000, APIManager::areComponentsPresent)
+            AsyncUtils.waitTimeout(100L, 30_000L, APIManager::areComponentsPresent)
 
         if (!allComponentsPresent) {
             updateWorkflow("No components found, try again...")
@@ -235,7 +235,9 @@ class WenuLinkApp : Application() {
             if (bootError == null) {
                 isAircraftBoot.value = true
                 updateWorkflow("Connected ready for service")
-            } else updateWorkflow("Boot error: $bootError")
+            } else {
+                updateWorkflow("Boot error: $bootError")
+            }
             isConnectingAircraft = false
         }
     }
@@ -245,8 +247,11 @@ class WenuLinkApp : Application() {
         appScope.launch {
             if (!::wenuLinkHandler.isInitialized) return@launch
             val shutdownError = wenuLinkHandler.unloadComponents(false)
-            if (shutdownError == null) isAircraftBoot.value = false
-            else logger.i { "Shutdown error: $shutdownError" }
+            if (shutdownError == null) {
+                isAircraftBoot.value = false
+            } else {
+                logger.i { "Shutdown error: $shutdownError" }
+            }
             wenuLinkHandler.enableSimulation(false)
         }
     }
@@ -255,9 +260,10 @@ class WenuLinkApp : Application() {
         logger.d { "onProductConnected $connected" }
         isAircraftPresent.value = connected
         if (connected) {
+            updateStatus("Aircraft present")
             initHandler()
         } else {
-            updateStatus("Aircraft disconnected")
+            updateStatus("No aircraft present")
             isSimulationReady.value = false
         }
     }

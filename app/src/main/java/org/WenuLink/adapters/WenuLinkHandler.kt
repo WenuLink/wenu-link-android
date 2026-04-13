@@ -2,6 +2,7 @@ package org.WenuLink.adapters
 
 import io.getstream.log.taggedLogger
 import kotlin.coroutines.resume
+import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -95,39 +96,44 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     private fun startMonitorJob(scope: CoroutineScope) {
         monitorJob?.cancel()
-        var lastLoop = System.currentTimeMillis()
+        // tune this (100–500ms is reasonable)
+        val minimumDelay = 200L
 
         monitorJob = scope.launch {
             logger.d { "Starting monitor job" }
-            while (!aircraft.isPowerOff) try {
-                coroutineScope {
-                    // --- Sync real aircraft state ---
-                    launch {
-                        aircraft.syncState()
-                        modeHooks()
-                    }
+            var lastLoop = System.currentTimeMillis()
+            while (!aircraft.isPowerOff) {
+                try {
+                    coroutineScope {
+                        // --- Sync real aircraft state ---
+                        launch {
+                            aircraft.syncState()
+                            modeHooks()
+                        }
 
-                    launch {
-                        mission.syncState()
-                        missionHooks()
-                    }
+                        launch {
+                            mission.syncState()
+                            missionHooks()
+                        }
 
-                    launch {
-                        cameraHooks()
-                    }
+                        launch {
+                            cameraHooks()
+                        }
 
-                    launch {
-                        safetyChecks()
-                    }
-                }.join()
-            } catch (e: Exception) {
-                logger.e { "Monitor loop error: ${e.message}" }
-                // emergency land? manual control?
-            } finally {
-                delay(200L) // tune this (100–500ms is reasonable)
-                val loopTime = System.currentTimeMillis() - lastLoop
-                logger.d { "Monitor loop time: ${loopTime}ms" }
-                lastLoop = System.currentTimeMillis()
+                        launch {
+                            safetyChecks()
+                        }
+                    }.join()
+                } catch (e: Exception) {
+                    logger.e { "Monitor loop error: ${e.message}" }
+                    // emergency land? manual control?
+                } finally {
+                    // avoid delay for those cases where elapsed time > minimumDelay.
+                    val dTime = max(0, minimumDelay - (System.currentTimeMillis() - lastLoop))
+                    delay(dTime)
+                    logger.d { "Monitor loop time: ${System.currentTimeMillis() - lastLoop}ms" }
+                    lastLoop = System.currentTimeMillis()
+                }
             }
             logger.d { "Monitor job ended" }
         }
@@ -179,7 +185,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         camera.unload()
         onImageCaptured = null
         stopMonitor()
-        val shutdownError = dispatchAndAwait(WenuLinkCommand.Aircraft(ShutdownCommand(strictTransition)))
+        val shutdownError =
+            dispatchAndAwait(WenuLinkCommand.Aircraft(ShutdownCommand(strictTransition)))
         return shutdownError
     }
 
