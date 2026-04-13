@@ -134,7 +134,7 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         }
     }
 
-    fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0): Boolean =
+    fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0) =
         getCamera(cameraIdx)?.state?.captureStatus == status
 
     fun captureInProgress(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
@@ -147,7 +147,7 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         cameraIdx
     )
 
-    fun checkCameraMode(mode: Int, cameraIdx: Int = 0): Boolean =
+    fun checkCameraMode(mode: Int, cameraIdx: Int = 0) =
         getCamera(cameraIdx)?.state?.mavlinkMode == mode
 
     fun isPhotoMode(cameraIdx: Int = 0): Boolean = checkCameraMode(

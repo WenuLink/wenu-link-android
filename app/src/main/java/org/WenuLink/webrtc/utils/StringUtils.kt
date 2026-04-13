@@ -40,7 +40,7 @@ fun JavaAudioDeviceModule.AudioSamples.stringify(): String =
     "AudioSamples(audioFormat=$audioFormat, channelCount=$channelCount, " +
         "sampleRate=$sampleRate, data.size=${data.size})"
 
-fun StreamPeerType.stringify() = when (this) {
+fun StreamPeerType.stringify(): String = when (this) {
     StreamPeerType.PUBLISHER -> "publisher"
     StreamPeerType.SUBSCRIBER -> "subscriber"
 }

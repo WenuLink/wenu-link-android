@@ -341,7 +341,7 @@ class StreamPeerConnection(
         logger.i { "[onSelectedCandidatePairChanged] #sfu; #$typeTag; event: $event" }
     }
 
-    override fun onDataChannel(channel: DataChannel?): Unit = Unit
+    override fun onDataChannel(channel: DataChannel?) = Unit
 
     override fun toString(): String =
         "StreamPeerConnection(type='$typeTag', constraints=$mediaConstraints)"

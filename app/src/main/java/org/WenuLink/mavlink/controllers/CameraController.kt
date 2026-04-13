@@ -264,7 +264,7 @@ class CameraController(
                 // setting messages frequency
                 onSetMessageRate(
                     msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
-                    ((1f / statusFreq) * 1_000).roundToLong()
+                    ((1f / statusFreq) * 1000).roundToLong()
                 )
             }
         }

@@ -18,10 +18,10 @@ object RCManager {
     }
 
     @Synchronized
-    fun isUpdated(): Boolean = lastData != null && lastBatteryData.percentCharge != null
+    fun isUpdated() = lastData != null && lastBatteryData.percentCharge != null
 
     @Synchronized
-    fun isRCConnected(): Boolean = rcInstance != null
+    fun isRCConnected() = rcInstance != null
 
     fun startListeners() {
         startHardwareListener()

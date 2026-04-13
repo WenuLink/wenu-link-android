@@ -46,7 +46,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
 
     @Synchronized
-    fun hasData(): Boolean = lastTelemetryData != null
+    fun hasData() = lastTelemetryData != null
 
     @Synchronized
     fun getData(): TelemetryData? = lastTelemetryData
@@ -162,7 +162,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     }
 
     @Synchronized
-    fun isCompassOk() = FCManager.compassOk()
+    fun isCompassOk(): Boolean = FCManager.compassOk()
 
     @Synchronized
     fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } == true

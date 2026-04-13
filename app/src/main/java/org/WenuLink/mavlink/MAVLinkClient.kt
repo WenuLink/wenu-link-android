@@ -84,7 +84,7 @@ class MAVLinkClient(
         logger.d { "Sending end" }
     }
 
-    fun mustProcessMessages(): Boolean = mustReceiveMessages.get() || mustSendMessages.get()
+    fun mustProcessMessages() = mustReceiveMessages.get() || mustSendMessages.get()
 
     fun sendMessage(msg: MAVLinkMessage) {
         if (socket.isClosed) {

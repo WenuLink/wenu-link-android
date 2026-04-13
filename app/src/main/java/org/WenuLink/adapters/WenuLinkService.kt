@@ -167,7 +167,7 @@ class WenuLinkService : Service() {
         }
     }
 
-    fun isWebRTCUp(): Boolean = if (isWebRTCReady()) webRTC.isServiceUp else false
+    fun isWebRTCUp() = isWebRTCReady() && webRTC.isServiceUp
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 
@@ -215,7 +215,7 @@ class WenuLinkService : Service() {
         webRTCStopJob?.join()
         mavlinkStopJob?.join()
         handler.unload()
-        AsyncUtils.waitTimeout(1000L, 20000L) { !handler.isAircraftPowerOn }
+        AsyncUtils.waitTimeout(1000L, 20_000L) { !handler.isAircraftPowerOn }
         thisApp.isAircraftBoot.value = false
     }
 }

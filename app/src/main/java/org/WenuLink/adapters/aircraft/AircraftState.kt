@@ -203,7 +203,7 @@ class AircraftStateMachine {
         state = target
     }
 
-    fun hasStateChanged(target: AircraftState): Boolean = state.mavlink != target.mavlink ||
+    fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||
         state.landed != target.landed
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {

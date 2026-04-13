@@ -13,8 +13,8 @@ import org.WenuLink.adapters.aircraft.Quaternion
 
 object AsyncUtils {
     suspend fun waitTimeout(
-        intervalTime: Long = 100,
-        timeout: Long = 2000,
+        intervalTime: Long = 100L,
+        timeout: Long = 2000L,
         isReady: () -> Boolean
     ): Boolean {
         val startTime = System.currentTimeMillis()
@@ -29,7 +29,7 @@ object AsyncUtils {
         return isReady()
     }
 
-    suspend fun waitReady(intervalTime: Long = 10, isReady: () -> Boolean) {
+    suspend fun waitReady(intervalTime: Long = 10L, isReady: () -> Boolean) {
         while (!isReady()) {
             delay(intervalTime) // Wait for the next check
         }
@@ -37,7 +37,7 @@ object AsyncUtils {
 }
 
 object MessageUtils {
-    fun getMicroTime(): Long = System.currentTimeMillis() * 1_000
+    fun getMicroTime(): Long = System.currentTimeMillis() * 1000
 
     // float deg to deg E7
     fun coordinateDJI2MAVLink(value: Double): Int = (10_000_000 * value).roundToInt()
@@ -46,7 +46,7 @@ object MessageUtils {
     fun coordinateMAVLink2DJI(value: Int): Double = value / 10_000_000.0
 
     // meters to millimeters
-    fun altitudeDJI2MAVLink(value: Float): Int = (value * 1_000).roundToInt()
+    fun altitudeDJI2MAVLink(value: Float): Int = (value * 1000).roundToInt()
 
     fun packVersion(major: Int, minor: Int, patch: Int, type: Int): Long = (
         (major shl 24) or
@@ -83,7 +83,7 @@ object MessageUtils {
             }
         }
 
-    fun xyzMAVLink2Coordinates(x: Int, y: Int, z: Float) = Coordinates3D(
+    fun xyzMAVLink2Coordinates(x: Int, y: Int, z: Float): Coordinates3D = Coordinates3D(
         coordinateMAVLink2DJI(x),
         coordinateMAVLink2DJI(y),
         z
