@@ -176,6 +176,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             // Register listeners
             mission.registerScope(scope)
             camera.registerScope(scope)
+            // Wait for camera be initialized
+            AsyncUtils.waitTimeout(100L, 5000L) { camera.wasInitialized }
             startMonitorJob(scope)
         }
         return bootResult

@@ -84,7 +84,11 @@ class WebRTCService {
 
     // getting front camera
     private val videoCapturer: VideoCapturer by lazy { CameraCapturer() }
-    lateinit var mediaOptions: CameraCapturer.MediaMetadata
+    private val mediaOptions: CameraCapturer.MediaMetadata by lazy {
+        CameraCapturer.MediaMetadata.fromCameraManager() ?: error(
+            "CameraManager not ready, cannot start WebRTC"
+        )
+    }
     private var offer: String? = null
 
     fun updateServerAddress(serverAddress: String) {
@@ -109,11 +113,6 @@ class WebRTCService {
     fun startClient(serviceScope: CoroutineScope, context: Context) {
         if (!isEnabled) {
             logger.i { "Unable to start client, WebRTC not enabled." }
-            return
-        }
-
-        mediaOptions = CameraCapturer.MediaMetadata.fromCameraManager() ?: run {
-            logger.e { "CameraManager not ready, cannot start WebRTC" }
             return
         }
 
