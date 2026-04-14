@@ -14,9 +14,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 object SDKUtils {
     private val logger by taggedLogger(SDKUtils::class.java.simpleName)
 
-    fun gpsSignalLevelFlags(inputLevel: GPSSignalLevel): List<Boolean> =
-        GPSSignalLevel.entries.map { it == inputLevel }
-
     fun createCompletionCallback(
         onResult: (String?) -> Unit
     ): CommonCallbacks.CompletionCallback<DJIError> =

@@ -357,20 +357,11 @@ class NavigationController(
             return@apply
         }
 
-        val gpsLevel = telemetryData.gpsLevel.indexOfFirst { it }
-
         time_usec = MessageUtils.getMicroTime()
         lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
         lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
         satellites_visible = telemetryData.satelliteCount.toShort()
-
-        // DJI reports signal quality as a level 0-11; mapped to Mavlink  fix types below.
-        fix_type = when (gpsLevel) {
-            0, 1 -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
-            2 -> GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
-            3, 4, 5 -> GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX.toShort()
-            else -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
-        }
+        fix_type = telemetryData.gpsFixType.toShort()
     }
 
     fun msgLocalPositionNed(): MAVLinkMessage? = msg_local_position_ned().apply {

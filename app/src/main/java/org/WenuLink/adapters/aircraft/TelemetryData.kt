@@ -1,5 +1,7 @@
 package org.WenuLink.adapters.aircraft
 
+import com.MAVLink.enums.GPS_FIX_TYPE
+import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -28,10 +30,9 @@ data class TelemetryData(
     val isFlying: Boolean,
     val motorsOn: Boolean,
     val satelliteCount: Int,
-    // DJI reports signal quality on a scale of 1-11
-    // Mavlink has separate codes for fix type.
-    val gpsLevel: List<Boolean>,
-    val gpsFixType: Int = 0
+    // DJI reports signal quality on a scale of 0-10 and None
+    // Mavlink has fix types from 0-8.
+    val gpsFixType: Int
 )
 
 data class MAVLinkTelemetryData(
@@ -186,6 +187,29 @@ object BatteryMapper {
             voltagesBattery = source.voltage ?: UNKNOWN_INT,
             currentBatteryRaw = source.current?.toShort() ?: UNKNOWN_INT.toShort()
         )
+    }
+}
+
+object GPSMapper {
+
+    /** DJI reports signal quality as level 0-11 and None; mapped to Mavlink 0-8 fix types. */
+    fun toMavlinkFixType(level: GPSSignalLevel): Int = when (level) {
+        GPSSignalLevel.LEVEL_0,
+        GPSSignalLevel.LEVEL_1 -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX
+
+        GPSSignalLevel.LEVEL_2 -> GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX
+
+        GPSSignalLevel.LEVEL_3,
+        GPSSignalLevel.LEVEL_4,
+        GPSSignalLevel.LEVEL_5 -> GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX
+
+        GPSSignalLevel.LEVEL_6, // TODO: Pick a fix type for 6 and above
+        GPSSignalLevel.LEVEL_7,
+        GPSSignalLevel.LEVEL_8,
+        GPSSignalLevel.LEVEL_9,
+        GPSSignalLevel.LEVEL_10 -> GPS_FIX_TYPE.GPS_FIX_TYPE_DGPS
+
+        GPSSignalLevel.NONE -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX
     }
 }
 

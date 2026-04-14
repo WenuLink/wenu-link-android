@@ -8,6 +8,7 @@ import dji.common.model.LocationCoordinate2D
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.adapters.aircraft.GPSMapper
 import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
 import org.WenuLink.adapters.aircraft.TelemetryData
 
@@ -61,7 +62,7 @@ object FCManager {
         isFlying = state.isFlying,
         motorsOn = state.areMotorsOn(),
         satelliteCount = state.satelliteCount,
-        gpsLevel = SDKUtils.gpsSignalLevelFlags(state.gpsSignalLevel)
+        gpsFixType = GPSMapper.toMavlinkFixType(state.gpsSignalLevel)
     )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
