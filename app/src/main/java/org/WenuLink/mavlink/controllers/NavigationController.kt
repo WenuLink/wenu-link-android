@@ -149,10 +149,10 @@ class NavigationController(
 
     fun sendMissionCount() = client.sendMessage(
         msg_mission_count().apply {
-            logger.d { "sendMissionCount: $count" }
             mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
             count = handler.mission.state.totalNodes()
             opaque_id = handler.mission.state.id.toLong()
+            logger.d { "sendMissionCount: $count" }
         }
     )
 

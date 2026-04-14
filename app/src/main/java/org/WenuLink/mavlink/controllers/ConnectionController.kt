@@ -185,8 +185,8 @@ class ConnectionController(
 //        client.sendMessage(msg)
     }
 
-    fun msgVibration(): MAVLinkMessage = // client.sendMessage(msg_vibration())
-        msg_vibration()
+    // client.sendMessage(msg_vibration())
+    fun msgVibration(): MAVLinkMessage = msg_vibration()
 
     fun msgHUD(): MAVLinkMessage? = msg_vfr_hud().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
