@@ -7,7 +7,9 @@ import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.WenuLink.adapters.aircraft.AircraftHandler
@@ -126,8 +128,9 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                             safetyChecks()
                         }
                     }
-                } catch (e: CancellationException) {
-                    logger.w { "Monitor loop cancelled: ${e.message}" }
+                } catch (_: CancellationException) {
+                    logger.w { "Monitor loop CancellationException" }
+                    currentCoroutineContext().ensureActive()
                 } catch (e: Exception) {
                     logger.e { "Monitor loop error: ${e.message}" }
                     // emergency land? manual control?
