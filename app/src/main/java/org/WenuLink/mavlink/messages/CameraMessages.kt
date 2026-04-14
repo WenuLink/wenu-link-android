@@ -11,7 +11,7 @@ import com.MAVLink.common.msg_mission_item_int
  */
 data class RequestCameraInformationCommandLong(val capabilities: Boolean?) {
     constructor(msg: msg_command_long) : this(
-        capabilities = ParamUtils.toBoolean(msg.param1)
+        capabilities = MessageUtils.toBoolean(msg.param1)
     )
 }
 
@@ -72,7 +72,7 @@ data class ImageStartCaptureMissionItem(
  *                          cameras. It is also used to target specific cameras when the MAV_CMD is
  *                          used in a mission.
  */
-data class ImageStopCaptureParams(val targetCameraId: Int) {
+data class ImageStopCaptureCommandLong(val targetCameraId: Int) {
     constructor(msg: msg_command_long) : this(
         targetCameraId = msg.param1.toInt()
     )
@@ -91,7 +91,7 @@ data class ImageStopCaptureParams(val targetCameraId: Int) {
  *                          cameras. It is also used to target specific cameras when the MAV_CMD is
  *                          used in a mission.
  */
-data class VideoStartCaptureParams(
+data class VideoStartCaptureCommandLong(
     val streamId: Int,
     val statusFreqHz: Float,
     val targetCameraId: Int
@@ -114,7 +114,7 @@ data class VideoStartCaptureParams(
  *                          cameras. It is also used to target specific cameras when the MAV_CMD is
  *                          used in a mission.
  */
-data class VideoStopCaptureParams(val streamId: Int, val targetCameraId: Int) {
+data class VideoStopCaptureCommandLong(val streamId: Int, val targetCameraId: Int) {
     constructor(msg: msg_command_long) : this(
         streamId = msg.param1.toInt(),
         targetCameraId = msg.param2.toInt()

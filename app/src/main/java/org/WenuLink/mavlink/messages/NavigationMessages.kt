@@ -235,13 +235,13 @@ data class ConditionYawMessage(
         angleDeg = msg.param1,
         angularSpeedDegS = msg.param2,
         clockwise = msg.param3.toInt(),
-        relative = ParamUtils.toBoolean(msg.param4)
+        relative = MessageUtils.toBoolean(msg.param4)
     )
 
     constructor(msg: msg_mission_item_int) : this(
         angleDeg = msg.param1,
         angularSpeedDegS = msg.param2,
         clockwise = msg.param3.toInt(),
-        relative = ParamUtils.toBoolean(msg.param4)
+        relative = MessageUtils.toBoolean(msg.param4)
     )
 }

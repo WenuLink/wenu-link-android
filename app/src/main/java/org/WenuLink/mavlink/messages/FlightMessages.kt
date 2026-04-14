@@ -32,7 +32,7 @@ data class DoSetModeCommandLong(val mode: Int, val customMode: Long, val customS
  */
 data class ComponentArmDisarmCommandLong(val arm: Boolean?, val force: Int) {
     constructor(msg: msg_command_long) : this(
-        arm = ParamUtils.toBoolean(msg.param1),
+        arm = MessageUtils.toBoolean(msg.param1),
         force = msg.param2.toInt()
     )
 }
