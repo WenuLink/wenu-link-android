@@ -134,12 +134,12 @@ class NavigationController(
         )
     }
 
-    fun sendAckAnswer(type: Int) {
-        val msg = msg_mission_ack()
-        msg.type = type.toShort()
-        msg.opaque_id = handler.mission.state.id.toLong()
-        client.sendMessage(msg)
-    }
+    fun sendAckAnswer(type: Int) = client.sendMessage(
+        msg_mission_ack().apply {
+            this.type = type.toShort()
+            opaque_id = handler.mission.state.id.toLong()
+        }
+    )
 
     fun processAck(msg: MAVLinkMessage) {
         val ackMsg = msg as msg_mission_ack
@@ -147,14 +147,14 @@ class NavigationController(
         logger.d { "ACK type: ${ackMsg.type} missionType ${ackMsg.mission_type}" }
     }
 
-    fun sendMissionCount() {
-        val msg = msg_mission_count()
-        msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        msg.count = handler.mission.state.totalNodes()
-        msg.opaque_id = handler.mission.state.id.toLong()
-        logger.d { "sendMissionCount: ${msg.count}" }
-        client.sendMessage(msg)
-    }
+    fun sendMissionCount() = client.sendMessage(
+        msg_mission_count().apply {
+            logger.d { "sendMissionCount: $count" }
+            mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
+            count = handler.mission.state.totalNodes()
+            opaque_id = handler.mission.state.id.toLong()
+        }
+    )
 
     fun sendMissionItem(msg: MAVLinkMessage) {
         val itemMsg = msg as msg_mission_request_int
@@ -171,13 +171,13 @@ class NavigationController(
         sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
     }
 
-    fun requestMissionItem(seq: Int) {
-        logger.d { "requestMissionItem #$seq" }
-        val msg = msg_mission_request_int()
-        msg.seq = seq
-        msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        client.sendMessage(msg)
-    }
+    fun requestMissionItem(seq: Int) = client.sendMessage(
+        msg_mission_request_int().apply {
+            logger.d { "requestMissionItem #$seq" }
+            this.seq = seq
+            mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
+        }
+    )
 
     fun createNewMission(msg: MAVLinkMessage) {
         logger.d { "createNewMission" }
@@ -198,12 +198,12 @@ class NavigationController(
         }
     }
 
-    fun ackReceivedItem(sequence: Int) {
-        logger.d { "ackReceivedItem #$sequence" }
-        val msg = msg_mission_item_reached()
-        msg.seq = sequence
-        client.sendMessage(msg)
-    }
+    fun ackReceivedItem(sequence: Int) = client.sendMessage(
+        msg_mission_item_reached().apply {
+            logger.d { "ackReceivedItem #$sequence" }
+            seq = sequence
+        }
+    )
 
     fun processMissionItem(msg: MAVLinkMessage) {
         logger.d { "processMissionItem" }
@@ -243,20 +243,20 @@ class NavigationController(
         }
     }
 
-    fun sendMissionCurrent(sequence: Int) {
-        logger.d { "sendCurrentMission" }
-        val msg = msgMissionCurrent()
-        msg.seq = sequence
-        client.sendMessage(msg)
-    }
+    fun sendMissionCurrent(sequence: Int) = client.sendMessage(
+        msgMissionCurrent().apply {
+            logger.d { "sendCurrentMission" }
+            seq = sequence
+        }
+    )
 
-    fun sendStatusText(error: String, severity: Int) {
-        logger.d { "sendStatusText" }
-        val msg = msg_statustext()
-        msg.text = error.toByteArray()
-        msg.severity = severity.toShort()
-        client.sendMessage(msg)
-    }
+    fun sendStatusText(error: String, severity: Int) = client.sendMessage(
+        msg_statustext().apply {
+            logger.d { "sendStatusText" }
+            text = error.toByteArray()
+            this.severity = severity.toShort()
+        }
+    )
 
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
@@ -268,6 +268,7 @@ class NavigationController(
                 )
             )
         )
+
         client.sendMessage(
             MessageUtils.msgCommandAck(
                 MAV_CMD.MAV_CMD_MISSION_START,
@@ -311,96 +312,85 @@ class NavigationController(
 //        }
 //    }
 
-    fun msgMissionCurrent(): msg_mission_current {
-        val msg = msg_mission_current()
-        msg.seq = handler.mission.state.currentSequence ?: 0
-        msg.mission_id = handler.mission.state.id.toLong()
-        msg.mission_state = handler.mission.state.mavlink.toShort()
-        return msg
+    fun msgMissionCurrent(): msg_mission_current = msg_mission_current().apply {
+        seq = handler.mission.state.currentSequence ?: 0
+        mission_id = handler.mission.state.id.toLong()
+        mission_state = handler.mission.state.mavlink.toShort()
     }
 
     // TODO: start, pause, and resume procedures
 
-    fun msgHomePosition(): MAVLinkMessage? {
+    fun msgHomePosition(): MAVLinkMessage? = msg_home_position().apply {
         val coordinates = handler.aircraft.state.homeCoordinates ?: return null
-        val msg = msg_home_position()
-        msg.latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
-        msg.longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
-        msg.altitude = MessageUtils.altitudeDJI2MAVLink(coordinates.alt)
-        return msg
+
+        latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
+        longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
+        altitude = MessageUtils.altitudeDJI2MAVLink(coordinates.alt)
     }
 
-    fun msgGlobalPositionInt(): MAVLinkMessage? {
+    fun msgGlobalPositionInt(): MAVLinkMessage? = msg_global_position_int().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
-        val msg = msg_global_position_int()
-        msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
-        msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
-        // NOTE: Commented out this field, because msg.relative_alt seems to be intended for altitude above the current terrain,
-        // but DJI reports altitude above home point.
+
+        lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
+        lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
+        alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
+        // NOTE: Commented out this field, because relative_alt seems to be intended for
+        // altitude above the current terrain, but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)
-        // DJI: relative altitude of the aircraft relative to take off location, measured by barometer, in meters.
-        msg.relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.relativeAltitude)
-        msg.vx = (telemetryData.velocityX * 100).roundToInt().toShort()
-        msg.vy = (telemetryData.velocityY * 100).roundToInt().toShort()
-        msg.vz = (telemetryData.velocityZ * 100).roundToInt().toShort()
+        // DJI: relative altitude of the aircraft relative to take off location, measured by
+        // barometer, in meters.
+        relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.relativeAltitude)
+        vx = (telemetryData.velocityX * 100).roundToInt().toShort()
+        vy = (telemetryData.velocityY * 100).roundToInt().toShort()
+        vz = (telemetryData.velocityZ * 100).roundToInt().toShort()
         var yaw = telemetryData.yaw
         if (yaw < 0) yaw += 360
-        msg.hdg = (yaw * 100).roundToInt()
+        hdg = (yaw * 100).roundToInt()
 //        client.sendMessage(msg)
-        return msg
     }
 
-    fun msgRawGPSInt(): MAVLinkMessage? {
+    fun msgRawGPSInt(): MAVLinkMessage? = msg_gps_raw_int().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
 
-        val msg = msg_gps_raw_int()
         if (handler.aircraft.telemetry.isSimulationActive) {
-            msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
-            return msg
+            fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
+            return@apply
         }
-        msg.time_usec = MessageUtils.getMicroTime()
-        msg.lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
-        msg.lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        msg.satellites_visible = telemetryData.satelliteCount.toShort()
-        // DJI reports signal quality on a scale of 1-11
-        // Mavlink has separate codes for fix type.
-        if (telemetryData.gpsLevel[0] || telemetryData.gpsLevel[1]) {
-            msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
-        } else if (telemetryData.gpsLevel[2]) {
-            msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
-        } else if (
-            telemetryData.gpsLevel[3] ||
-            telemetryData.gpsLevel[4] ||
-            telemetryData.gpsLevel[5]
-        ) {
-            msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX.toShort()
-        } else {
-            msg.fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
+
+        val gpsLevel = telemetryData.gpsLevel.indexOfFirst { it }
+
+        time_usec = MessageUtils.getMicroTime()
+        lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
+        lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
+        satellites_visible = telemetryData.satelliteCount.toShort()
+
+        // DJI reports signal quality as a level 0-11; mapped to Mavlink  fix types below.
+        fix_type = when (gpsLevel) {
+            0, 1 -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
+            2 -> GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
+            3, 4, 5 -> GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX.toShort()
+            else -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX.toShort()
         }
-        return msg
     }
 
-    fun msgLocalPositionNed(): MAVLinkMessage? {
+    fun msgLocalPositionNed(): MAVLinkMessage? = msg_local_position_ned().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
-        val msg = msg_local_position_ned()
-        msg.time_boot_ms = handler.systemBootTime
-        msg.x = telemetryData.positionX
-        msg.y = telemetryData.positionY
-        msg.z = telemetryData.positionZ
-        msg.vx = telemetryData.velocityX
-        msg.vy = telemetryData.velocityY
-        msg.vz = telemetryData.velocityZ
-        return msg
+
+        time_boot_ms = handler.systemBootTime
+        x = telemetryData.positionX
+        y = telemetryData.positionY
+        z = telemetryData.positionZ
+        vx = telemetryData.velocityX
+        vy = telemetryData.velocityY
+        vz = telemetryData.velocityZ
     }
 
-    fun msgGpsGlobalOrigin(): MAVLinkMessage? {
+    fun msgGpsGlobalOrigin(): MAVLinkMessage? = msg_gps_global_origin().apply {
         val homeLoc = handler.aircraft.state.homeCoordinates ?: return null
-        val msg = msg_gps_global_origin()
-        msg.latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
-        msg.longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)
-        msg.altitude = MessageUtils.altitudeDJI2MAVLink(homeLoc.alt)
-        msg.time_usec = MessageUtils.getMicroTime()
-        return msg
+
+        latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
+        longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)
+        altitude = MessageUtils.altitudeDJI2MAVLink(homeLoc.alt)
+        time_usec = MessageUtils.getMicroTime()
     }
 }

@@ -118,10 +118,8 @@ class ConnectionController(
         gcsLastTimestamp = System.currentTimeMillis()
     }
 
-    fun msgTimeSync(): MAVLinkMessage {
-        val msg = msg_timesync()
-        msg.tc1 = MessageUtils.getMicroTime()
-        return msg
+    fun msgTimeSync(): MAVLinkMessage = msg_timesync().apply {
+        tc1 = MessageUtils.getMicroTime()
     }
 
     fun processTimeSync(msg: MAVLinkMessage) {
@@ -132,145 +130,128 @@ class ConnectionController(
         client.sendMessage(outMsg)
     }
 
-    fun msgSystemTime(): MAVLinkMessage {
+    fun msgSystemTime(): MAVLinkMessage = msg_system_time().apply {
         val currentStamp = System.currentTimeMillis()
-        val msg = msg_system_time()
-        msg.time_unix_usec = currentStamp * 1000
-        msg.time_boot_ms = currentStamp - handler.startTimestamp
-        return msg
+        time_unix_usec = currentStamp * 1000
+        time_boot_ms = currentStamp - handler.startTimestamp
     }
 
     fun processSystemTime(msg: MAVLinkMessage) = client.sendMessage(msgSystemTime())
 
-    fun msgHeartbeat(): MAVLinkMessage {
-        val heartbeat = msg_heartbeat()
-        heartbeat.type = MAV_TYPE.MAV_TYPE_QUADROTOR.toShort()
-        heartbeat.autopilot = MAV_AUTOPILOT.MAV_AUTOPILOT_ARDUPILOTMEGA.toShort()
-        heartbeat.system_status = handler.aircraftState.mavlink.toShort()
-        heartbeat.mavlink_version = 3
+    fun msgHeartbeat(): MAVLinkMessage = msg_heartbeat().apply {
+        type = MAV_TYPE.MAV_TYPE_QUADROTOR.toShort()
+        autopilot = MAV_AUTOPILOT.MAV_AUTOPILOT_ARDUPILOTMEGA.toShort()
+        system_status = handler.aircraftState.mavlink.toShort()
+        mavlink_version = 3
         // mode definition
         // For base mode logic, see Copter::sendHeartBeat() in ArduCopter/GCS_Mavlink.cpp
-        heartbeat.base_mode = handler.aircraftState.modeFlag.toShort()
-        heartbeat.custom_mode = handler.aircraftState.flightMode.mode
-        return heartbeat
+        base_mode = handler.aircraftState.modeFlag.toShort()
+        custom_mode = handler.aircraftState.flightMode.mode
     }
 
-    fun msgSysStatus(): MAVLinkMessage {
+    fun msgSysStatus(): MAVLinkMessage = msg_sys_status().apply {
         val battery = BatteryMapper.toMavlink(handler.aircraft.telemetry.getAircraftBattery())
-        val msg = msg_sys_status()
 
 //        if (!aircraft.preArmCheckOk) sensorsHealth = sensorsHealth and
 //                MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_PREARM_CHECK.inv()
 
-        msg.onboard_control_sensors_present = sensorsPresent.toLong()
-        msg.onboard_control_sensors_enabled = sensorsEnabled.toLong()
-        msg.onboard_control_sensors_health = sensorsHealth.toLong()
+        onboard_control_sensors_present = sensorsPresent.toLong()
+        onboard_control_sensors_enabled = sensorsEnabled.toLong()
+        onboard_control_sensors_health = sensorsHealth.toLong()
 
-        msg.battery_remaining = battery.batteryRemaining
-        msg.voltage_battery = battery.voltagesBattery
-        msg.current_battery = battery.currentBatteryRaw
+        battery_remaining = battery.batteryRemaining
+        voltage_battery = battery.voltagesBattery
+        current_battery = battery.currentBatteryRaw
 //        client.sendMessage(msg)
-        return msg
     }
 
-    fun msgAttitude(): MAVLinkMessage? {
+    fun msgAttitude(): MAVLinkMessage? = msg_attitude().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
-
-        val msg = msg_attitude()
         // TODO: this next line causes an exception
         // msg.time_boot_ms = getTimestampMilliseconds();
-        msg.roll = (telemetryData.roll * Math.PI / 180).toFloat()
-        msg.pitch = (telemetryData.pitch * Math.PI / 180).toFloat()
-        msg.yaw = (telemetryData.yaw * Math.PI / 180).toFloat()
-        // TODO msg.rollspeed = 0;
-        // TODO msg.pitchspeed = 0;
-        // TODO msg.yawspeed = 0;
+        roll = (telemetryData.roll * Math.PI / 180).toFloat()
+        pitch = (telemetryData.pitch * Math.PI / 180).toFloat()
+        yaw = (telemetryData.yaw * Math.PI / 180).toFloat()
+        // TODO rollspeed = 0;
+        // TODO pitchspeed = 0;
+        // TODO yawspeed = 0;
 //        client.sendMessage(msg)
-        return msg
     }
 
-    fun msgAltitude(): MAVLinkMessage? {
+    fun msgAltitude(): MAVLinkMessage? = msg_altitude().apply {
         val data = handler.aircraft.telemetry.getData() ?: return null
-        val msg = msg_altitude()
-        msg.altitude_relative = data.altitude
+
+        altitude_relative = data.altitude
 //        client.sendMessage(msg)
-        return msg
     }
 
-    fun msgVibration(): MAVLinkMessage {
-//        client.sendMessage(msg_vibration())
-        return msg_vibration()
-    }
+    fun msgVibration(): MAVLinkMessage = // client.sendMessage(msg_vibration())
+        msg_vibration()
 
-    fun msgHUD(): MAVLinkMessage? {
+    fun msgHUD(): MAVLinkMessage? = msg_vfr_hud().apply {
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
         val rcData = handler.aircraft.telemetry.getRCData()?.toMAVLink() ?: return null
-        val msg = msg_vfr_hud()
+
         // Mavlink: Current airspeed in m/s
         // DJI: unclear whether getState() returns airspeed or groundspeed
-        msg.airspeed = sqrt(
+        airspeed = sqrt(
             telemetryData.velocityX * telemetryData.velocityX +
                 telemetryData.velocityY * telemetryData.velocityY
         )
         // Mavlink: Current ground speed in m/s. For now, just echoing airspeed.
-        msg.groundspeed = msg.airspeed
+        groundspeed = airspeed
         // yaw angle
         var heading = telemetryData.yaw
         if (heading < 0) heading += 360
-        msg.heading = heading.toInt().toShort()
+        this.heading = heading.toInt().toShort()
         // vertical info
-        msg.throttle = rcData.throttleSetting
-        msg.alt = -telemetryData.altitude
+        throttle = rcData.throttleSetting
+        alt = -telemetryData.altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down
-        msg.climb = -telemetryData.velocityZ
-        return msg
+        climb = -telemetryData.velocityZ
     }
 
-    fun msgRadioStatus(): MAVLinkMessage {
+    fun msgRadioStatus(): MAVLinkMessage = msg_radio_status().apply {
         val airlinkSignal = handler.aircraft.telemetry.getAirlinkSignal()
-        val msg = msg_radio_status()
         // DJI represent the signal quality in percent with range [0, 100], where 100 is the best
         // quality. MAVLink uses [0, 254] as uint8_t
 
         // AirLink's DownLinkSignalQuality
-        msg.rssi = airlinkSignal.downlink?.let { ((it / 100f) * 255f).roundToInt().toShort() }
+        rssi = airlinkSignal.downlink
+            ?.let { ((it / 100f) * 255f).roundToInt().toShort() }
             ?: Short.MAX_VALUE
+
         // AirLink's UpLinkSignalQuality
-        msg.remrssi = airlinkSignal.uplink?.let { ((it / 100f) * 255f).roundToInt().toShort() }
+        remrssi = airlinkSignal.uplink
+            ?.let { ((it / 100f) * 255f).roundToInt().toShort() }
             ?: Short.MAX_VALUE
-        return msg
     }
 
     fun msgPowerStatus(): MAVLinkMessage = msg_power_status()
 
-    fun msgBatteryStatus(): MAVLinkMessage {
+    fun msgBatteryStatus(): MAVLinkMessage = msg_battery_status().apply {
         val battery = BatteryMapper.toMavlink(handler.aircraft.telemetry.getAircraftBattery())
-        val msg = msg_battery_status()
-        msg.current_consumed = battery.currentConsumed
-        msg.temperature = battery.temperature
-        msg.voltages = battery.voltages.toIntArray()
-        msg.battery_remaining = battery.batteryRemaining
-        msg.current_battery = battery.currentBattery
+
+        current_consumed = battery.currentConsumed
+        temperature = battery.temperature
+        voltages = battery.voltages.toIntArray()
+        battery_remaining = battery.batteryRemaining
+        current_battery = battery.currentBattery
 //        client.sendMessage(msg)
-        return msg
     }
 
-    fun msgExtendedSys(): MAVLinkMessage {
-        val msg = msg_extended_sys_state()
-        msg.landed_state = handler.aircraftState.landed.toShort()
-        msg.vtol_state = MAV_VTOL_STATE.MAV_VTOL_STATE_MC.toShort()
-        return msg
+    fun msgExtendedSys(): MAVLinkMessage = msg_extended_sys_state().apply {
+        landed_state = handler.aircraftState.landed.toShort()
+        vtol_state = MAV_VTOL_STATE.MAV_VTOL_STATE_MC.toShort()
     }
 
-    fun msgMagCal(): MAVLinkMessage {
-        val msg = msg_mag_cal_report()
-        msg.compass_id = 1
-        msg.cal_mask = 1
-        msg.cal_status = MAG_CAL_STATUS.MAG_CAL_SUCCESS.toShort()
-        msg.old_orientation = MAV_SENSOR_ORIENTATION.MAV_SENSOR_ROTATION_NONE.toShort()
-        msg.new_orientation = MAV_SENSOR_ORIENTATION.MAV_SENSOR_ROTATION_NONE.toShort()
-        msg.autosaved = 1
-        return msg
+    fun msgMagCal(): MAVLinkMessage = msg_mag_cal_report().apply {
+        compass_id = 1
+        cal_mask = 1
+        cal_status = MAG_CAL_STATUS.MAG_CAL_SUCCESS.toShort()
+        old_orientation = MAV_SENSOR_ORIENTATION.MAV_SENSOR_ROTATION_NONE.toShort()
+        new_orientation = MAV_SENSOR_ORIENTATION.MAV_SENSOR_ROTATION_NONE.toShort()
+        autosaved = 1
     }
 }
