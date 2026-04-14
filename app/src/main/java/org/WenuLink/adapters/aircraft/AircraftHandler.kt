@@ -153,7 +153,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return FCManager.getHomePosition() != null
     }
 
-    suspend fun waitHomeSet(timeout: Long = 10000L): Boolean = AsyncUtils.waitTimeout(
+    suspend fun waitHomeSet(timeout: Long = 10_000L): Boolean = AsyncUtils.waitTimeout(
         100L,
         timeout,
         state::isHomeSet
