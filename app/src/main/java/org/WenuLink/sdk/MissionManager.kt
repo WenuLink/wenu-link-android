@@ -153,10 +153,10 @@ object MissionManager {
             WaypointAction(WaypointActionType.STAY, action.timeMillis.toInt())
 
         is RotateAction ->
-            WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, action.angle.roundToInt())
+            WaypointAction(WaypointActionType.ROTATE_AIRCRAFT, if (action.angle.isNaN()) 0 else action.angle.roundToInt())
 
         is GimbalPitchAction ->
-            WaypointAction(WaypointActionType.GIMBAL_PITCH, action.angle.roundToInt())
+            WaypointAction(WaypointActionType.GIMBAL_PITCH, if (action.angle.isNaN()) 0 else action.angle.roundToInt())
 
         is PhotoAction ->
             WaypointAction(WaypointActionType.START_TAKE_PHOTO, 0)
