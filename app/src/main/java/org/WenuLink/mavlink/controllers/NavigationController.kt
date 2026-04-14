@@ -59,24 +59,36 @@ class NavigationController(
     var wasRequested = false
         private set
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST to { sendMissionCount() },
+        msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT to ::createNewMission,
+        msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT to ::processMissionItem,
+        msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT to ::sendMissionItem,
+        msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL to { sendMissionClear() },
+        msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK to ::processAck
+    )
+
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_MISSION_START to ::missionStart
+    )
+
+    private val commandIntRegistry: Map<Int, (msg_command_int) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_DO_REPOSITION to ::processDoReposition
+        // 192
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST -> sendMissionCount()
-            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT -> createNewMission(msg)
-            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT -> processMissionItem(msg)
-            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT -> sendMissionItem(msg)
-            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL -> sendMissionClear()
-            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
+        return true
+    }
+
+    override fun processCommandInt(commandIntMsg: msg_command_int): Boolean {
+        commandIntRegistry[commandIntMsg.command]?.invoke(commandIntMsg) ?: return false
         return true
     }
 
@@ -88,16 +100,6 @@ class NavigationController(
         msg_local_position_ned.MAVLINK_MSG_ID_LOCAL_POSITION_NED -> msgLocalPositionNed()
         msg_gps_global_origin.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN -> msgGpsGlobalOrigin()
         else -> null
-    }
-
-    override fun processCommandInt(commandIntMsg: msg_command_int): Boolean {
-        when (commandIntMsg.command) {
-            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg)
-
-            // 192
-            else -> return false
-        }
-        return true
     }
 
     fun node2MissionItemMsg(nIdx: Int): msg_mission_item_int {

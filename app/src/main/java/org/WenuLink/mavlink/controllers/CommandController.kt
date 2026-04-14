@@ -45,27 +45,33 @@ class CommandController(override var client: MAVLinkClient, override val handler
         MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
     ).fold(0L) { acc, value -> acc or value.toLong() }
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to { sendAutopilotAck() }
+    )
+
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_DO_SET_MODE to ::setMode,
+        MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM to ::processArmDisarm,
+        MAV_CMD.MAV_CMD_NAV_TAKEOFF to ::processTakeoff,
+        MAV_CMD.MAV_CMD_NAV_LAND to ::processLanding,
+        MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH to ::processReturn,
+        MAV_CMD.MAV_CMD_NAV_DELAY to ::processDelay,
+        MAV_CMD.MAV_CMD_CONDITION_YAW to ::processYaw
+    )
+
+    private val requestLongRegistry: Map<Int, () -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to ::sendAutopilotVersion
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotAck()
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
         if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
 
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_DO_SET_MODE -> setMode(commandLongMsg)
-            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM -> processArmDisarm(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_TAKEOFF -> processTakeoff(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_LAND -> processLanding(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH -> processReturn(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_DELAY -> processDelay(commandLongMsg)
-            MAV_CMD.MAV_CMD_CONDITION_YAW -> processYaw(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
         return true
     }
 
@@ -73,11 +79,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
     override fun processRequestLong(commandLongMsg: msg_command_long): Boolean {
         if (commandLongMsg.command != MAV_CMD.MAV_CMD_REQUEST_MESSAGE) return false
 
-        val requestID = commandLongMsg.param1.toInt()
-        when (requestID) {
-            msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotVersion()
-            else -> return false
-        }
+        requestLongRegistry[commandLongMsg.param1.toInt()]?.invoke() ?: return false
         return true
     }
 
@@ -107,7 +109,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
         }
     )
 
-    fun setMode(commandMsg: msg_command_long, handler: WenuLinkHandler) {
+    fun setMode(commandMsg: msg_command_long) {
         val params = DoSetModeCommandLong(commandMsg)
 
         logger.d { "FlightMode requested: ${params.customMode}" }

@@ -116,22 +116,21 @@ class TelemetryController(
 //            MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_CONTROLLER -> null
     )
 
-    override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM -> processDataStreamRequest(
-                msg
-            )
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_request_data_stream.MAVLINK_MSG_ID_REQUEST_DATA_STREAM to ::processDataStreamRequest
+    )
 
-            else -> return false
-        }
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL to ::processMessageInterval
+    )
+
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_SET_MESSAGE_INTERVAL -> processMessageInterval(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
         return true
     }
 

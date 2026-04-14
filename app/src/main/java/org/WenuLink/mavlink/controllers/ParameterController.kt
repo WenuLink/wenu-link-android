@@ -25,13 +25,14 @@ class ParameterController(
     var wasRequested = false
         private set
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST to { requestList() },
+        msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ to ::requestRead,
+        msg_param_set.MAVLINK_MSG_ID_PARAM_SET to ::requestUpdate
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_param_request_list.MAVLINK_MSG_ID_PARAM_REQUEST_LIST -> requestList()
-            msg_param_request_read.MAVLINK_MSG_ID_PARAM_REQUEST_READ -> requestRead(msg)
-            msg_param_set.MAVLINK_MSG_ID_PARAM_SET -> requestUpdate(msg)
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
