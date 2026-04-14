@@ -242,7 +242,10 @@ class WenuLinkApp : Application() {
     }
 
     fun disconnectAircraft() {
+        if (connectJob?.isActive == true) return
+
         if (!::wenuLinkHandler.isInitialized) return
+
         appScope.launch {
             val shutdownResult = wenuLinkHandler.unloadComponents(false)
             if (shutdownResult.hasError) {

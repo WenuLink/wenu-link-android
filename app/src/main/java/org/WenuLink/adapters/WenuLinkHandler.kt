@@ -126,6 +126,8 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                             safetyChecks()
                         }
                     }
+                } catch (e: CancellationException) {
+                    logger.w { "Monitor loop cancelled: ${e.message}" }
                 } catch (e: Exception) {
                     logger.e { "Monitor loop error: ${e.message}" }
                     // emergency land? manual control?
