@@ -65,7 +65,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         logger.e { "Unable to set runSimulation=$enable, Simulation not available." }
     } else {
         if (mustRunSimulation && !enable) {
-            logger.w { "Deactivate simulation to reboot the Aircraft for real aircraft connection" }
+            logger.w { "Deactivating the simulation requires to reboot the Aircraft for real aircraft connection" }
         }
 
         mustRunSimulation = enable

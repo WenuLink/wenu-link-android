@@ -167,7 +167,7 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
     fun notifySystemReady() {
         telemetryController.startBroadcast()
-        logger.i { "Service is up an ready" }
+        logger.i { "Service is up and ready" }
     }
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent

@@ -1,6 +1,7 @@
 package org.WenuLink.adapters
 
 import io.getstream.log.taggedLogger
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
@@ -124,7 +125,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                         launch {
                             safetyChecks()
                         }
-                    }.join()
+                    }
                 } catch (e: Exception) {
                     logger.e { "Monitor loop error: ${e.message}" }
                     // emergency land? manual control?

@@ -34,10 +34,10 @@ class WenuLinkApp : Application() {
     }
     private val logger by taggedLogger(WenuLinkApp::class.java.simpleName)
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var startingJob: Job? = null
+    private var initJob: Job? = null
+    private var connectJob: Job? = null
     private lateinit var wenuLinkHandler: WenuLinkHandler
     private var isContextAttached = false
-    private var isConnectingAircraft = false
     var wenuLinkService: WenuLinkService? = null
 
     // Basic status reporting
@@ -163,8 +163,6 @@ class WenuLinkApp : Application() {
             this::startService
         }
         startFunction(Intent(this, WenuLinkService::class.java))
-        wenuLinkService?.runServices()
-        isServiceUp.value = true
     }
 
     suspend fun stopWenulinkService() {
@@ -172,7 +170,6 @@ class WenuLinkApp : Application() {
 
         wenuLinkService?.terminate()
         stopService(Intent(this, WenuLinkService::class.java))
-        isServiceUp.value = false
     }
 
     private fun onRegistration(result: UnitResult) {
@@ -188,20 +185,20 @@ class WenuLinkApp : Application() {
     }
 
     private fun initHandler() {
-        if (startingJob != null) {
+        if (initJob != null) {
             logger.w { "Already initializing handler" }
             return
         }
 
         // Launches it
-        startingJob = appScope.launch {
+        initJob = appScope.launch {
             waitComponentsAndStartHandler()
         }
 
         // wait for termination to clear
         appScope.launch {
-            startingJob?.join()
-            startingJob = null
+            initJob?.join()
+            initJob = null
             updateWorkflow("WenuLink with ${wenuLinkHandler.aircraftModel}")
         }
     }
@@ -226,31 +223,30 @@ class WenuLinkApp : Application() {
     }
 
     fun connectAircraft(useSimulation: Boolean = false) {
-        if (isConnectingAircraft) return
-        appScope.launch {
-            if (!::wenuLinkHandler.isInitialized) return@launch
-            isConnectingAircraft = true
+        if (connectJob?.isActive == true) return
+
+        if (!::wenuLinkHandler.isInitialized) return
+
+        connectJob = appScope.launch {
             wenuLinkHandler.enableSimulation(useSimulation)
-            updateWorkflow("Connecting to Aircraft")
+            updateWorkflow("Connecting to ${wenuLinkHandler.aircraftModel}")
             // Wait Aircraft to boot
-            val bootError = wenuLinkHandler.loadComponents(appScope)
-            if (bootError is CommandResult.Failure) {
-                updateWorkflow("Boot error: $bootError.reason")
+            val bootResult = wenuLinkHandler.loadComponents(appScope)
+            if (bootResult.hasError) {
+                updateWorkflow("Boot error: ${bootResult.errorReason}")
             } else {
                 isAircraftBoot.value = true
-                updateWorkflow("Connected ready for service")
+                updateWorkflow("Connected and ready for services")
             }
-            isConnectingAircraft = false
         }
     }
 
     fun disconnectAircraft() {
-        if (isConnectingAircraft) return
+        if (!::wenuLinkHandler.isInitialized) return
         appScope.launch {
-            if (!::wenuLinkHandler.isInitialized) return@launch
-            val shutdownError = wenuLinkHandler.unloadComponents(false)
-            if (shutdownError is CommandResult.Failure) {
-                logger.i { "Shutdown error: ${shutdownError.reason}" }
+            val shutdownResult = wenuLinkHandler.unloadComponents(false)
+            if (shutdownResult.hasError) {
+                updateWorkflow("Shutdown error: ${shutdownResult.errorReason}")
             } else {
                 isAircraftBoot.value = false
             }
@@ -292,7 +288,7 @@ class WenuLinkApp : Application() {
     }
 
     fun apiDestroy() {
-        wenuLinkHandler.unload()
+        if (::wenuLinkHandler.isInitialized) wenuLinkHandler.unload()
         appScope.cancel()
         APIManager.destroy()
     }

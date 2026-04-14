@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
                 Button(onClick = {
                     servicesViewModel.loadAircraft(!isAircraftUp, false)
                 }) {
-                    Text(if (!isAircraftUp) "Connect" else "Disconnect" + " aircraft")
+                    Text("${if (!isAircraftUp) "Connect" else "Disconnect"} aircraft")
                 }
 
                 if (isSimulationReady && !isAircraftUp) {

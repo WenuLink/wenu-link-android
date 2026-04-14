@@ -52,9 +52,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         val isAllowed = stateMachine.isModeAllowed(mode)
 
-        if (isAllowed.hasError) return CommandResult.error(
-            "Mode $mode not allowed: ${isAllowed.errorReason}"
-        )
+        if (isAllowed.hasError) {
+            return CommandResult.error(
+                "Mode $mode not allowed: ${isAllowed.errorReason}"
+            )
+        }
 
         logger.d { "Mode change: ${state.flightMode} -> $mode" }
 
@@ -88,13 +90,13 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
-    suspend fun syncState(sensorsInterval: Long = 1000L) {
+    fun syncState(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
 
         // only allows check sensors after sensorsInterval ms
         if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
-            sensorsHealthy = sensorChecks(100L)
+            sensorsHealthy = sensorChecks()
             sensorsTimestamp = currentTimestamp
         }
 
@@ -110,7 +112,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.w { "State reconciliation: $state -> $fcState" }
 
         stateMachine.forceSet(fcState)
-        enforceModeConsistency()
     }
 
     private suspend fun loadParameters(timeout: Long = 5000L): Boolean {

@@ -50,8 +50,6 @@ class WenuLinkService : Service() {
         if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
             mavlink = MAVLinkService(handler)
         }
-
-        logger.i { "WenuLinkService created." }
     }
 
     private fun startForegroundServiceWithNotification() {
@@ -105,14 +103,17 @@ class WenuLinkService : Service() {
 
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
-
+        runServices()
+        thisApp.isServiceUp.value = true
+        logger.i { "WenuLinkService started" }
         return START_STICKY // The service will continue running
     }
 
     override fun onDestroy() {
         thisApp.wenuLinkService = null // Clear the reference
         serviceScope.cancel()
-        logger.i { "WenuLinkService ended." }
+        thisApp.isServiceUp.value = false
+        logger.i { "WenuLinkService ended" }
         super.onDestroy()
     }
 
