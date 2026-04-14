@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.ServiceAddress
 import org.WenuLink.adapters.WenuLinkHandler
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 
 class MAVLinkService(handler: WenuLinkHandler) {
     companion object {
@@ -76,14 +78,18 @@ class MAVLinkService(handler: WenuLinkHandler) {
             client?.startSending(controller::sendMessages)
         }
 
-    suspend fun launchService(onResult: (String?) -> Unit) {
+    suspend fun launchService(onResult: (UnitResult) -> Unit) {
         logger.d { "Requesting to launch MAVLinkService." }
         // notify UI
         _isRunning.value = true
         // Start client
         createClient()
         if (!clientCanStart()) {
-            onResult("MAVLinkClient not ready, possibly disabled or already running.")
+            onResult(
+                CommandResult.error(
+                    "MAVLinkClient not ready, possibly disabled or already running."
+                )
+            )
             return
         }
         // Initialize controllers
@@ -103,7 +109,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         // Wait for station's heartbeat or shutdown if no received after a while
         val currentStationConnected = controller.waitGroundStation(30_000L)
         if (!currentStationConnected) {
-            onResult("No ground control station found, stoping")
+            onResult(CommandResult.error("No ground control station found, stoping"))
             stopService()
             return
         }
@@ -127,7 +133,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
                     "(sending=${sendingJob?.isActive})"
             }
 
-            onResult(null)
+            onResult(CommandResult.ok)
 
             // non-blocking wait for home position to report GPS_GLOBAL_ORIGIN
             controller.waitHomePosition()

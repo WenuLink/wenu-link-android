@@ -2,6 +2,7 @@ package org.WenuLink.adapters.aircraft
 
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,7 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     private val _isListeningAircraft = MutableStateFlow(false)
     val isListeningAircraft: StateFlow<Boolean> = _isListeningAircraft.asStateFlow()
     private var lastTelemetryData: TelemetryData? = null
-    private var lastIMUState: IMUState? = null
+    private var lastIMUState: IMUState = IMUState()
     val isSimulationAvailable: Boolean
         get() = SimManager.isAvailable()
     val isSimulationActive: Boolean
@@ -58,10 +59,17 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
 
     @Synchronized
     fun enableSimulation(enable: Boolean) = if (isActive()) {
+        // TODO: move to CommandResult
         logger.e { "Unable to set runSimulation=$enable, Telemetry active." }
     } else if (!isSimulationAvailable) {
         logger.e { "Unable to set runSimulation=$enable, Simulation not available." }
     } else {
+        if (mustRunSimulation && !enable) {
+            logger.w {
+                "Deactivating the simulation requires to reboot the Aircraft for real aircraft connection"
+            }
+        }
+
         mustRunSimulation = enable
         logger.i { "Enable Simulation $mustRunSimulation" }
     }
@@ -99,9 +107,9 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
             registerSimState(register)
         } else {
             registerRealState(register)
+            // Sensor listeners only for real aircraft
+            registerIMUListener(register)
         }
-        // Sensor listeners
-        registerSensorState(register)
     }
 
     fun listenRemoteController(listen: Boolean) = if (listen) {
@@ -116,59 +124,96 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         AircraftManager.stopListeners()
     }
 
-    fun listenSimulation(listen: Boolean) {
+    suspend fun listenSimulation(listen: Boolean) {
+        var attempts = 0
         if (listen) {
-            SimManager.run { error ->
-                if (error == null) {
-                    logger.i { "Simulation running." }
-                } else {
-                    logger.e { "Unable to start simulation: $error" }
-                }
+            while (attempts < 3) {
+                val runError = SimManager.run() ?: break
+                logger.w { "Error in run simulation: $runError. Trying again" }
+                attempts++
+                delay(500L)
+            }
+            if (attempts < 3) {
+                logger.i { "Simulation running." }
+            } else {
+                logger.e { "Unable to start simulation, 3 failed attempts. Stoping" }
             }
         } else {
-            SimManager.stop { error ->
-                if (error == null) {
-                    logger.i { "Simulation stopped." }
-                } else {
-                    logger.e { "Unable to stop simulation: $error" }
-                }
+            val stopError = SimManager.stop()
+            if (stopError == null) {
+                logger.i { "Simulation stopped." }
+            } else {
+                logger.e { "Unable to stop simulation: $stopError" }
             }
         }
     }
 
-    fun listenVehicleState(listen: Boolean) = if (mustRunSimulation) {
+    suspend fun listenVehicleState(listen: Boolean) = if (mustRunSimulation) {
         listenSimulation(listen)
     } else {
         listenAircraft(listen)
     }
 
-    fun registerSensorState(listen: Boolean) {
-        FCManager.unregisterIMUState() // always clear first
+    @Synchronized
+    fun updateIMUState(imuState: IMUState) {
+        lastIMUState = lastIMUState.copy(
+            gyroscope = imuState.gyroscope,
+            accelerometer = imuState.accelerometer
+        )
+    }
+
+    fun registerIMUListener(listen: Boolean) {
+        // These sensors are only reported with real Aircraft
         if (listen) {
-            FCManager.registerIMUState { imuState ->
-                updateIMUState(imuState)
+            val nSensors = FCManager.getIMUCount()
+
+            if (nSensors <= 0) {
+                logger.i { "No IMU sensor found!" }
+                return
+            }
+
+            logger.d { "Listening $nSensors IMU(s)" }
+
+            val state = IMUState(
+                MutableList(nSensors) { SensorState.BOOT },
+                MutableList(nSensors) { SensorState.BOOT }
+            )
+
+            FCManager.registerIMUStateCallback { imuState ->
+                // logger.i { "setIMUStateCallback: ${imuState.index}" }
+                // The callback is executed one time per sensor, with -1 indicating the list's end
+                if (imuState.index == -1) {
+                    // Publish a copy after receiving the entire list
+                    updateIMUState(state)
+                    return@registerIMUStateCallback
+                }
+                // assumes same number gyros and accel
+                state.gyroscope[imuState.index] = FCManager.sensorState(imuState.gyroscopeState)
+                state.accelerometer[imuState.index] =
+                    FCManager.sensorState(imuState.accelerometerState)
             }
         } else {
-            updateIMUState(null)
+            logger.d { "Stop listening IMU(s)" }
+            FCManager.unregisterIMUStateCallback()
+            updateIMUState(IMUState())
         }
     }
 
-    @Synchronized
-    fun isReadingSensors() = lastIMUState != null
+    private fun noIMU() = FCManager.getIMUCount() == 0
 
     @Synchronized
-    fun updateIMUState(imuState: IMUState?) {
-        lastIMUState = imuState
-    }
+    fun isReadingSensors() = noIMU() || lastIMUState.gyroscope.isNotEmpty() || mustRunSimulation
 
     @Synchronized
-    fun isCompassOk(): Boolean = FCManager.compassOk()
+    fun isCompassOk() = noIMU() || FCManager.compassOk() || mustRunSimulation
 
     @Synchronized
-    fun isAccelerometerOk() = lastIMUState?.accelerometer?.all { it == SensorState.OK } == true
+    fun isAccelerometerOk() = noIMU() || mustRunSimulation ||
+        lastIMUState.accelerometer.all { it == SensorState.OK }
 
     @Synchronized
-    fun isGyroscopeOk() = lastIMUState?.gyroscope?.all { it == SensorState.OK } == true
+    fun isGyroscopeOk() = noIMU() || mustRunSimulation ||
+        lastIMUState.gyroscope.all { it == SensorState.OK }
 
     fun startBroadcast() {
         if (isReadingData()) {
@@ -223,18 +268,18 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
     }
 
     override fun unload() {
-        stopBroadcast()
+        launchTelemetry(false)
     }
 
-    fun isReadingData(): Boolean = // RC should always exists
-        RCManager.isUpdated() &&
-            // If simulation activated, must wait for its startup
-            if (mustRunSimulation) {
-                isSimulationActive
-            } // Assumes that if not sim, Aircraft is present
-            else {
-                AircraftManager.isUpdated()
-            }
+    private fun hasAircraftData(): Boolean = // If simulation activated, must wait for its startup
+        if (mustRunSimulation) {
+            isSimulationActive
+        } // Assumes that if not sim, Aircraft is present
+        else {
+            AircraftManager.isUpdated()
+        }
+
+    fun isReadingData(): Boolean = RCManager.isUpdated() && hasAircraftData() && isReadingSensors()
 
     suspend fun waitDataReading(timeout: Long = 5000L): Boolean {
         // First check wait for listeners transfer data

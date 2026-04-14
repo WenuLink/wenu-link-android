@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
         val isSimulationReady by viewModel.isSimReady.collectAsState(false)
         val isAircraftUp by viewModel.isAircraftBoot.collectAsState(false)
         // services
-        val isDataFlowing by viewModel.telemetryStateFlow.collectAsState(false)
+        val isServiceUp by viewModel.isServiceUp.collectAsState(false)
         val isMAVLinkRunning by viewModel.isMAVLinkRunning.collectAsState(false)
         val isWebRTCRunning by viewModel.isWebRTCRunning.collectAsState(false)
         // Logs
@@ -144,9 +144,11 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(4.dp))
                 Text("SDK registered?: $isSDKOk")
                 Spacer(Modifier.height(2.dp))
-                Text("DataFlow active?: $isDataFlowing")
+                Text("Aircraft present?: $isAircraftPresent")
                 Spacer(Modifier.height(2.dp))
                 Text("Aircraft boot?: $isAircraftUp")
+                Spacer(Modifier.height(2.dp))
+                Text("Simulation ready?: $isSimulationReady")
                 Spacer(Modifier.height(2.dp))
                 Text("MAVLinkService up?: $isMAVLinkRunning")
                 Spacer(Modifier.height(2.dp))
@@ -159,20 +161,30 @@ class MainActivity : ComponentActivity() {
             if (isSDKOk && isAircraftPresent) {
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
-                    servicesViewModel.runService(!isAircraftUp, false)
+                    servicesViewModel.loadAircraft(!isAircraftUp, false)
                 }) {
-                    Text("${buttonLabel(isAircraftUp)} WenuLink Service")
+                    Text("${if (!isAircraftUp) "Connect" else "Disconnect"} aircraft")
                 }
 
                 if (isSimulationReady && !isAircraftUp) {
+                    Spacer(Modifier.height(8.dp))
                     Button(onClick = {
-                        servicesViewModel.runService(run = true, simEnabled = true)
+                        servicesViewModel.loadAircraft(true, simEnabled = true)
                     }) {
-                        Text("Start SIM WenuLink Service")
+                        Text("Use simulation")
                     }
                 }
 
                 if (isAircraftUp) {
+                    HorizontalDivider()
+                    Button(onClick = {
+                        servicesViewModel.runService(!isServiceUp)
+                    }) {
+                        Text("${buttonLabel(isServiceUp)} WenuLink Service")
+                    }
+                }
+
+                if (isServiceUp) {
                     HorizontalDivider()
 
                     Button(onClick = {

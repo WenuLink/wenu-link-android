@@ -1,7 +1,6 @@
 package org.WenuLink.adapters.aircraft
 
 import io.getstream.log.taggedLogger
-import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandHandler
@@ -42,7 +41,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
             listOf(
                 ArduPilotParametersProvider,
                 DJIParametersProvider(
-                    FCManager.fcInstance ?: error("FlightController not available")
+                    FCManager.mInstance ?: error("FlightController not available")
                 )
             )
         )
@@ -51,9 +50,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun requestMode(mode: ArduCopterFlightMode): UnitResult {
         if (mode == state.flightMode) return CommandResult.ok
 
-        if (!stateMachine.isModeAllowed(mode)) {
+        val isAllowed = stateMachine.isModeAllowed(mode)
+
+        if (isAllowed.hasError) {
             return CommandResult.error(
-                "Mode $mode not allowed from ${state.flightMode}"
+                "Mode $mode not allowed: ${isAllowed.errorReason}"
             )
         }
 
@@ -65,7 +66,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     private fun enforceModeConsistency() {
-        if (!stateMachine.isModeAllowed(state.flightMode)) {
+        if (stateMachine.isModeAllowed(state.flightMode).hasError) {
             stateMachine.syncArmState()
             return
         }
@@ -89,13 +90,13 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
-    suspend fun syncState(sensorsInterval: Long = 1000L) {
+    fun syncState(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
 
         // only allows check sensors after sensorsInterval ms
         if ((currentTimestamp - sensorsTimestamp) >= sensorsInterval) {
-            sensorsHealthy = sensorChecks(100L)
+            sensorsHealthy = sensorChecks()
             sensorsTimestamp = currentTimestamp
         }
 
@@ -111,52 +112,37 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.w { "State reconciliation: $state -> $fcState" }
 
         stateMachine.forceSet(fcState)
-        enforceModeConsistency()
     }
 
-    suspend fun loadParameters(timeout: Long = 5000L): Boolean {
-        logger.i { "Waiting for parameters" }
+    private suspend fun loadParameters(timeout: Long = 5000L): Boolean {
+        logger.d { "Loading parameters" }
         parameters.load()
         return AsyncUtils.waitTimeout(timeout, 1000L, parameters::isLoaded)
     }
 
-    suspend fun sensorChecks(timeout: Long = 10_000L): Boolean {
-        val perSensorTime = (timeout / 3f).roundToLong()
-        logger.i { "Waiting sensors data" }
-
-        if (!AsyncUtils.waitTimeout(100L, timeout, telemetry::isReadingSensors)) {
+    private fun sensorChecks(): Boolean {
+        if (!telemetry.isReadingSensors()) {
             logger.e { "No sensor readings!" }
             return false
         }
 
         // https://developer.dji.com/api-reference/android-api/Components/Compass/DJICompass.html
-        val compassOk = AsyncUtils.waitTimeout(
-            100L,
-            perSensorTime,
-            telemetry::isCompassOk
-        )
+        val compassOk = telemetry.isCompassOk()
         if (!compassOk) logger.e { "Compass error!" }
 
         // https://developer.dji.com/api-reference/android-api/Components/IMUState/DJIIMUState.html
-        val accOk = AsyncUtils.waitTimeout(
-            100L,
-            perSensorTime,
-            telemetry::isAccelerometerOk
-        )
+        val accOk = telemetry.isAccelerometerOk()
         if (!accOk) logger.e { "Accelerometer error!" }
 
-        val gyroOk = AsyncUtils.waitTimeout(
-            100L,
-            perSensorTime,
-            telemetry::isGyroscopeOk
-        )
+        val gyroOk = telemetry.isGyroscopeOk()
         if (!gyroOk) logger.e { "Gyroscope error!" }
 
         return compassOk && accOk && gyroOk
     }
 
     // check for home location and set
-    fun updateHomeCoordinatesFromAircraft(): Boolean {
+    private fun updateHomeCoordinatesFromAircraft(): Boolean {
+        if (FCManager.getHomePosition() != null) return true
         // Ask for home position
         logger.d { "Requesting home coordinates update with current aircraft's location." }
         FCManager.setHomePosition { error ->
@@ -164,27 +150,23 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
                 logger.w { "Error request: $error" }
             }
         }
-        return state.isHomeSet()
+        return FCManager.getHomePosition() != null
     }
 
-    suspend fun waitHomeSet(timeout: Long = 10_000L): Boolean {
-        if (state.isHomeSet()) return true
+    suspend fun waitHomeSet(timeout: Long = 10_000L): Boolean = AsyncUtils.waitTimeout(
+        100L,
+        timeout,
+        state::isHomeSet
+    )
 
-        return AsyncUtils.waitTimeout(
-            100L,
-            timeout,
-            ::updateHomeCoordinatesFromAircraft
-        )
-    }
-
-    suspend fun startTelemetry(timeout: Long = 5000L): Boolean {
+    private suspend fun startTelemetry(timeout: Long = 5000L): Boolean {
         // Start telemetry process
         telemetry.launchTelemetry(true)
         // Second wait to receive the data ready for broadcast
         return telemetry.waitDataReading(timeout)
     }
 
-    suspend fun stopTelemetry(delay: Long = 1000L): Boolean {
+    private suspend fun stopTelemetry(delay: Long = 1000L): Boolean {
         // Stop telemetry process
         telemetry.launchTelemetry(false)
         // Second wait to remove the existing data
@@ -196,12 +178,13 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.d { "Aircraft booting..." }
 
         if (!loadParameters(timeout)) return "No parameters"
-        logger.d { "\tLoading parameters: OK" }
+        logger.d { "\tParameters: OK" }
 
         if (!startTelemetry(timeout)) return "No telemetry"
-        logger.d { "\tInit. telemetry: OK" }
+        logger.d { "\tTelemetry: OK" }
 
-        sensorsHealthy = sensorChecks(timeout)
+        sensorsHealthy =
+            AsyncUtils.waitTimeout(500L, timeout) { sensorChecks() } && state.isHomeSet()
         logger.d { "\tSensors healthy?: $sensorsHealthy" }
 
         logger.d { "Aircraft boot: OK" }
@@ -214,12 +197,16 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         startCommandProcessor(scope, this@AircraftHandler, logger)
     }
 
-    suspend fun shutdown(): String? {
+    override fun unload() {
+        telemetry.unload()
+        super.unload()
+    }
+
+    suspend fun shutdown() {
         sensorsHealthy = false
         // Reverse boot sequence
         stopTelemetry(500L)
         isPowerOff = true
-        return null
     }
 
     fun armMotors() {

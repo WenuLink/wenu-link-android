@@ -3,6 +3,7 @@ package org.WenuLink.sdk
 import android.content.Context
 import dji.common.error.DJIError
 import dji.common.error.DJISDKError
+import dji.common.product.Model
 import dji.common.realname.AircraftBindingState
 import dji.common.realname.AircraftBindingState.AircraftBindingStateListener
 import dji.common.realname.AppActivationState
@@ -18,6 +19,9 @@ import dji.sdk.remotecontroller.RemoteController
 import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 
 object APIManager {
     private val logger by taggedLogger(APIManager::class.java.simpleName)
@@ -41,6 +45,9 @@ object APIManager {
             DJISDKManager.getInstance().registerApp(context, sdkManagerCallback)
         }
     }
+
+    fun areComponentsPresent() =
+        AircraftManager.isConnected() && FCManager.isConnected() && CameraManager.isConnected()
 
     private fun setActivationCallback(callback: (Boolean, String?) -> Unit) {
         activationStateListener =
@@ -83,8 +90,25 @@ object APIManager {
         sdkManagerCallback = null
     }
 
+    private fun updateAircraftInstance(instance: BaseProduct?): Boolean {
+        logger.i { "Product present: $instance" }
+
+        return instance
+            ?.takeIf { it is Aircraft && it.model != Model.UNKNOWN_AIRCRAFT }
+            ?.also { aircraft ->
+                logger.i { "Model: ${aircraft.model}" }
+            }
+            ?.model
+            ?.let {
+                AircraftManager.init(instance as Aircraft)
+                logger.i { "Aircraft: $instance" }
+                true
+            }
+            ?: false
+    }
+
     fun registerCallbacks(
-        registrationCallback: (String?) -> Unit,
+        registrationCallback: (UnitResult) -> Unit,
         productConnectedCallback: (Boolean) -> Unit,
         activationCallback: (Boolean, String?) -> Unit = { _, _ -> },
         bindingCallback: (Boolean, String?) -> Unit = { _, _ -> }
@@ -97,12 +121,12 @@ object APIManager {
                 if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                     DJISDKManager.getInstance().startConnectionToProduct()
                     loggerC.i { "Successfully registered" }
-                    registrationCallback(null)
+                    registrationCallback(CommandResult.ok)
                 } else {
                     val errorDescription = djiError.description
                     loggerC.i { "Error in registration, $errorDescription" }
                     DJISDKManager.getInstance().destroy()
-                    registrationCallback(errorDescription)
+                    registrationCallback(CommandResult.error(errorDescription))
                 }
                 registrationInProgress = false
             }
@@ -113,15 +137,13 @@ object APIManager {
             }
 
             override fun onProductConnect(product: BaseProduct?) {
-                product.let {
-                    if (it is Aircraft) AircraftManager.init(it)
-                }
-                productConnectedCallback(true)
+                loggerC.i { "onProductConnect()" }
+                productConnectedCallback(updateAircraftInstance(product))
             }
 
-            override fun onProductChanged(p0: BaseProduct?) {
+            override fun onProductChanged(product: BaseProduct?) {
                 loggerC.i { "onProductChanged()" }
-                productConnectedCallback(true)
+                productConnectedCallback(updateAircraftInstance(product))
             }
 
             override fun onComponentChange(

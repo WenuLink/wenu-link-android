@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -40,7 +41,6 @@ class WenuLinkService : Service() {
 
         // create the aircraft instance
         handler = WenuLinkHandler.getInstance()
-        handler.registerScope(serviceScope)
 
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady()) {
@@ -50,8 +50,6 @@ class WenuLinkService : Service() {
         if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
             mavlink = MAVLinkService(handler)
         }
-
-        logger.i { "WenuLinkService created." }
     }
 
     private fun startForegroundServiceWithNotification() {
@@ -80,7 +78,7 @@ class WenuLinkService : Service() {
             contentText = "Sending periodic heartbeats to GCS\n"
         }
         if (::webRTC.isInitialized) {
-            contentText += "WebRTC streaming: ${webRTC.mediaOptions.videoCameraName}"
+            contentText += "WebRTC streaming"
         }
         // TODO: update according to each present service
         startForeground(
@@ -105,26 +103,17 @@ class WenuLinkService : Service() {
 
         // Start the foreground service if both services are initialized
         startForegroundServiceWithNotification()
-
-        // Wait Aircraft to boot
-        serviceScope.launch {
-            val bootError = handler.bootAircraft()
-            if (bootError != null) {
-                // No aircraft -> No service
-                terminate()
-                onDestroy()
-            } else {
-                thisApp.isAircraftBoot.value = true
-            }
-        }
-
+        runServices()
+        thisApp.isServiceUp.value = true
+        logger.i { "WenuLinkService started" }
         return START_STICKY // The service will continue running
     }
 
     override fun onDestroy() {
         thisApp.wenuLinkService = null // Clear the reference
         serviceScope.cancel()
-        logger.i { "WenuLinkService ended." }
+        thisApp.isServiceUp.value = false
+        logger.i { "WenuLinkService ended" }
         super.onDestroy()
     }
 
@@ -171,7 +160,7 @@ class WenuLinkService : Service() {
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 
-    fun startMAVLinkService(onResult: (String?) -> Unit): Job? {
+    fun startMAVLinkService(onResult: (UnitResult) -> Unit): Job? {
         if (!MAVLinkService.isEnabled) {
             logger.i { "Unable to start MAVLink, service not enabled." }
             return null
@@ -214,8 +203,5 @@ class WenuLinkService : Service() {
         val mavlinkStopJob = stopMAVLinkService()
         webRTCStopJob?.join()
         mavlinkStopJob?.join()
-        handler.unload()
-        AsyncUtils.waitTimeout(1000L, 20_000L) { !handler.isAircraftPowerOn }
-        thisApp.isAircraftBoot.value = false
     }
 }

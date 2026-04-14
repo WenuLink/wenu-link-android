@@ -61,40 +61,6 @@ object CameraManager {
         logger.i { toString() }
     }
 
-    fun createCompletionCallback(
-        onResult: (String, Boolean) -> Unit
-    ): CommonCallbacks.CompletionCallbackWith<String> =
-        object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(value: String) = onResult(value, true)
-
-            override fun onFailure(p0: DJIError?) =
-                onResult(p0?.description ?: "Unknown error", false)
-        }
-
-    suspend fun retrieveFirmwareVersion(): String? = suspendCancellableCoroutine { cont ->
-        if (fwVersion != null) {
-            cont.resume(fwVersion)
-            return@suspendCancellableCoroutine
-        }
-        mInstance?.getFirmwareVersion(
-            createCompletionCallback { firmwareVersion, _ ->
-                cont.resume(firmwareVersion)
-            }
-        ) ?: cont.resume(null)
-    }
-
-    suspend fun retrieveSerialNumber(): String? = suspendCancellableCoroutine { cont ->
-        if (serialNumber != null) {
-            cont.resume(serialNumber)
-            return@suspendCancellableCoroutine
-        }
-        mInstance?.getSerialNumber(
-            createCompletionCallback { serialNumber, _ ->
-                cont.resume(serialNumber)
-            }
-        ) ?: cont.resume(null)
-    }
-
     suspend fun retrieveCameraMode(): SettingsDefinitions.CameraMode? =
         suspendCancellableCoroutine { cont ->
             mInstance?.getMode(
@@ -125,12 +91,9 @@ object CameraManager {
             ) ?: cont.resume(null)
         }
 
-    suspend fun retrieveMetadata() {
-        if (mInstance == null) return
-
-        fwVersion = retrieveFirmwareVersion()
-        serialNumber = retrieveSerialNumber()
-
+    suspend fun retrieveMetadata() = mInstance?.let { camInstance ->
+        fwVersion = SDKUtils.retrieveFirmwareVersion(camInstance)
+        serialNumber = SDKUtils.retrieveSerialNumber(camInstance)
         retrieveCameraMode()?.let { this.cameraMode = it }
         retrieveCaptureMode()?.let { this.captureMode = it }
     }

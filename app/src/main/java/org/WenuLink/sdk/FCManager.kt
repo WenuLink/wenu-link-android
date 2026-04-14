@@ -1,84 +1,47 @@
 package org.WenuLink.sdk
 
-import dji.common.error.DJIError
 import dji.common.flightcontroller.CompassCalibrationState
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.imu.IMUState
 import dji.common.flightcontroller.imu.SensorState
 import dji.common.model.LocationCoordinate2D
-import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.aircraft.Coordinates3D
-import org.WenuLink.adapters.aircraft.IMUState as AppIMUState
 import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
 import org.WenuLink.adapters.aircraft.TelemetryData
 
 object FCManager {
     private val logger by taggedLogger(FCManager::class.java.simpleName)
 
-    var fcInstance: FlightController? = null
+    var mInstance: FlightController? = null
         private set
     private var serialNumber: String? = null
     private var fwVersion: String? = null
 
     @Synchronized
-    fun updateSerialNumber(sn: String) {
-        serialNumber = sn
-    }
-
-    @Synchronized
-    fun updateFirmwareVersion(firmware: String) {
-        fwVersion = firmware
-    }
-
-    @Synchronized
     fun init(flightController: FlightController) {
-        fcInstance = flightController
-
-        flightController.getSerialNumber(
-            object : CommonCallbacks.CompletionCallbackWith<String> {
-                override fun onSuccess(sn: String) {
-                    updateSerialNumber(sn)
-                    logger.i { "${this@FCManager}: $sn" }
-                }
-
-                override fun onFailure(error: DJIError) {
-                    logger.e { "No Serial Number obtained: $error" }
-                }
-            }
-        )
-
-        flightController.getFirmwareVersion(
-            object : CommonCallbacks.CompletionCallbackWith<String> {
-                override fun onSuccess(firmware: String) {
-                    updateFirmwareVersion(firmware)
-                    logger.i { this@FCManager.toString() }
-                }
-
-                override fun onFailure(error: DJIError) {
-                    logger.e { "No Firmware version obtained: $error" }
-                }
-            }
-        )
-
-        logger.i { "FlightController init" }
-
         SimManager.init(flightController)
+        mInstance = flightController
+        logger.i { "FlightController init" }
+    }
+
+    suspend fun retrieveMetadata() = mInstance?.let { fcInstance ->
+        fwVersion = SDKUtils.retrieveFirmwareVersion(fcInstance)
+        serialNumber = SDKUtils.retrieveSerialNumber(fcInstance)
     }
 
     @Synchronized
-    fun isConnected() = fcInstance != null
+    fun isConnected() = mInstance != null
 
-    override fun toString(): String {
-        val isConnected = isConnected()
-        return if (isConnected && serialNumber != null && fwVersion != null) {
+    override fun toString(): String =
+        if (isConnected() && serialNumber != null && fwVersion != null) {
             "FlightController SN: $serialNumber - FW: $fwVersion"
-        } else if (isConnected) {
+        } else if (isConnected()) {
             "Reading FlightController"
         } else {
             "No FlightController"
         }
-    }
 
     fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
         roll = state.attitude.roll,
@@ -102,12 +65,12 @@ object FCManager {
     )
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
-        fcInstance?.setStateCallback(stateCallback)
+        mInstance?.setStateCallback(stateCallback)
 
-    fun unregisterStateCallback() = fcInstance?.setStateCallback(null)
+    fun unregisterStateCallback() = mInstance?.setStateCallback(null)
 
     fun getHomePosition(): Coordinates3D? {
-        val flightState = fcInstance!!.state
+        val flightState = mInstance!!.state
         if (!flightState.isHomeLocationSet) return null
 
         val homeLocation = flightState.homeLocation
@@ -124,40 +87,40 @@ object FCManager {
         onResult: (String?) -> Unit
     ) {
         if (latitude != null && longitude != null) {
-            fcInstance?.setHomeLocation(
+            mInstance?.setHomeLocation(
                 LocationCoordinate2D(latitude, longitude),
                 SDKUtils.createCompletionCallback(onResult)
             )
         } else {
-            fcInstance?.setHomeLocationUsingAircraftCurrentLocation(
+            mInstance?.setHomeLocationUsingAircraftCurrentLocation(
                 SDKUtils.createCompletionCallback(onResult)
             )
         }
     }
 
-    fun isFlying() = fcInstance?.state?.isFlying == true
+    fun isFlying() = mInstance?.state?.isFlying == true
 
-    fun needLandingConfirmation() = fcInstance?.state?.isLandingConfirmationNeeded == true
+    fun needLandingConfirmation() = mInstance?.state?.isLandingConfirmationNeeded == true
 
-    fun getAltitude(): Float = fcInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
+    fun getAltitude(): Float = mInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
 
-    fun startTakeoff() = fcInstance?.startTakeoff { }
+    fun startTakeoff() = mInstance?.startTakeoff { }
 
     fun confirmLanding(onResult: (String?) -> Unit) =
         // for somehow these kind of actions does not return anything, possibly is a thread issue.
-        fcInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
+        mInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
 
-    fun areMotorsArmed() = fcInstance?.state?.areMotorsOn() == true
+    fun areMotorsArmed() = mInstance?.state?.areMotorsOn() == true
 
     fun armMotors() {
         logger.d { "Arming motors" }
-        fcInstance?.turnOnMotors { } // ignored callback, async wait for state change
+        mInstance?.turnOnMotors { } // ignored callback, async wait for state change
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
         // apparently ignores the callback and must wait for change to happen
-        fcInstance?.turnOffMotors { }
+        mInstance?.turnOffMotors { }
     }
 
     fun sensorState(sensorState: SensorState?): AppSensorState = when (sensorState) {
@@ -180,55 +143,23 @@ object FCManager {
         null -> AppSensorState.BOOT
     }
 
-    fun registerIMUState(onSensor: (AppIMUState) -> Unit) {
-        val nSensors = fcInstance?.imuCount ?: 0
-        logger.d { "Listening sensor: $nSensors IMU(s)" }
+    fun getIMUCount(): Int = mInstance?.imuCount ?: 0
 
-        if (nSensors <= 0) {
-            logger.i { "No IMU sensor found!" }
-            return
-        }
+    fun registerIMUStateCallback(stateCallback: (IMUState) -> Unit) =
+        mInstance?.setIMUStateCallback(stateCallback)
 
-        val state = AppIMUState(
-            MutableList(nSensors) { AppSensorState.BOOT },
-            MutableList(nSensors) { AppSensorState.BOOT }
-        )
+    fun unregisterIMUStateCallback() = mInstance?.setIMUStateCallback(null)
 
-        fcInstance?.setIMUStateCallback { p0 ->
-            // The callback is executed one time per sensor, with -1 indicating the list's end
-            if (p0.index == -1) {
-                // Publish a copy after receiving the entire list
-                onSensor(
-                    AppIMUState().copy(
-                        gyroscope = state.gyroscope,
-                        accelerometer = state.accelerometer
-                    )
-                )
-                return@setIMUStateCallback
-            }
-
-            // assumes same number gyros and accel
-            state.gyroscope[p0.index] = sensorState(p0.gyroscopeState)
-            state.accelerometer[p0.index] = sensorState(p0.accelerometerState)
-        }
-    }
-
-    fun unregisterIMUState() {
-        logger.d { "Stop listening sensor: ${fcInstance?.imuCount} IMU(s)" }
-        fcInstance?.setIMUStateCallback(null)
-    }
+    fun getCompassCount(): Int = mInstance?.compassCount ?: 0
 
     fun compassOk(): Boolean {
-        val nSensors = fcInstance?.compassCount ?: 0
-        logger.d { "Reading sensor: $nSensors compasses" }
-
-        if (nSensors <= 0) {
+        if (getCompassCount() <= 0) {
             logger.i { "No Compass sensor found!" }
             return false
         }
 
-        val compass = fcInstance?.compass
-        return compass?.hasError() != true &&
-            compass?.calibrationState == CompassCalibrationState.NOT_CALIBRATING
+        return mInstance?.compass?.let {
+            !it.hasError() && it.calibrationState == CompassCalibrationState.NOT_CALIBRATING
+        } ?: false
     }
 }

@@ -25,14 +25,17 @@ object AircraftManager {
         aircraftInstance = aircraft
         batteryInstance = aircraft.battery
         CameraManager.updateStreamID(getModel())
-        logger.i { "Aircraft connected: ${getModelName()}" }
+        logger.i { "Aircraft present: ${getModelName()}" }
     }
+
+    @Synchronized
+    fun isConnected(): Boolean = aircraftInstance != null
 
     @Synchronized
     fun initAirLink(airLink: AirLink) {
         this.airLinkInstance = airLink
         useAirLink = true
-        logger.i { "AirLink connected" }
+        logger.i { "AirLink present" }
     }
 
     @Synchronized

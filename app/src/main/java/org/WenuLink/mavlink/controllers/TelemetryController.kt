@@ -150,6 +150,10 @@ class TelemetryController(
                 // skip if deactivated
                 continue
             }
+            if ((currentMicroTime - rate.lastUpdateStamp) <= rate.microSecondsInterval) {
+                // skip if not time-ready
+                continue
+            }
 
             // create the message from controllers definitions
             val message = controllers.asSequence()
@@ -163,11 +167,9 @@ class TelemetryController(
                 continue
             }
 
-            // if a message is created, check if must sent and update
-            if ((currentMicroTime - rate.lastUpdateStamp) >= rate.microSecondsInterval) {
-                rate.lastUpdateStamp = currentMicroTime
-                client.sendMessage(message)
-            }
+            // send message and update timestamp
+            client.sendMessage(message)
+            rate.lastUpdateStamp = currentMicroTime
         }
     }
 
@@ -212,7 +214,6 @@ class TelemetryController(
 
     @Synchronized
     fun processMessageInterval(commandMsg: msg_command_long) {
-        logger.d { "processMessageInterval" }
         val mavlinkMsgID = commandMsg.param1.toInt()
         val interval = commandMsg.param2.toLong() // already in micro seconds
         setMessageRate(mavlinkMsgID, interval)

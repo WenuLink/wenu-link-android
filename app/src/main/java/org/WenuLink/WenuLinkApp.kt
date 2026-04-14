@@ -14,10 +14,18 @@ import androidx.multidex.MultiDex
 import com.cySdkyc.clx.Helper
 import io.getstream.log.AndroidStreamLogger
 import io.getstream.log.taggedLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.WenuLinkService
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.UnitResult
 import org.WenuLink.sdk.APIManager
 
 class WenuLinkApp : Application() {
@@ -25,20 +33,26 @@ class WenuLinkApp : Application() {
         val apiIntentAction: String get() = APIManager.getIntentAction()
     }
     private val logger by taggedLogger(WenuLinkApp::class.java.simpleName)
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var initJob: Job? = null
+    private var connectJob: Job? = null
+    private lateinit var wenuLinkHandler: WenuLinkHandler
+    private var isContextAttached = false
+    var wenuLinkService: WenuLinkService? = null
 
+    // Basic status reporting
+    val isPermissionsGranted = MutableStateFlow(false)
+    val workflowStatus = MutableStateFlow("Idle")
+    val sdkStatus = MutableStateFlow("Idle")
+
+    // SDK state handling
     val isRegistered = MutableStateFlow(false)
     val bindingString = MutableStateFlow("Idle")
     val activationString = MutableStateFlow("Idle")
     val isAircraftPresent = MutableStateFlow(false)
-    val isPermissionsGranted = MutableStateFlow(false)
-    val workflowStatus = MutableStateFlow("Idle")
-    val sdkStatus = MutableStateFlow("Idle")
     val isSimulationReady = MutableStateFlow(false)
     val isAircraftBoot = MutableStateFlow(false)
-
-    var wenuLinkService: WenuLinkService? = null
-    var wenuLinkHandler: WenuLinkHandler? = null
-    var isContextAttached: Boolean = false
+    val isServiceUp = MutableStateFlow(false)
 
     private val permissionsList by lazy {
         val permList = mutableListOf(
@@ -83,28 +97,32 @@ class WenuLinkApp : Application() {
     }
 
     private fun updateStatus(text: String) {
+        logger.i { "SDK status: $text" }
         sdkStatus.value = text
     }
 
     fun updateWorkflow(text: String) {
+        logger.i { "Workflow: $text" }
         workflowStatus.value = text
     }
 
     fun onPermissionsGranted() {
         logger.i { "All permissions granted" }
         updatePermission(true)
-        updateWorkflow("Waiting for SDK")
         apiStart()
     }
 
     fun onPermissionsDenied() {
-        logger.e { "Some permissions denied" }
+        logger.w { "Some permissions denied" }
         updatePermission(false)
         updateWorkflow("Missing permission(s), please restart the app.")
     }
 
     override fun attachBaseContext(paramContext: Context?) {
         super.attachBaseContext(paramContext)
+        // Attach logger first
+        AndroidStreamLogger.installOnDebuggableApp(this)
+        // Attach SDK
         MultiDex.install(this)
         Helper.install(this)
         isContextAttached = true
@@ -129,12 +147,15 @@ class WenuLinkApp : Application() {
         } else {
             registerReceiver(usbReceiver, filter)
         }
-
-        AndroidStreamLogger.installOnDebuggableApp(this)
     }
 
-    suspend fun launchWenulinkService() {
+    fun launchWenulinkService() {
         if (wenuLinkService != null) return
+
+        if (!wenuLinkHandler.isAircraftPowerOn) {
+            logger.w { "Unable to start, Aircraft's not ready." }
+            return
+        }
 
         val startFunction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             this::startForegroundService
@@ -142,31 +163,97 @@ class WenuLinkApp : Application() {
             this::startService
         }
         startFunction(Intent(this, WenuLinkService::class.java))
-
-        AsyncUtils.waitReady(500L) { isAircraftBoot.value }
-
-        wenuLinkService?.runServices()
     }
 
     suspend fun stopWenulinkService() {
         if (wenuLinkService == null) return
 
         wenuLinkService?.terminate()
-        wenuLinkHandler?.enableSimulation(false) // always disable
-        stopService(
-            Intent(this, WenuLinkService::class.java)
-        )
+        stopService(Intent(this, WenuLinkService::class.java))
     }
 
-    private fun onRegistration(error: String?) {
-        if (error == null) {
-            isRegistered.value = true
-            updateStatus("Registered")
-            updateWorkflow("Waiting for Aircraft")
-        } else {
+    private fun onRegistration(result: UnitResult) {
+        if (result is CommandResult.Failure) {
             isRegistered.value = false
-            updateStatus(error)
+            updateStatus(result.reason)
             updateWorkflow("Error during SDK registration")
+            return
+        }
+        isRegistered.value = true
+        updateStatus("Registered")
+        updateWorkflow("Waiting for Aircraft")
+    }
+
+    private fun initHandler() {
+        if (initJob != null) {
+            logger.w { "Already initializing handler" }
+            return
+        }
+
+        // Launches it
+        initJob = appScope.launch {
+            waitComponentsAndStartHandler()
+        }
+
+        // wait for termination to clear
+        appScope.launch {
+            initJob?.join()
+            initJob = null
+            updateWorkflow("WenuLink with ${wenuLinkHandler.aircraftModel}")
+        }
+    }
+
+    private suspend fun waitComponentsAndStartHandler() {
+        updateWorkflow("Waiting for components")
+        val allComponentsPresent =
+            AsyncUtils.waitTimeout(100L, 30_000L, APIManager::areComponentsPresent)
+
+        if (!allComponentsPresent) {
+            updateWorkflow("No components found, try again...")
+            return
+        }
+        // check if simReady
+        isSimulationReady.value = APIManager.isSimulationAvailable
+
+        if (::wenuLinkHandler.isInitialized) return
+
+        updateWorkflow("Initializing handler")
+        wenuLinkHandler = WenuLinkHandler.getInstance()
+        wenuLinkHandler.registerScope(appScope)
+    }
+
+    fun connectAircraft(useSimulation: Boolean = false) {
+        if (connectJob?.isActive == true) return
+
+        if (!::wenuLinkHandler.isInitialized) return
+
+        connectJob = appScope.launch {
+            wenuLinkHandler.enableSimulation(useSimulation)
+            updateWorkflow("Connecting to ${wenuLinkHandler.aircraftModel}")
+            // Wait Aircraft to boot
+            val bootResult = wenuLinkHandler.loadComponents(appScope)
+            if (bootResult.hasError) {
+                updateWorkflow("Boot error: ${bootResult.errorReason}")
+            } else {
+                isAircraftBoot.value = true
+                updateWorkflow("Connected and ready for services")
+            }
+        }
+    }
+
+    fun disconnectAircraft() {
+        if (connectJob?.isActive == true) return
+
+        if (!::wenuLinkHandler.isInitialized) return
+
+        appScope.launch {
+            val shutdownResult = wenuLinkHandler.unloadComponents(false)
+            if (shutdownResult.hasError) {
+                updateWorkflow("Shutdown error: ${shutdownResult.errorReason}")
+            } else {
+                isAircraftBoot.value = false
+            }
+            wenuLinkHandler.enableSimulation(false)
         }
     }
 
@@ -174,10 +261,11 @@ class WenuLinkApp : Application() {
         logger.d { "onProductConnected $connected" }
         isAircraftPresent.value = connected
         if (connected) {
-            updateWorkflow("Initializing handler")
-            wenuLinkHandler = WenuLinkHandler.getInstance()
-            updateStatus("Connected to ${wenuLinkHandler!!.aircraftModel}.")
-            isSimulationReady.value = APIManager.isSimulationAvailable
+            updateStatus("Aircraft present")
+            initHandler()
+        } else {
+            updateStatus("No aircraft present")
+            isSimulationReady.value = false
         }
     }
 
@@ -203,6 +291,8 @@ class WenuLinkApp : Application() {
     }
 
     fun apiDestroy() {
+        if (::wenuLinkHandler.isInitialized) wenuLinkHandler.unload()
+        appScope.cancel()
         APIManager.destroy()
     }
 }

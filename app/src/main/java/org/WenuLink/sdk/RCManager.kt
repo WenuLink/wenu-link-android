@@ -14,7 +14,7 @@ object RCManager {
     @Synchronized
     fun init(remoteController: RemoteController) {
         rcInstance = remoteController
-        logger.i { "Remote Controller connected" }
+        logger.i { "Remote Controller present" }
     }
 
     @Synchronized

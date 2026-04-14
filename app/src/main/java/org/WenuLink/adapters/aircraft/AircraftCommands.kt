@@ -108,9 +108,9 @@ data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCo
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         if (withTransitionCheck) ctx.dispatchTransition(PowerOffTransition)
-        return ctx.shutdown()
-            ?.let { CommandResult.error(it) }
-            ?: CommandResult.ok
+        ctx.shutdown()
+        ctx.dispatchTransition(InitialTransition)
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {

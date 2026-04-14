@@ -51,7 +51,9 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         availableCameras.clear()
         photoSeqIndex = 0
         lastSeenCaptureCount = 0
+        _captureCount.value = 0
         wasStoringPhoto = false
+        wasInitialized = false
         super.unload()
     }
 
@@ -65,7 +67,6 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     suspend fun initCameras(): Boolean {
         if (!CameraManager.isConnected()) return false
 
-        logger.d { "initCamera" }
         CameraManager.retrieveMetadata()
 
         // for now assumes a single camera, however this class should manage multi camera if must
@@ -84,7 +85,6 @@ class CameraHandler : CommandHandler<CameraHandler>() {
                     CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
             )
         )
-        logger.d { "availableCameras(${availableCameras.size})" }
         setMode(CAMERA_MODE.CAMERA_MODE_IMAGE, 0)
 
         logger.d { "Managing ${availableCameras.size} detected camera(s)" }
