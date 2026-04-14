@@ -1,4 +1,4 @@
-package org.WenuLink.mavlink.params
+package org.WenuLink.mavlink.messages
 
 object ParamUtils {
     fun toBoolean(param: Float): Boolean? = when (param) {

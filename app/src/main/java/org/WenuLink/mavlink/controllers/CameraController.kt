@@ -30,12 +30,11 @@ import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
-import org.WenuLink.mavlink.params.ImageStartCaptureParams
-import org.WenuLink.mavlink.params.ImageStopCaptureParams
-import org.WenuLink.mavlink.params.RequestCameraInformationParams
-import org.WenuLink.mavlink.params.SetCameraModeParams
-import org.WenuLink.mavlink.params.VideoStartCaptureParams
-import org.WenuLink.mavlink.params.VideoStopCaptureParams
+import org.WenuLink.mavlink.messages.ImageStopCaptureParams
+import org.WenuLink.mavlink.messages.RequestCameraInformationCommandLong
+import org.WenuLink.mavlink.messages.SetCameraModeCommandLong
+import org.WenuLink.mavlink.messages.VideoStartCaptureParams
+import org.WenuLink.mavlink.messages.VideoStopCaptureParams
 
 /**
  * MAVLinkController class to deal with the camera protocol v2's messages.
@@ -107,7 +106,7 @@ class CameraController(
     }
 
     private fun handleCameraInformation(commandLongMsg: msg_command_long) {
-        val params = RequestCameraInformationParams.from(commandLongMsg)
+        val params = RequestCameraInformationCommandLong(commandLongMsg)
         if (params.capabilities == true) reportCameras()
     }
 
@@ -132,7 +131,7 @@ class CameraController(
 
     private fun handleSetCameraMode(commandLongMsg: msg_command_long) {
         sendCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_IN_PROGRESS, 0)
-        val params = SetCameraModeParams.from(commandLongMsg)
+        val params = SetCameraModeCommandLong(commandLongMsg)
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(SetModeCommand(params.mode, params.id))
@@ -216,7 +215,7 @@ class CameraController(
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long) {
-        val params = ImageStopCaptureParams.from(commandLongMsg)
+        val params = ImageStopCaptureParams(commandLongMsg)
         val cameraInfo = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
@@ -246,10 +245,8 @@ class CameraController(
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long) {
-        val params = VideoStartCaptureParams.from(commandLongMsg)
-        val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
-
-        if (cameraInfo == null) {
+        val params = VideoStartCaptureParams(commandLongMsg)
+        val cameraInfo: CameraMetadata = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -282,7 +279,7 @@ class CameraController(
     }
 
     private fun requestStopRecording(commandLongMsg: msg_command_long) {
-        val params = VideoStopCaptureParams.from(commandLongMsg)
+        val params = VideoStopCaptureParams(commandLongMsg)
         val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
 
         if (cameraInfo == null) {

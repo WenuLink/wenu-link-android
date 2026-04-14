@@ -19,10 +19,10 @@ import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.mavlink.MAVLinkClient
-import org.WenuLink.mavlink.params.ComponentArmDisarmParams
-import org.WenuLink.mavlink.params.ConditionYawParams
-import org.WenuLink.mavlink.params.DoSetModeParams
-import org.WenuLink.mavlink.params.NavDelayParams
+import org.WenuLink.mavlink.messages.ComponentArmDisarmCommandLong
+import org.WenuLink.mavlink.messages.ConditionYawMessage
+import org.WenuLink.mavlink.messages.DoSetModeCommandLong
+import org.WenuLink.mavlink.messages.NavDelayMessage
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
@@ -108,7 +108,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
     )
 
     fun setMode(commandMsg: msg_command_long, handler: WenuLinkHandler) {
-        val params = DoSetModeParams.from(commandMsg)
+        val params = DoSetModeCommandLong(commandMsg)
 
         logger.d { "FlightMode requested: ${params.customMode}" }
         val customMode = ArduCopterFlightMode.from(params.customMode)
@@ -126,7 +126,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {
-        val params = ComponentArmDisarmParams.from(commandMsg)
+        val params = ComponentArmDisarmCommandLong(commandMsg)
 
         if (params.arm == null) {
             logger.d { "Invalid arm/disarm request" }
@@ -179,7 +179,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestMissionAction(
-                    DelayAction.fromParameters(NavDelayParams.from(commandMsg))
+                    DelayAction.fromParameters(NavDelayMessage(commandMsg))
                 )
             )
         ) { result ->
@@ -193,7 +193,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestMissionAction(
-                    RotateAction.fromParameters(ConditionYawParams.from(commandMsg))
+                    RotateAction.fromParameters(ConditionYawMessage(commandMsg))
                 )
             )
         ) { result ->

@@ -9,11 +9,11 @@ import kotlinx.coroutines.launch
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.commands.UnitResult
-import org.WenuLink.mavlink.params.ConditionYawParams
-import org.WenuLink.mavlink.params.ImageStartCaptureParams
-import org.WenuLink.mavlink.params.NavDelayParams
-import org.WenuLink.mavlink.params.NavTakeoffParams
-import org.WenuLink.mavlink.params.NavWaypointParams
+import org.WenuLink.mavlink.messages.ConditionYawMessage
+import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.NavDelayMessage
+import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
+import org.WenuLink.mavlink.messages.NavWaypointMissionItem
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -149,15 +149,15 @@ class MissionHandler : CommandHandler<MissionHandler>() {
             MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_DELAY -> state.assembler.addActionToLast(
-                DelayAction.fromParameters(NavDelayParams.from(itemMsg))
+                DelayAction.fromParameters(NavDelayMessage(itemMsg))
             )
 
             MAV_CMD.MAV_CMD_CONDITION_YAW -> state.assembler.addActionToLast(
-                RotateAction.fromParameters(ConditionYawParams.from(itemMsg))
+                RotateAction.fromParameters(ConditionYawMessage(itemMsg))
             )
 
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> state.assembler.addActionToLast(
-                PhotoAction.fromParameters(ImageStartCaptureParams.from(itemMsg))
+                PhotoAction.fromParameters(ImageStartCaptureMissionItem(itemMsg))
             )
 
             MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE ->
@@ -179,14 +179,14 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     private fun assembleTakeoffNode(itemMsg: msg_mission_item_int) {
-        val params = NavTakeoffParams.from(itemMsg)
+        val params = NavTakeoffMissionItem(itemMsg)
         state.assembler.addTakeoff(
             Coordinates3D(params.latitude, params.longitude, params.altitude)
         )
     }
 
     private fun assembleWaypointNode(itemMsg: msg_mission_item_int) {
-        val params = NavWaypointParams.from(itemMsg)
+        val params = NavWaypointMissionItem(itemMsg)
         // Assumes Global only
         val coordinates = Coordinates3D(params.latitude, params.longitude, params.altitude)
 

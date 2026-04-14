@@ -19,7 +19,6 @@ import com.MAVLink.common.msg_mission_request_list
 import com.MAVLink.common.msg_statustext
 import com.MAVLink.enums.GPS_FIX_TYPE
 import com.MAVLink.enums.MAV_CMD
-import com.MAVLink.enums.MAV_FRAME
 import com.MAVLink.enums.MAV_MISSION_RESULT
 import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
@@ -34,7 +33,10 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
-import org.WenuLink.mavlink.params.MissionStartParams
+import org.WenuLink.mavlink.messages.MissionStartCommandLong
+import org.WenuLink.mavlink.messages.NavLandMissionItem
+import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
+import org.WenuLink.mavlink.messages.NavWaypointMissionItem
 
 /**
  * MAVLinkController class to deal with the handler.mission service and related MAVLink messages.
@@ -98,41 +100,28 @@ class NavigationController(
         return true
     }
 
-    fun createMissionItemMsg(
-        itemSeq: Int,
-        coordX: Int,
-        coordY: Int,
-        coordZ: Float,
-        command: Int? = null
-    ): msg_mission_item_int {
-        val msg = msg_mission_item_int()
-        msg.seq = itemSeq
-        msg.frame = MAV_FRAME.MAV_FRAME_GLOBAL_RELATIVE_ALT.toShort()
-        msg.command = command ?: MAV_CMD.MAV_CMD_NAV_WAYPOINT
-        msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        msg.x = coordX
-        msg.y = coordY
-        msg.z = coordZ
-        logger.d { "Creating MissionItem: $msg" }
-        return msg
-    }
-
     fun node2MissionItemMsg(nIdx: Int): msg_mission_item_int {
         val node = handler.mission.getWaypointNode(nIdx)
         val coordinates = node.coordinates3D
-        val command = when (node) {
-            is MissionNode.Takeoff -> MAV_CMD.MAV_CMD_NAV_TAKEOFF
-            is MissionNode.Waypoint -> MAV_CMD.MAV_CMD_NAV_WAYPOINT
-            is MissionNode.Land -> MAV_CMD.MAV_CMD_NAV_LAND
-        }
+        return when (node) {
+            is MissionNode.Takeoff -> NavTakeoffMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
 
-        return createMissionItemMsg(
-            nIdx,
-            coordinates.lat.toInt(),
-            coordinates.long.toInt(),
-            coordinates.alt,
-            command
-        )
+            is MissionNode.Waypoint -> NavWaypointMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
+
+            is MissionNode.Land -> NavLandMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
+        }
     }
 
     fun sendAckAnswer(type: Int) = client.sendMessage(
@@ -261,7 +250,7 @@ class NavigationController(
 
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
-        val params = MissionStartParams.from(commandLongMsg)
+        val params = MissionStartCommandLong(commandLongMsg)
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(

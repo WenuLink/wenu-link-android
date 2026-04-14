@@ -18,10 +18,10 @@ import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
-import org.WenuLink.mavlink.params.ConditionYawParams
-import org.WenuLink.mavlink.params.DoRepositionParams
-import org.WenuLink.mavlink.params.ImageStartCaptureParams
-import org.WenuLink.mavlink.params.NavDelayParams
+import org.WenuLink.mavlink.messages.ConditionYawMessage
+import org.WenuLink.mavlink.messages.DoRepositionCommandInt
+import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.NavDelayMessage
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
 
@@ -175,7 +175,7 @@ interface MissionActionCommand : MissionCommand {
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
     companion object {
-        fun fromParameters(params: NavDelayParams): DelayAction {
+        fun fromParameters(params: NavDelayMessage): DelayAction {
             val totalSeconds = if (params.delaySec != -1) {
                 params.delaySec
             } else {
@@ -240,7 +240,7 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
     ) {
     companion object {
         fun fromCommandInt(commandIntMsg: msg_command_int): RepositionAction {
-            val params = DoRepositionParams.from(commandIntMsg)
+            val params = DoRepositionCommandInt(commandIntMsg)
             return RepositionAction(
                 Coordinates3D(params.latitude, params.longitude, params.altitude),
                 if (params.speed == -1f) 1f else params.speed
@@ -275,7 +275,7 @@ data class RotateAction(
     }
 ) {
     companion object {
-        fun fromParameters(params: ConditionYawParams): RotateAction {
+        fun fromParameters(params: ConditionYawMessage): RotateAction {
             // convert to compatible intervals
             val angle = ((params.angleDeg + 180) % 360) - 180 // [0, 360] deg
 
@@ -308,7 +308,7 @@ data class PhotoAction(private val number: Int, private val intervalSeconds: Int
         }
     ) {
     companion object {
-        fun fromParameters(params: ImageStartCaptureParams): PhotoAction =
+        fun fromParameters(params: ImageStartCaptureMissionItem): PhotoAction =
             PhotoAction(params.totalImages, params.intervalSec.toInt())
     }
 }

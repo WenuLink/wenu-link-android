@@ -1,24 +1,22 @@
-package org.WenuLink.mavlink.params
+package org.WenuLink.mavlink.messages
 
 import com.MAVLink.common.msg_command_long
 import com.MAVLink.common.msg_mission_item_int
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_REQUEST_CAMERA_INFORMATION](https://mavlink.io/en/messages/common.html#MAV_CMD_REQUEST_CAMERA_INFORMATION)
  * @param capabilities  Request camera capabilities (MAV_BOOL_TRUE). Values not equal to 0 or 1 are
  *                      invalid.
  */
-data class RequestCameraInformationParams(val capabilities: Boolean?) {
-    companion object {
-        fun from(msg: msg_command_long) = RequestCameraInformationParams(
-            capabilities = ParamUtils.toBoolean(msg.param1)
-        )
-    }
+data class RequestCameraInformationCommandLong(val capabilities: Boolean?) {
+    constructor(msg: msg_command_long) : this(
+        capabilities = ParamUtils.toBoolean(msg.param1)
+    )
 }
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_SET_CAMERA_MODE](https://mavlink.io/en/messages/common.html#MAV_CMD_SET_CAMERA_MODE)
  * @param id    Target camera ID. 7 to 255: MAVLink camera component id. 1 to 6 for cameras attached
  *              to the autopilot, which don't have a distinct component id. 0: all cameras. This is
@@ -26,17 +24,15 @@ data class RequestCameraInformationParams(val capabilities: Boolean?) {
  *              specific cameras when the MAV_CMD is used in a mission.
  * @param mode  Camera mode ([com.MAVLink.enums.CAMERA_MODE])
  */
-data class SetCameraModeParams(val id: Int, val mode: Int) {
-    companion object {
-        fun from(msg: msg_command_long) = SetCameraModeParams(
-            id = msg.param1.toInt(),
-            mode = msg.param2.toInt()
-        )
-    }
+data class SetCameraModeCommandLong(val id: Int, val mode: Int) {
+    constructor(msg: msg_command_long) : this(
+        id = msg.param1.toInt(),
+        mode = msg.param2.toInt()
+    )
 }
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_IMAGE_START_CAPTURE](https://mavlink.io/en/messages/common.html#MAV_CMD_IMAGE_START_CAPTURE)
  * @param targetCameraId    Target camera ID. 7 to 255: MAVLink camera component id. 1 to 6 for
  *                          cameras attached to the autopilot, which don't have a distinct component
@@ -52,31 +48,22 @@ data class SetCameraModeParams(val id: Int, val mode: Int) {
  *                          ID for each capture command to prevent double captures when a command is
  *                          re-transmitted.
  */
-data class ImageStartCaptureParams(
+data class ImageStartCaptureMissionItem(
     val targetCameraId: Int,
     val intervalSec: Float,
     val totalImages: Int,
     val sequenceNumber: Int
 ) {
-    companion object {
-        fun from(msg: msg_command_long) = ImageStartCaptureParams(
-            targetCameraId = msg.param1.toInt(),
-            intervalSec = msg.param2,
-            totalImages = msg.param3.toInt(),
-            sequenceNumber = msg.param4.toInt()
-        )
-
-        fun from(msg: msg_mission_item_int) = ImageStartCaptureParams(
-            targetCameraId = msg.param1.toInt(),
-            intervalSec = msg.param2,
-            totalImages = msg.param3.toInt(),
-            sequenceNumber = msg.param4.toInt()
-        )
-    }
+    constructor(msg: msg_mission_item_int) : this(
+        targetCameraId = msg.param1.toInt(),
+        intervalSec = msg.param2,
+        totalImages = msg.param3.toInt(),
+        sequenceNumber = msg.param4.toInt()
+    )
 }
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_IMAGE_STOP_CAPTURE](https://mavlink.io/en/messages/common.html#MAV_CMD_IMAGE_STOP_CAPTURE).
  *
  * @param targetCameraId    Target camera ID. 7 to 255: MAVLink camera component id. 1 to 6 for
@@ -86,15 +73,13 @@ data class ImageStartCaptureParams(
  *                          used in a mission.
  */
 data class ImageStopCaptureParams(val targetCameraId: Int) {
-    companion object {
-        fun from(msg: msg_command_long) = ImageStopCaptureParams(
-            targetCameraId = msg.param1.toInt()
-        )
-    }
+    constructor(msg: msg_command_long) : this(
+        targetCameraId = msg.param1.toInt()
+    )
 }
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_VIDEO_START_CAPTURE](https://mavlink.io/en/messages/common.html#MAV_CMD_VIDEO_START_CAPTURE).
  *
  * @param streamId          Video Stream ID (0 for all streams)
@@ -111,17 +96,15 @@ data class VideoStartCaptureParams(
     val statusFreqHz: Float,
     val targetCameraId: Int
 ) {
-    companion object {
-        fun from(msg: msg_command_long) = VideoStartCaptureParams(
-            streamId = msg.param1.toInt(),
-            statusFreqHz = msg.param2,
-            targetCameraId = msg.param3.toInt()
-        )
-    }
+    constructor(msg: msg_command_long) : this(
+        streamId = msg.param1.toInt(),
+        statusFreqHz = msg.param2,
+        targetCameraId = msg.param3.toInt()
+    )
 }
 
 /**
- * Parameter bindings for
+ * Message bindings for
  * [MAV_CMD_VIDEO_STOP_CAPTURE](https://mavlink.io/en/messages/common.html#MAV_CMD_VIDEO_STOP_CAPTURE).
  *
  * @param streamId          Video Stream ID (0 for all streams)
@@ -132,10 +115,8 @@ data class VideoStartCaptureParams(
  *                          used in a mission.
  */
 data class VideoStopCaptureParams(val streamId: Int, val targetCameraId: Int) {
-    companion object {
-        fun from(msg: msg_command_long) = VideoStopCaptureParams(
-            streamId = msg.param1.toInt(),
-            targetCameraId = msg.param2.toInt()
-        )
-    }
+    constructor(msg: msg_command_long) : this(
+        streamId = msg.param1.toInt(),
+        targetCameraId = msg.param2.toInt()
+    )
 }
