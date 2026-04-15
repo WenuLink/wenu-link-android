@@ -4,7 +4,6 @@
 package org.WenuLink.sdk
 
 import dji.common.error.DJIError
-import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
 import dji.sdk.base.BaseComponent
 import io.getstream.log.taggedLogger
