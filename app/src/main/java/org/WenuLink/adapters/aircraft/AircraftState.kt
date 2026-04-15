@@ -120,6 +120,7 @@ object StandbyTransition : StateTransition {
 }
 
 object ArmTransition : StateTransition {
+    // TODO: update with modes from https://ardupilot.org/copter/docs/arming_the_motors.html
     override fun canTransition(from: AircraftState): UnitResult = when {
         !from.isStandBy() -> CommandResult.error("Not ready to arm")
         else -> CommandResult.ok
@@ -130,9 +131,16 @@ object ArmTransition : StateTransition {
 }
 
 object TakeoffTransition : StateTransition {
+    // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
+    fun hasDelayedArmMode(from: AircraftState): Boolean = listOf(
+        ArduCopterFlightMode.GUIDED,
+        ArduCopterFlightMode.AUTO
+    ).any { it == from.flightMode }
+
     override fun canTransition(from: AircraftState): UnitResult = when {
-        !from.isArmed() -> CommandResult.error("Not armed")
-        !from.isOnTheGround() -> CommandResult.error("Not on the ground")
+        !hasDelayedArmMode(from) && !from.isArmed() ->
+            CommandResult.error("${from.flightMode} requires to be armed first")
+
         else -> CommandResult.ok
     }
 

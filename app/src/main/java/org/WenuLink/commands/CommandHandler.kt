@@ -39,6 +39,7 @@ open class CommandHandler<T : IHandler<T>> : IHandler<T> {
                     commandJob = deferred
 
                     val result = deferred.await()
+                    logger.d { "Command ended: ${cmd::class.simpleName}" }
                     onResult(result)
                 } catch (_: CancellationException) {
                     logger.w { "Command cancelled: ${cmd::class.simpleName}" }

@@ -206,7 +206,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     fun dispatchControlAuthority(authority: ControlAuthorityType) {
         // Decide policy: reject or stop mission
-        if (!controlAuthority.isNewAuthority(authority)) return
+        if (!controlAuthority.isNewAuthority(authority) || controlAuthority.isRemote()) return
         // Always stop everything
         stopAllCommands()
         logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }

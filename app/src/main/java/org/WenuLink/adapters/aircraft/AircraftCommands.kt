@@ -1,9 +1,9 @@
 package org.WenuLink.adapters.aircraft
 
+import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
-import org.WenuLink.sdk.FCManager
 
 sealed interface AircraftCommand : ICommand<AircraftHandler> {
     override fun validate(ctx: AircraftHandler): UnitResult
@@ -20,7 +20,10 @@ data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(BootTransition)
-        return ctx.boot(timeout)
+        val bootResult = ctx.boot(timeout)
+        if (bootResult.hasError) return bootResult
+        ctx.dispatchTransition(StandbyTransition)
+        return CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
@@ -37,9 +40,7 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(ArmTransition)
-        // TODO: update according to each mode
-        // https://ardupilot.org/copter/docs/arming_the_motors.html
-        if (ctx.state.flightMode == ArduCopterFlightMode.STABILIZE) {
+        if (!TakeoffTransition.hasDelayedArmMode(ctx.state)) {
             // Manual takeoff
             ctx.armMotors()
             if (!ctx.waitArmTransition(true, timeout)) {
@@ -120,12 +121,12 @@ data class SetHomePositionCommand(val timeout: Long = 30_000L) : AircraftCommand
     override fun validate(ctx: AircraftHandler): UnitResult = CommandResult.ok
 
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
-        if (ctx.state.isHomeSet()) return CommandResult.ok
-        if (ctx.waitHomeSet(timeout)) {
+        val isHomeSet = AsyncUtils.waitTimeout(1000L, timeout) {
+            ctx.updateHomeCoordinatesFromAircraft()
+        }
+        if (!isHomeSet) {
             return CommandResult.error("Home position not acquired after $timeout ms")
         }
-
-        FCManager.getHomePosition()?.let { ctx.stateMachine.updateHomePosition(it) }
 
         return CommandResult.ok
     }

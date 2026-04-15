@@ -141,16 +141,17 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     // check for home location and set
-    private fun updateHomeCoordinatesFromAircraft(): Boolean {
-        if (FCManager.getHomePosition() != null) return true
+    fun updateHomeCoordinatesFromAircraft(): Boolean = FCManager.getHomePosition()
+        ?.let {
+            stateMachine.updateHomePosition(it)
+            true
+        } ?: run {
         // Ask for home position
         logger.d { "Requesting home coordinates update with current aircraft's location." }
         FCManager.setHomePosition { error ->
-            if (error != null) {
-                logger.w { "Error request: $error" }
-            }
+            error?.let { logger.w { "Error request: $it" } }
         }
-        return FCManager.getHomePosition() != null
+        false
     }
 
     suspend fun waitHomeSet(timeout: Long = 10_000L): Boolean = AsyncUtils.waitTimeout(
@@ -184,7 +185,8 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.d { "\tTelemetry: OK" }
 
         sensorsHealthy =
-            AsyncUtils.waitTimeout(500L, timeout) { sensorChecks() } && state.isHomeSet()
+            AsyncUtils.waitTimeout(500L, timeout) { sensorChecks() } &&
+            updateHomeCoordinatesFromAircraft()
         logger.d { "\tSensors healthy?: $sensorsHealthy" }
 
         logger.d { "Aircraft boot: OK" }

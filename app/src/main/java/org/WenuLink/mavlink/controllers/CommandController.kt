@@ -111,9 +111,9 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun setMode(commandMsg: msg_command_long) {
         val params = DoSetModeCommandLong(commandMsg)
-
-        logger.d { "FlightMode requested: ${params.customMode}" }
         val customMode = ArduCopterFlightMode.from(params.customMode)
+
+        logger.d { "FlightMode requested: $customMode" }
 
         if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
@@ -144,7 +144,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
             DisarmCommand()
         }
         handler.dispatchCommand(WenuLinkCommand.Aircraft(command)) { result ->
-            logger.d { "processTakeoff: $result" }
+            if (result.hasError) logger.e { "Unable to $command: ${result.errorReason}" }
         }
 
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
@@ -153,7 +153,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
     fun processTakeoff(commandMsg: msg_command_long) {
         logger.d { "processTakeoff: $commandMsg" }
         handler.dispatchCommand(WenuLinkCommand.Request(RequestTakeoff())) { result ->
-            logger.d { "processTakeoff: $result" }
+            if (result.hasError) logger.e { "Takeoff error: ${result.errorReason}" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
     }

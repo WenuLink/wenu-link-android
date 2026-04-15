@@ -57,27 +57,27 @@ object MissionActionManager {
         return key
     }
 
-    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit) =
+    fun onFinish(action: KClass<out TimelineElement>, callback: () -> Unit): ActionCallbackKey =
         registerCallback(action, TimelineEvent.FINISHED, callback)
 
     fun startListener(onError: (String) -> Unit = {}) {
-        stopListener()
-
         listener = MissionControl.Listener { element, event, error ->
             if (error != null) {
                 onError("Timeline error: ${error.description}")
                 return@Listener
             }
 
-            val key = ActionCallbackKey(element!!::class, event)
-            callbacks[key]?.forEach { it.invoke() }
+            element?.let { action ->
+                val key = ActionCallbackKey(action::class, event)
+                callbacks[key]?.forEach { it.invoke() }
+            }
 
             if (event == TimelineEvent.STOPPED) {
                 logger.i { "Timeline stopped" }
             }
         }
 
-        missionControl.addListener(listener!!)
+        missionControl.addListener(listener)
     }
 
     fun stopListener() {
