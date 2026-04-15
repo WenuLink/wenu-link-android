@@ -91,11 +91,12 @@ class CameraController(
         sendRequestAck(MAV_RESULT.MAV_RESULT_ACCEPTED)
         handler.availableCameras.forEach {
             // Append boot time before send
-            val msg = msgCameraInformation(it).apply {
-                time_boot_ms = handler.systemBootTime
-            }
-            logger.d { "CameraReport: $msg" }
-            client.sendMessage(msg)
+            client.sendMessage(
+                msgCameraInformation(it).apply {
+                    logger.d { "CameraReport: $this" }
+                    time_boot_ms = handler.systemBootTime
+                }
+            )
         }
     }
 

@@ -9,6 +9,7 @@ import dji.sdk.flightcontroller.Simulator
 import io.getstream.log.taggedLogger
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.WenuLink.adapters.aircraft.GPSMapper
 import org.WenuLink.adapters.aircraft.TelemetryData
 
 object SimManager {
@@ -64,7 +65,7 @@ object SimManager {
             isFlying = state.isFlying,
             motorsOn = state.areMotorsOn(),
             satelliteCount = satelliteCount,
-            gpsLevel = SDKUtils.gpsSignalLevelFlags(GPSSignalLevel.LEVEL_7)
+            gpsFixType = GPSMapper.toMavlinkFixType(GPSSignalLevel.LEVEL_7)
         )
         // complete data from previous one
         if (previousData == null) return data

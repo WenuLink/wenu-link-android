@@ -31,6 +31,16 @@ class CommandController(override var client: MAVLinkClient, override val handler
     IController {
     private val logger by taggedLogger(CommandController::class.java.simpleName)
 
+    private val autopilotCapabilities = listOf(
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
+    ).fold(0L) { acc, value -> acc or value.toLong() }
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
         when (msg.msgid) {
             msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotAck()
@@ -78,29 +88,20 @@ class CommandController(override var client: MAVLinkClient, override val handler
         MAV_RESULT.MAV_RESULT_ACCEPTED
     )
 
-    fun sendAutopilotVersion() {
-        val msg = msg_autopilot_version()
-        msg.capabilities = listOf(
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION,
-            MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
-        ).fold(0L) { acc, value -> acc or value.toLong() }
-
-        msg.flight_sw_version = MessageUtils.packVersion(
-            4,
-            18,
-            23,
-            FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
-        ) // Match SDK version
-        // TODO: Identify SDK and Aircraft too
-        msg.os_sw_version = 0 // Possibly Android version
-        msg.middleware_sw_version = 0 // Possibly WenuLink version
-        client.sendMessage(msg)
-    }
+    fun sendAutopilotVersion() = client.sendMessage(
+        msg_autopilot_version().apply {
+            capabilities = autopilotCapabilities
+            flight_sw_version = MessageUtils.packVersion(
+                4,
+                18,
+                23,
+                FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
+            ) // Match SDK version
+            // TODO: Identify SDK and Aircraft too
+            os_sw_version = 0 // Possibly Android version
+            middleware_sw_version = 0 // Possibly WenuLink version
+        }
+    )
 
     fun setMode(commandMsg: msg_command_long) {
         val requestedMode = commandMsg.param2.toLong()

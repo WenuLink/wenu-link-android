@@ -19,7 +19,6 @@ import dji.sdk.remotecontroller.RemoteController
 import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 

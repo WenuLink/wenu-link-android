@@ -4,7 +4,6 @@
 package org.WenuLink.sdk
 
 import dji.common.error.DJIError
-import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
 import dji.sdk.base.BaseComponent
 import io.getstream.log.taggedLogger
@@ -13,9 +12,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 
 object SDKUtils {
     private val logger by taggedLogger(SDKUtils::class.java.simpleName)
-
-    fun gpsSignalLevelFlags(inputLevel: GPSSignalLevel): List<Boolean> =
-        GPSSignalLevel.entries.map { it == inputLevel }
 
     fun createCompletionCallback(
         onResult: (String?) -> Unit

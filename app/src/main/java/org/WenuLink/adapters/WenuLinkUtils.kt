@@ -59,16 +59,14 @@ object MessageUtils {
         messageID: Int,
         result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
         progress: Int = -1
-    ): MAVLinkMessage {
-        val msg = msg_command_ack()
-        msg.command = messageID
+    ): MAVLinkMessage = msg_command_ack().apply {
+        command = messageID
         if (progress > -1) {
-            msg.result = MAV_RESULT.MAV_RESULT_IN_PROGRESS.toShort()
-            msg.progress = progress.toShort()
+            this.result = MAV_RESULT.MAV_RESULT_IN_PROGRESS.toShort()
+            this.progress = progress.toShort()
         } else {
-            msg.result = result.toShort()
+            this.result = result.toShort()
         }
-        return msg
     }
 
     fun msgRequestAck(
