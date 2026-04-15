@@ -353,7 +353,7 @@ class NavigationController(
         val telemetryData = handler.aircraft.telemetry.getData() ?: return null
 
         if (handler.aircraft.telemetry.isSimulationActive) {
-            fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_NO_GPS.toShort()
+            fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
             return@apply
         }
 
