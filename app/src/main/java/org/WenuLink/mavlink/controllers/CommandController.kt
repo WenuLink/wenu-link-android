@@ -8,7 +8,6 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestTakeoff
 import org.WenuLink.adapters.WenuLinkCommand
@@ -22,6 +21,7 @@ import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.mavlink.messages.ComponentArmDisarmCommandLong
 import org.WenuLink.mavlink.messages.ConditionYawMessage
 import org.WenuLink.mavlink.messages.DoSetModeCommandLong
+import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.NavDelayMessage
 
 /**

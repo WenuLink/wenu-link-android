@@ -6,7 +6,6 @@ import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_FRAME
 import com.MAVLink.enums.MAV_MISSION_TYPE
-import org.WenuLink.adapters.MessageUtils
 
 /**
  * Message bindings for

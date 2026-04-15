@@ -31,11 +31,11 @@ import com.MAVLink.enums.MAV_DATA_STREAM
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.minimal.msg_heartbeat
 import io.getstream.log.taggedLogger
-import kotlin.math.roundToInt
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.MessageRate
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.MessageUtils
+import org.WenuLink.mavlink.messages.RequestDataStreamMessage
 import org.WenuLink.mavlink.messages.SetMessageIntervalCommandLong
 
 class TelemetryController(
@@ -189,26 +189,11 @@ class TelemetryController(
     fun processDataStreamRequest(msg: MAVLinkMessage) {
         // https://ardupilot.org/dev/docs/mavlink-requesting-data.html
         // https://mavlink.io/en/messages/common.html#MAV_DATA_STREAM
-        val request = msg as msg_request_data_stream
-
-        val dataList = availableDataList[request.req_stream_id.toInt()]
-        if (dataList == null || dataList.isEmpty()) return
-
-        var timeInterval = -1
-        if (request.start_stop.toInt() == 1) {
-            // requested interval in Hz
-            timeInterval = request.req_message_rate
-            // Standard 1Hz
-            timeInterval = if (timeInterval == 0) {
-                1_000_000
-            } // Hz to micro seconds if must start
-            else {
-                ((1.0 / timeInterval) * 1_000_000).roundToInt()
-            }
-        }
+        val params = RequestDataStreamMessage(msg as msg_request_data_stream)
+        val dataList = availableDataList[params.streamId] ?: return
 
         dataList.forEach {
-            setMessageRate(it, timeInterval.toLong())
+            setMessageRate(it, params.toIntervalUs())
         }
     }
 

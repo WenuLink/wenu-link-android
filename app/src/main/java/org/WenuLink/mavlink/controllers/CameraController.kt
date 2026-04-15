@@ -15,7 +15,6 @@ import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
@@ -31,6 +30,7 @@ import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
 import org.WenuLink.mavlink.messages.ImageStopCaptureCommandLong
+import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.RequestCameraInformationCommandLong
 import org.WenuLink.mavlink.messages.SetCameraModeCommandLong
 import org.WenuLink.mavlink.messages.VideoStartCaptureCommandLong

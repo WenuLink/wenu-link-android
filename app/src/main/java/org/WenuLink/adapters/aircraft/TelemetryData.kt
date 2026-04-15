@@ -5,7 +5,7 @@ import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.remotecontroller.HardwareState.FlightModeSwitch
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import org.WenuLink.adapters.MessageUtils
+import org.WenuLink.mavlink.messages.MessageUtils
 
 /**
  * Data class to hold telemetry info.

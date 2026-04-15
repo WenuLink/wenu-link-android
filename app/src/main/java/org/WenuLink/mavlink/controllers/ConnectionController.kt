@@ -22,10 +22,10 @@ import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.BatteryMapper
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.MessageUtils
 
 /**
  * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink
