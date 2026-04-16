@@ -46,8 +46,8 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
         // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
             if (run) {
-                thisApp.wenuLinkService?.startMAVLinkService { error ->
-                    logger.d { "startMAVLinkService error: $error" }
+                thisApp.wenuLinkService?.startMAVLinkService { result ->
+                    if (result.hasError) logger.d { "startMAVLinkService error: $result" }
                 }
             } else {
                 thisApp.wenuLinkService?.stopMAVLinkService()?.join()

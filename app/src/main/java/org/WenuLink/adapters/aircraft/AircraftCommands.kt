@@ -21,8 +21,6 @@ data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(BootTransition)
         return ctx.boot(timeout)
-            ?.let { CommandResult.error(it) }
-            ?: CommandResult.ok
     }
 
     override suspend fun onStop(ctx: AircraftHandler) {
