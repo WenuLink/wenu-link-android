@@ -90,6 +90,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
+    fun checkTransition(transition: StateTransition): Boolean =
+        stateMachine.isStateTransition(transition)
+
     fun syncState(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
@@ -100,14 +103,11 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
             sensorsTimestamp = currentTimestamp
         }
 
-        // Check for arm and flying conditions always
-        val fcState = state.resolveFrom(
-            FCManager.areMotorsArmed(),
-            FCManager.isFlying()
-        )
+        // Check for flying conditions only
+        val fcState = state.resolveFrom(FCManager.isFlying())
 
         // Force new logic state update only when different
-        if (!stateMachine.hasStateChanged(fcState)) return
+        if (!stateMachine.hasLandedChanged(fcState)) return
 
         logger.w { "State reconciliation: $state -> $fcState" }
 

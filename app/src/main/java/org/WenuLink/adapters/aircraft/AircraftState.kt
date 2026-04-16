@@ -48,34 +48,19 @@ data class AircraftState(
 
     fun isPowerOff() = mavlink == MAV_STATE.MAV_STATE_POWEROFF
 
-    fun resolveFrom(isArmed: Boolean, isFlying: Boolean): AircraftState {
-        val criticalStates = intArrayOf(
-            MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
-            MAV_STATE.MAV_STATE_CRITICAL,
-            MAV_STATE.MAV_STATE_EMERGENCY
-        )
-        val mavState = when {
-            this.mavlink in criticalStates -> this.mavlink
-            isArmed -> MAV_STATE.MAV_STATE_ACTIVE
-            else -> MAV_STATE.MAV_STATE_STANDBY
-        }
+    fun resolveFrom(isFlying: Boolean): AircraftState {
+        // ARM/DISARM state will be updated only from StateTransition.
 
+        // Sync of landed state = landing is triggered from the outside, and transitioned here
         val landedState = when {
-            !isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-
-            isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
-
-            isFlying -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
-
-            else -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            !isArmed() && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            isArmed() && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
+            isFlying && !isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+            !isFlying && isLanding() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            else -> this.landed
         }
 
-        return this.copy(
-            mavlink = mavState,
-            landed = landedState
-        )
+        return this.copy(landed = landedState)
     }
 }
 
@@ -219,20 +204,25 @@ data class FlightModeTransition(private val flightMode: ArduCopterFlightMode) : 
 class AircraftStateMachine {
     var state = AircraftState()
         private set
+    var transition: StateTransition = InitialTransition
+        private set
 
     fun canDispatch(event: StateTransition): UnitResult = event.canTransition(state)
 
     fun dispatch(event: StateTransition): AircraftState {
         state = event.reduce(state)
+        transition = event
         return syncArmState()
     }
 
     fun forceSet(target: AircraftState) {
         state = target
+        syncArmState()
     }
 
-    fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||
-        state.landed != target.landed
+    fun hasLandedChanged(target: AircraftState) = state.landed != target.landed
+
+    fun isStateTransition(target: StateTransition) = transition == target
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
         state = state.copy(homeCoordinates = homeCoordinates)

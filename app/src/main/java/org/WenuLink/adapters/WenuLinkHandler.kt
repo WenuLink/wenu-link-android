@@ -112,12 +112,12 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                         // --- Sync real aircraft state ---
                         launch {
                             aircraft.syncState()
-                            modeHooks()
+                            if (aircraft.state.isFlying()) flyingModeHooks()
                         }
 
                         launch {
                             mission.syncState()
-                            missionHooks()
+                            if (mission.state.isActive()) activeMissionHooks()
                         }
 
                         launch {
@@ -296,11 +296,11 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     fun stopAndDispatch(command: RequestCommand, onResult: (UnitResult) -> Unit = {}) {
         if (currentCommand == command) return
-        missionStop()
+        stopAllCommands()
         dispatchCommand(command, onResult)
     }
 
-    private fun modeHooks() = when (aircraft.state.flightMode) {
+    private fun flyingModeHooks() = when (aircraft.state.flightMode) {
         ArduCopterFlightMode.BRAKE -> missionPause()
         ArduCopterFlightMode.AUTO -> missionResume()
         ArduCopterFlightMode.LAND -> stopAndDispatch(RequestLand(true))
@@ -308,7 +308,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         else -> {}
     }
 
-    private fun missionHooks() = when {
+    private fun activeMissionHooks() = when {
         mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
         mission.state.unvisitedSequence -> mission.processNode()
         else -> {}

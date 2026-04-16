@@ -41,12 +41,11 @@ open class RequestTransition(open val transition: StateTransition) : RequestComm
         ctx.aircraft.canDispatchTransition(transition)
 
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
-        val prevState = ctx.aircraft.state.copy()
         ctx.aircraft.dispatchTransition(transition)
-        return if (prevState != ctx.aircraft.state) {
+        return if (ctx.aircraft.checkTransition(transition)) {
             CommandResult.ok
         } else {
-            CommandResult.error("State not changed")
+            CommandResult.error("Unsuccessful state transition")
         }
     }
 
