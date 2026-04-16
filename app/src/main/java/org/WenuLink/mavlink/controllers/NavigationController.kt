@@ -19,14 +19,12 @@ import com.MAVLink.common.msg_mission_request_list
 import com.MAVLink.common.msg_statustext
 import com.MAVLink.enums.GPS_FIX_TYPE
 import com.MAVLink.enums.MAV_CMD
-import com.MAVLink.enums.MAV_FRAME
 import com.MAVLink.enums.MAV_MISSION_RESULT
 import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToInt
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
 import org.WenuLink.adapters.WenuLinkCommand
@@ -34,6 +32,11 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.MessageUtils
+import org.WenuLink.mavlink.messages.MissionStartCommandLong
+import org.WenuLink.mavlink.messages.NavLandMissionItem
+import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
+import org.WenuLink.mavlink.messages.NavWaypointMissionItem
 
 /**
  * MAVLinkController class to deal with the handler.mission service and related MAVLink messages.
@@ -56,24 +59,36 @@ class NavigationController(
     var wasRequested = false
         private set
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST to { sendMissionCount() },
+        msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT to ::createNewMission,
+        msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT to ::processMissionItem,
+        msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT to ::sendMissionItem,
+        msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL to { sendMissionClear() },
+        msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK to ::processAck
+    )
+
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_MISSION_START to ::missionStart
+    )
+
+    private val commandIntRegistry: Map<Int, (msg_command_int) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_DO_REPOSITION to ::processDoReposition
+        // 192
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_mission_request_list.MAVLINK_MSG_ID_MISSION_REQUEST_LIST -> sendMissionCount()
-            msg_mission_count.MAVLINK_MSG_ID_MISSION_COUNT -> createNewMission(msg)
-            msg_mission_item_int.MAVLINK_MSG_ID_MISSION_ITEM_INT -> processMissionItem(msg)
-            msg_mission_request_int.MAVLINK_MSG_ID_MISSION_REQUEST_INT -> sendMissionItem(msg)
-            msg_mission_clear_all.MAVLINK_MSG_ID_MISSION_CLEAR_ALL -> sendMissionClear()
-            msg_mission_ack.MAVLINK_MSG_ID_MISSION_ACK -> processAck(msg)
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_MISSION_START -> missionStart(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
+        return true
+    }
+
+    override fun processCommandInt(commandIntMsg: msg_command_int): Boolean {
+        commandIntRegistry[commandIntMsg.command]?.invoke(commandIntMsg) ?: return false
         return true
     }
 
@@ -87,51 +102,28 @@ class NavigationController(
         else -> null
     }
 
-    override fun processCommandInt(commandIntMsg: msg_command_int): Boolean {
-        when (commandIntMsg.command) {
-            MAV_CMD.MAV_CMD_DO_REPOSITION -> processDoReposition(commandIntMsg)
-
-            // 192
-            else -> return false
-        }
-        return true
-    }
-
-    fun createMissionItemMsg(
-        itemSeq: Int,
-        coordX: Int,
-        coordY: Int,
-        coordZ: Float,
-        command: Int? = null
-    ): msg_mission_item_int {
-        val msg = msg_mission_item_int()
-        msg.seq = itemSeq
-        msg.frame = MAV_FRAME.MAV_FRAME_GLOBAL_RELATIVE_ALT.toShort()
-        msg.command = command ?: MAV_CMD.MAV_CMD_NAV_WAYPOINT
-        msg.mission_type = MAV_MISSION_TYPE.MAV_MISSION_TYPE_MISSION.toShort()
-        msg.x = coordX
-        msg.y = coordY
-        msg.z = coordZ
-        logger.d { "Creating MissionItem: $msg" }
-        return msg
-    }
-
     fun node2MissionItemMsg(nIdx: Int): msg_mission_item_int {
         val node = handler.mission.getWaypointNode(nIdx)
         val coordinates = node.coordinates3D
-        val command = when (node) {
-            is MissionNode.Takeoff -> MAV_CMD.MAV_CMD_NAV_TAKEOFF
-            is MissionNode.Waypoint -> MAV_CMD.MAV_CMD_NAV_WAYPOINT
-            is MissionNode.Land -> MAV_CMD.MAV_CMD_NAV_LAND
-        }
+        return when (node) {
+            is MissionNode.Takeoff -> NavTakeoffMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
 
-        return createMissionItemMsg(
-            nIdx,
-            coordinates.lat.toInt(),
-            coordinates.long.toInt(),
-            coordinates.alt,
-            command
-        )
+            is MissionNode.Waypoint -> NavWaypointMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
+
+            is MissionNode.Land -> NavLandMissionItem(
+                latitude = coordinates.lat,
+                longitude = coordinates.long,
+                altitude = coordinates.alt
+            ).toMavLink(nIdx)
+        }
     }
 
     fun sendAckAnswer(type: Int) = client.sendMessage(
@@ -260,11 +252,12 @@ class NavigationController(
 
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
+        val params = MissionStartCommandLong(commandLongMsg)
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(
-                    commandLongMsg.param1.toInt(),
-                    commandLongMsg.param2.toInt()
+                    params.firstItem,
+                    params.lastItem
                 )
             )
         )

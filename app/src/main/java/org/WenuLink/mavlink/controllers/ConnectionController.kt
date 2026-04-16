@@ -22,10 +22,10 @@ import com.MAVLink.enums.MAV_VTOL_STATE
 import com.MAVLink.minimal.msg_heartbeat
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.BatteryMapper
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.MessageUtils
 
 /**
  * MAVLinkController class to deal with the heartbeat/connection service and related MAVLink
@@ -46,7 +46,7 @@ class ConnectionController(
         }
 
     // TODO: update with sensors from AircraftHandler
-    val sensorsPresent = MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_GYRO or
+    private val sensorsPresent = MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_GYRO or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_ACCEL or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_MAG or
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE or
@@ -65,13 +65,13 @@ class ConnectionController(
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROPULSION
 
     // TODO: Update accordingly?
-    val sensorsEnabled = sensorsPresent and
+    private val sensorsEnabled = sensorsPresent and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv() and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_GEOFENCE.inv() and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_LOGGING.inv()
 
-    val sensorsHealth = (
+    private val sensorsHealth = (
         sensorsPresent or
             MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_GPS or
             MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_PROXIMITY
@@ -79,13 +79,14 @@ class ConnectionController(
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL.inv() and
         MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL.inv()
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT to { processHeartbeatGCS() },
+        msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME to ::processSystemTime,
+        msg_timesync.MAVLINK_MSG_ID_TIMESYNC to ::processTimeSync
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_heartbeat.MAVLINK_MSG_ID_HEARTBEAT -> processHeartbeatGCS()
-            msg_system_time.MAVLINK_MSG_ID_SYSTEM_TIME -> processSystemTime(msg)
-            msg_timesync.MAVLINK_MSG_ID_TIMESYNC -> processTimeSync(msg)
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 

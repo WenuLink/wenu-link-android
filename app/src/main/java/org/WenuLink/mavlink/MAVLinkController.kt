@@ -7,7 +7,6 @@ import com.MAVLink.common.msg_home_position
 import com.MAVLink.enums.MAV_CMD
 import io.getstream.log.taggedLogger
 import org.WenuLink.adapters.AsyncUtils
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.mavlink.controllers.CameraController
 import org.WenuLink.mavlink.controllers.CommandController
@@ -16,6 +15,7 @@ import org.WenuLink.mavlink.controllers.IController
 import org.WenuLink.mavlink.controllers.NavigationController
 import org.WenuLink.mavlink.controllers.ParameterController
 import org.WenuLink.mavlink.controllers.TelemetryController
+import org.WenuLink.mavlink.messages.MessageUtils
 
 /**
  * Management class for different MAVLink's microservices message processing.

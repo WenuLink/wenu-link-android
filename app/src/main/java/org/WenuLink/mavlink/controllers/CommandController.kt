@@ -8,7 +8,6 @@ import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
 import com.MAVLink.enums.MAV_RESULT
 import io.getstream.log.taggedLogger
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestTakeoff
 import org.WenuLink.adapters.WenuLinkCommand
@@ -19,6 +18,11 @@ import org.WenuLink.adapters.aircraft.DisarmCommand
 import org.WenuLink.adapters.mission.DelayAction
 import org.WenuLink.adapters.mission.RotateAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.ComponentArmDisarmCommandLong
+import org.WenuLink.mavlink.messages.ConditionYawMessage
+import org.WenuLink.mavlink.messages.DoSetModeCommandLong
+import org.WenuLink.mavlink.messages.MessageUtils
+import org.WenuLink.mavlink.messages.NavDelayMessage
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
@@ -41,27 +45,33 @@ class CommandController(override var client: MAVLinkClient, override val handler
         MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
     ).fold(0L) { acc, value -> acc or value.toLong() }
 
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to { sendAutopilotAck() }
+    )
+
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_DO_SET_MODE to ::setMode,
+        MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM to ::processArmDisarm,
+        MAV_CMD.MAV_CMD_NAV_TAKEOFF to ::processTakeoff,
+        MAV_CMD.MAV_CMD_NAV_LAND to ::processLanding,
+        MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH to ::processReturn,
+        MAV_CMD.MAV_CMD_NAV_DELAY to ::processDelay,
+        MAV_CMD.MAV_CMD_CONDITION_YAW to ::processYaw
+    )
+
+    private val requestLongRegistry: Map<Int, () -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to ::sendAutopilotVersion
+    )
+
     override fun processMessage(msg: MAVLinkMessage): Boolean {
-        when (msg.msgid) {
-            msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotAck()
-            else -> return false
-        }
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
         return true
     }
 
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
         if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
 
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_DO_SET_MODE -> setMode(commandLongMsg)
-            MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM -> processArmDisarm(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_TAKEOFF -> processTakeoff(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_LAND -> processLanding(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH -> processReturn(commandLongMsg)
-            MAV_CMD.MAV_CMD_NAV_DELAY -> processDelay(commandLongMsg)
-            MAV_CMD.MAV_CMD_CONDITION_YAW -> processYaw(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
         return true
     }
 
@@ -69,11 +79,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
     override fun processRequestLong(commandLongMsg: msg_command_long): Boolean {
         if (commandLongMsg.command != MAV_CMD.MAV_CMD_REQUEST_MESSAGE) return false
 
-        val requestID = commandLongMsg.param1.toInt()
-        when (requestID) {
-            msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION -> sendAutopilotVersion()
-            else -> return false
-        }
+        requestLongRegistry[commandLongMsg.param1.toInt()]?.invoke() ?: return false
         return true
     }
 
@@ -104,9 +110,10 @@ class CommandController(override var client: MAVLinkClient, override val handler
     )
 
     fun setMode(commandMsg: msg_command_long) {
-        val requestedMode = commandMsg.param2.toLong()
-        logger.d { "FlightMode requested: $requestedMode" }
-        val customMode = ArduCopterFlightMode.from(requestedMode)
+        val params = DoSetModeCommandLong(commandMsg)
+
+        logger.d { "FlightMode requested: ${params.customMode}" }
+        val customMode = ArduCopterFlightMode.from(params.customMode)
 
         if (customMode == null) {
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
@@ -121,21 +128,21 @@ class CommandController(override var client: MAVLinkClient, override val handler
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {
-        val action = when (commandMsg.param1) {
-            1f -> true
-            0f -> false
-            else -> null
-        }
+        val params = ComponentArmDisarmCommandLong(commandMsg)
 
-        if (action == null) {
-            logger.d { "Invalid arm/disarm request: ${commandMsg.param1}" }
+        if (params.arm == null) {
+            logger.d { "Invalid arm/disarm request" }
             sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
             return
         }
 
-        logger.d { "Requesting to ${if (action) "arm" else "disarm"} motors" }
-
-        val command = if (action) ArmCommand() else DisarmCommand()
+        val command = if (params.arm) {
+            logger.d { "Requesting to arm motors" }
+            ArmCommand()
+        } else {
+            logger.d { "Requesting to disarm motors" }
+            DisarmCommand()
+        }
         handler.dispatchCommand(WenuLinkCommand.Aircraft(command)) { result ->
             logger.d { "processTakeoff: $result" }
         }
@@ -173,7 +180,9 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processDelay: $commandMsg" }
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestMissionAction(DelayAction.fromCommandLong(commandMsg))
+                RequestMissionAction(
+                    DelayAction.fromParameters(NavDelayMessage(commandMsg))
+                )
             )
         ) { result ->
             logger.d { "processDelay: $result" }
@@ -185,7 +194,9 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processYaw: $commandMsg" }
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestMissionAction(RotateAction.fromCommandLong(commandMsg))
+                RequestMissionAction(
+                    RotateAction.fromParameters(ConditionYawMessage(commandMsg))
+                )
             )
         ) { result ->
             logger.d { "processYaw: $result" }

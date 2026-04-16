@@ -15,7 +15,6 @@ import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
 import kotlin.math.roundToLong
-import org.WenuLink.adapters.MessageUtils
 import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
@@ -30,6 +29,12 @@ import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.ImageStopCaptureCommandLong
+import org.WenuLink.mavlink.messages.MessageUtils
+import org.WenuLink.mavlink.messages.RequestCameraInformationCommandLong
+import org.WenuLink.mavlink.messages.SetCameraModeCommandLong
+import org.WenuLink.mavlink.messages.VideoStartCaptureCommandLong
+import org.WenuLink.mavlink.messages.VideoStopCaptureCommandLong
 
 /**
  * MAVLinkController class to deal with the camera protocol v2's messages.
@@ -44,30 +49,31 @@ class CameraController(
 ) : IController {
     private val logger by taggedLogger(CameraController::class.java.simpleName)
 
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION to ::handleCameraInformation,
+        MAV_CMD.MAV_CMD_SET_CAMERA_MODE to ::handleSetCameraMode,
+        MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE to ::requestStartCapture,
+        MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE to ::requestStopCapture,
+        MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE to ::requestStartRecording,
+        MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE to ::requestStopRecording
+    )
+
+    private val requestLongRegistry: Map<Int, () -> Unit> = mapOf(
+        msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION to ::reportCameras,
+        msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS to ::reportSettings,
+        msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION to ::sendStorageStatus,
+        msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS to ::sendCaptureStatus
+    )
+
     // TODO: Unhandled COMMAND_LONG ID: 2504 MAV_CMD_REQUEST_VIDEO_STREAM_INFORMATION
     override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
-        when (commandLongMsg.command) {
-            MAV_CMD.MAV_CMD_REQUEST_CAMERA_INFORMATION -> handleCameraInformation(commandLongMsg)
-            MAV_CMD.MAV_CMD_SET_CAMERA_MODE -> handleSetCameraMode(commandLongMsg)
-            MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> requestStartCapture(commandLongMsg)
-            MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE -> requestStopCapture(commandLongMsg)
-            MAV_CMD.MAV_CMD_VIDEO_START_CAPTURE -> requestStartRecording(commandLongMsg)
-            MAV_CMD.MAV_CMD_VIDEO_STOP_CAPTURE -> requestStopRecording(commandLongMsg)
-            else -> return false
-        }
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
         return true
     }
 
     // TODO: Unhandled REQUEST_LONG ID: 269 VIDEO_STREAM_INFORMATION
     override fun processRequestLong(commandLongMsg: msg_command_long): Boolean {
-        val requestID = commandLongMsg.param1.toInt()
-        when (requestID) {
-            msg_camera_information.MAVLINK_MSG_ID_CAMERA_INFORMATION -> reportCameras()
-            msg_camera_settings.MAVLINK_MSG_ID_CAMERA_SETTINGS -> reportSettings()
-            msg_storage_information.MAVLINK_MSG_ID_STORAGE_INFORMATION -> sendStorageStatus()
-            msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS -> sendCaptureStatus()
-            else -> return false
-        }
+        requestLongRegistry[commandLongMsg.param1.toInt()]?.invoke() ?: return false
         return true
     }
 
@@ -101,9 +107,8 @@ class CameraController(
     }
 
     private fun handleCameraInformation(commandLongMsg: msg_command_long) {
-        if (commandLongMsg.param1 != 1f) return
-
-        reportCameras()
+        val params = RequestCameraInformationCommandLong(commandLongMsg)
+        if (params.capabilities == true) reportCameras()
     }
 
     private fun reportSettings() {
@@ -126,15 +131,12 @@ class CameraController(
     }
 
     private fun handleSetCameraMode(commandLongMsg: msg_command_long) {
-        sendCommandAck(
-            commandLongMsg.command,
-            MAV_RESULT.MAV_RESULT_IN_PROGRESS,
-            0
-        )
-        val index = commandLongMsg.param1.toInt()
-        val mode = commandLongMsg.param2.toInt()
+        sendCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_IN_PROGRESS, 0)
+        val params = SetCameraModeCommandLong(commandLongMsg)
 
-        handler.dispatchCommand(WenuLinkCommand.Camera(SetModeCommand(mode, index))) { result ->
+        handler.dispatchCommand(
+            WenuLinkCommand.Camera(SetModeCommand(params.mode, params.id))
+        ) { result ->
             sendCommandAck(
                 commandLongMsg.command,
                 if (result.isOk) {
@@ -214,7 +216,8 @@ class CameraController(
     }
 
     private fun requestStopCapture(commandLongMsg: msg_command_long) {
-        val cameraInfo = getCamera(commandLongMsg.param1.toInt()) ?: run {
+        val params = ImageStopCaptureCommandLong(commandLongMsg)
+        val cameraInfo = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -243,9 +246,8 @@ class CameraController(
     }
 
     private fun requestStartRecording(commandLongMsg: msg_command_long) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param3.toInt())
-
-        if (cameraInfo == null) {
+        val params = VideoStartCaptureCommandLong(commandLongMsg)
+        val cameraInfo: CameraMetadata = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -261,9 +263,6 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
-        val streamID = commandLongMsg.param1.toInt()
-        val statusFreq = commandLongMsg.param2 // Hz
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StartRecordCommand(cameraInfo.id))
@@ -274,14 +273,15 @@ class CameraController(
                 // setting messages frequency
                 onSetMessageRate(
                     msg_camera_capture_status.MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS,
-                    ((1f / statusFreq) * 1000).roundToLong()
+                    ((1f / params.statusFreqHz) * 1000).roundToLong()
                 )
             }
         }
     }
 
     private fun requestStopRecording(commandLongMsg: msg_command_long) {
-        val cameraInfo: CameraMetadata? = getCamera(commandLongMsg.param2.toInt())
+        val params = VideoStopCaptureCommandLong(commandLongMsg)
+        val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
 
         if (cameraInfo == null) {
             client.sendMessage(
@@ -299,8 +299,6 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
-
-        val streamID = commandLongMsg.param1.toInt()
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopRecordCommand(cameraInfo.id))
