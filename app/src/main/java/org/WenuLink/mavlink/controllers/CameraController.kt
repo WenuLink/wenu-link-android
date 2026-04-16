@@ -304,9 +304,9 @@ class CameraController(
 
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopRecordCommand(cameraInfo.id))
-        ) { error ->
-            if (error != null) {
-                logger.w { "Error in requestStopRecording: $error" }
+        ) { result ->
+            if (result.hasError) {
+                logger.w { "Error in requestStopRecording: ${result.errorReason}" }
                 return@dispatchCommand
             }
             // deactivating messages
