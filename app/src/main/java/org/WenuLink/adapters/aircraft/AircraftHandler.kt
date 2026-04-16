@@ -173,14 +173,14 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         return telemetry.waitDataRemoving(delay)
     }
 
-    suspend fun boot(timeout: Long = 5000L): String? {
+    suspend fun boot(timeout: Long = 5000L): UnitResult {
         sensorsHealthy = false
         logger.d { "Aircraft booting..." }
 
-        if (!loadParameters(timeout)) return "No parameters"
+        if (!loadParameters(timeout)) return CommandResult.error("No parameters")
         logger.d { "\tParameters: OK" }
 
-        if (!startTelemetry(timeout)) return "No telemetry"
+        if (!startTelemetry(timeout)) return CommandResult.error("No telemetry")
         logger.d { "\tTelemetry: OK" }
 
         sensorsHealthy =
@@ -189,7 +189,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
         logger.d { "Aircraft boot: OK" }
         isPowerOff = false
-        return null
+        return CommandResult.ok
     }
 
     override fun registerScope(scope: CoroutineScope) {
