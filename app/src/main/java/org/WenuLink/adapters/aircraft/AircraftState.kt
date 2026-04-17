@@ -201,7 +201,6 @@ data class FlightModeTransition(private val flightMode: ArduCopterFlightMode) : 
     }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
-        landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR,
         flightMode = this.flightMode
     )
 }
@@ -213,14 +212,11 @@ data class FlightModeTransition(private val flightMode: ArduCopterFlightMode) : 
 class AircraftStateMachine {
     var state = AircraftState()
         private set
-    var transition: StateTransition = InitialTransition
-        private set
 
     fun canDispatch(event: StateTransition): UnitResult = event.canTransition(state)
 
     fun dispatch(event: StateTransition): AircraftState {
         state = event.reduce(state)
-        transition = event
         return syncArmState()
     }
 
@@ -231,8 +227,6 @@ class AircraftStateMachine {
 
     fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||
         state.landed != target.landed
-
-    fun isStateTransition(target: StateTransition) = transition == target
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
         state = state.copy(homeCoordinates = homeCoordinates)

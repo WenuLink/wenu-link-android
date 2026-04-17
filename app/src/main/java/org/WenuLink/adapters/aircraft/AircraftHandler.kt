@@ -91,9 +91,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun dispatchTransition(transition: StateTransition): AircraftState =
         stateMachine.dispatch(transition)
 
-    fun checkTransition(transition: StateTransition): Boolean =
-        stateMachine.isStateTransition(transition)
-
     fun syncSensors(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
@@ -155,7 +152,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         // Ask for home position
         logger.d { "Requesting home coordinates update with current aircraft's location." }
         FCManager.setHomePosition { error ->
-            logger.d { "Error in set home position: $error" }
+            if (error != null) {
+                logger.w { "Error in set home position: $error" }
+            }
         }
         false
     }
@@ -221,14 +220,18 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun armMotors() {
         logger.d { "Arming motors" }
         FCManager.armMotors { error ->
-            logger.d { "Arm error: $error" }
+            if (error != null) {
+                logger.w { "Arm error: $error" }
+            }
         }
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
         FCManager.disarmMotors { error ->
-            logger.d { "Disarm error: $error" }
+            if (error != null) {
+                logger.w { "Disarm error: $error" }
+            }
         }
     }
 
@@ -252,7 +255,9 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun takeOff() {
         logger.d { "Aircraft taking off" }
         FCManager.startTakeoff { error ->
-            logger.d { "Takeoff error: $error" }
+            if (error != null) {
+                logger.w { "Takeoff error: $error" }
+            }
         }
     }
 
