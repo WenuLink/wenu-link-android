@@ -23,6 +23,7 @@ import org.WenuLink.mavlink.messages.ConditionYawMessage
 import org.WenuLink.mavlink.messages.DoSetModeCommandLong
 import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.NavDelayMessage
+import org.WenuLink.mavlink.messages.NavTakeoffCommandLong
 
 /**
  * MAVLinkController class to deal with the command service and related MAVLink messages.
@@ -152,7 +153,12 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun processTakeoff(commandMsg: msg_command_long) {
         logger.d { "processTakeoff: $commandMsg" }
-        handler.dispatchCommand(WenuLinkCommand.Request(RequestTakeoff())) { result ->
+        val params = NavTakeoffCommandLong(commandMsg)
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestTakeoff(params.altitude)
+            )
+        ) { result ->
             if (result.hasError) logger.e { "Takeoff error: ${result.errorReason}" }
         }
         sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)

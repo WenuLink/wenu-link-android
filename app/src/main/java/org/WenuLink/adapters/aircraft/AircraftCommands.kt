@@ -39,16 +39,15 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
 
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.dispatchTransition(ArmTransition)
         if (!TakeoffTransition.hasDelayedArmMode(ctx.state)) {
             // Manual takeoff
             ctx.armMotors()
             if (!ctx.waitArmTransition(true, timeout)) {
                 return CommandResult.error("Unable to arm motors")
             }
-        } else {
-            // Automatic takeoff only. Must wait for state changes
         }
+        // Automatic takeoff only. Must wait for state changes
+        ctx.dispatchTransition(ArmTransition)
 
         return CommandResult.ok
     }
@@ -63,10 +62,9 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
         ctx.canDispatchTransition(StandbyTransition)
 
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
-        // TODO: check if compatible with CancellableCoroutine
-        ctx.dispatchTransition(StandbyTransition)
         ctx.disarmMotors()
         return if (ctx.waitArmTransition(false, timeout)) {
+            ctx.dispatchTransition(StandbyTransition)
             CommandResult.ok
         } else {
             CommandResult.error("Unable to disarm motors")
@@ -85,6 +83,7 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
         ctx.dispatchTransition(TakeoffTransition)
         ctx.takeOff()
         return if (ctx.waitFlightState(true, timeout)) {
+            ctx.dispatchTransition(FlyingTransition)
             CommandResult.ok
         } else {
             ctx.dispatchCommand(DisarmCommand())

@@ -31,6 +31,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     var sensorsHealthy = false
         private set
     val telemetry = TelemetryHandler.getInstance()
+    val currentTelemetry: TelemetryData? get() = telemetry.getData()
     val currentCoordinates: Coordinates3D?
         get() = telemetry.getData()?.let {
             Coordinates3D(it.latitude, it.longitude, it.relativeAltitude)
@@ -93,7 +94,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     fun checkTransition(transition: StateTransition): Boolean =
         stateMachine.isStateTransition(transition)
 
-    fun syncState(sensorsInterval: Long = 1000L) {
+    fun syncSensors(sensorsInterval: Long = 1000L) {
         if (isPowerOff) return
         val currentTimestamp = System.currentTimeMillis()
 
@@ -102,14 +103,19 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
             sensorsHealthy = sensorChecks()
             sensorsTimestamp = currentTimestamp
         }
+    }
 
-        // Check for flying conditions only
-        val fcState = state.resolveFrom(FCManager.isFlying())
+    fun syncState() {
+        // Check for armed and flying conditions to update the last
+        val fcState = state.resolveFrom(
+            currentTelemetry?.motorsOn ?: false,
+            currentTelemetry?.isFlying ?: false
+        )
 
         // Force new logic state update only when different
-        if (!stateMachine.hasLandedChanged(fcState)) return
+        if (!stateMachine.hasStateChanged(fcState)) return
 
-        logger.w { "State reconciliation: $state -> $fcState" }
+        logger.i { "New aircraft state: $fcState" }
 
         stateMachine.forceSet(fcState)
     }
@@ -141,15 +147,15 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     // check for home location and set
-    fun updateHomeCoordinatesFromAircraft(): Boolean = FCManager.getHomePosition()
-        ?.let {
-            stateMachine.updateHomePosition(it)
-            true
-        } ?: run {
+    fun updateHomeCoordinatesFromAircraft(): Boolean = FCManager.getHomePosition()?.let {
+        logger.d { "Home coordinates acquired: $it." }
+        stateMachine.updateHomePosition(it)
+        true
+    } ?: run {
         // Ask for home position
         logger.d { "Requesting home coordinates update with current aircraft's location." }
         FCManager.setHomePosition { error ->
-            error?.let { logger.w { "Error request: $it" } }
+            logger.d { "Error in set home position: $error" }
         }
         false
     }
@@ -190,6 +196,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.d { "\tSensors healthy?: $sensorsHealthy" }
 
         logger.d { "Aircraft boot: OK" }
+        syncState()
         isPowerOff = false
         return CommandResult.ok
     }
@@ -213,16 +220,23 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
 
     fun armMotors() {
         logger.d { "Arming motors" }
-        FCManager.armMotors()
+        FCManager.armMotors { error ->
+            logger.d { "Arm error: $error" }
+        }
     }
 
     fun disarmMotors() {
         logger.d { "Disarming motors" }
-        FCManager.disarmMotors()
+        FCManager.disarmMotors { error ->
+            logger.d { "Disarm error: $error" }
+        }
     }
 
     suspend fun waitArmTransition(mustArm: Boolean, timeout: Long): Boolean {
-        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout) { mustArm == state.isArmed() }
+        logger.d { "Waiting for ${if (mustArm) "arming" else "disarming"} motors" }
+        val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout) {
+            mustArm == currentTelemetry?.motorsOn
+        }
 
         if (motorsUpdated) {
             logger.i { if (mustArm) "Aircraft armed" else "Aircraft in standby" }
@@ -230,19 +244,23 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
             logger.w { "Timeout: ${if (mustArm) "armed" else "disarmed"} state not reached" }
         }
 
+        syncState()
+
         return motorsUpdated
     }
 
     fun takeOff() {
         logger.d { "Aircraft taking off" }
-        FCManager.startTakeoff()
+        FCManager.startTakeoff { error ->
+            logger.d { "Takeoff error: $error" }
+        }
     }
 
     suspend fun waitFlightState(takingOff: Boolean, timeout: Long): Boolean {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
 
         val flyingStateUpdated = AsyncUtils.waitTimeout(100L, timeout) {
-            takingOff == state.isFlying()
+            takingOff == currentTelemetry?.isFlying
         }
 
         if (flyingStateUpdated) {
@@ -250,6 +268,8 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         } else {
             logger.w { "Timeout: ${if (takingOff) "takeoff" else "landing"} state not reached" }
         }
+
+        syncState()
 
         return flyingStateUpdated
     }

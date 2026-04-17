@@ -36,3 +36,34 @@ data class ComponentArmDisarmCommandLong(val arm: Boolean?, val force: Int) {
         force = msg.param2.toInt()
     )
 }
+
+/**
+ * Message bindings for
+ * [MAV_CMD_NAV_TAKEOFF](https://mavlink.io/en/messages/common.html#MAV_CMD_NAV_TAKEOFF).
+ *
+ * @param pitch     Minimum pitch (if airspeed sensor present), desired pitch without sensor (deg).
+ * @param flags     Bitmask of options flags (NAV_TAKEOFF_FLAGS).
+ * @param yaw       Yaw angle in degrees (if magnetometer present), ignored without magnetometer.
+ *                  NaN to use the current system yaw heading mode (e.g. yaw towards next waypoint,
+ *                  yaw to home, etc.).
+ * @param latitude  Latitude
+ * @param longitude Longitude
+ * @param altitude  Altitude in meters
+ */
+data class NavTakeoffCommandLong(
+    val pitch: Float,
+    val flags: Int,
+    val yaw: Float,
+    val latitude: Float,
+    val longitude: Float,
+    val altitude: Float
+) {
+    constructor(msg: msg_command_long) : this(
+        pitch = msg.param1,
+        flags = msg.param3.toInt(),
+        yaw = msg.param4,
+        latitude = msg.param5,
+        longitude = msg.param6,
+        altitude = msg.param7
+    )
+}

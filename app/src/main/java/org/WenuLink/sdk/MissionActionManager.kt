@@ -62,18 +62,17 @@ object MissionActionManager {
 
     fun startListener(onError: (String) -> Unit = {}) {
         listener = MissionControl.Listener { element, event, error ->
-            if (error != null) {
-                onError("Timeline error: ${error.description}")
+            logger.d { "Timeline event: $event" }
+
+            error?.let {
+                logger.d { "Timeline error: ${it.description}" }
+                onError(it.description)
                 return@Listener
             }
 
             element?.let { action ->
                 val key = ActionCallbackKey(action::class, event)
                 callbacks[key]?.forEach { it.invoke() }
-            }
-
-            if (event == TimelineEvent.STOPPED) {
-                logger.i { "Timeline stopped" }
             }
         }
 

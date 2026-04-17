@@ -111,7 +111,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                     coroutineScope {
                         // --- Sync real aircraft state ---
                         launch {
-                            aircraft.syncState()
+                            aircraft.syncSensors()
                             if (aircraft.state.isFlying()) flyingModeHooks()
                         }
 
@@ -294,10 +294,14 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         this.stopCommand()
     }
 
-    fun stopAndDispatch(command: RequestCommand, onResult: (UnitResult) -> Unit = {}) {
+    fun stopAndDispatch(command: RequestCommand) {
         if (currentCommand == command) return
         stopAllCommands()
-        dispatchCommand(command, onResult)
+        dispatchCommand(command) { result ->
+            if (result.hasError) {
+                logger.e { "Problem during command execution: ${result.errorReason}" }
+            }
+        }
     }
 
     private fun flyingModeHooks() = when (aircraft.state.flightMode) {

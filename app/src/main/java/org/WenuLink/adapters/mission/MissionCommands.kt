@@ -201,24 +201,27 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
 }
 
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
-    override suspend fun execute(ctx: MissionHandler): UnitResult =
-        suspendCancellableCoroutine { cont ->
-            MissionActionManager.clear()
+    override suspend fun execute(ctx: MissionHandler): UnitResult {
+        MissionActionManager.clear()
 
-            val error = MissionActionManager.schedule(action)
+        val error = MissionActionManager.schedule(action)
 
-            if (error != null) {
-                cont.resume(CommandResult.error("Error in $action: ${error.description}"))
-                return@suspendCancellableCoroutine
-            }
+        if (error != null) {
+            return CommandResult.error("Error in $action: ${error.description}")
+        }
 
+        return suspendCancellableCoroutine { cont ->
             val actionKey = MissionActionManager.onFinish(action::class) {
-                cont.resume(CommandResult.ok)
+                if (cont.isActive) {
+                    cont.resume(CommandResult.ok)
+                }
             }
 
             MissionActionManager.startListener {
-                // onError
-                cont.resume(CommandResult.error("Action failed: $it"))
+                if (cont.isActive) {
+                    // onError
+                    cont.resume(CommandResult.error("Action failed: $it"))
+                }
             }
 
             MissionActionManager.start()
@@ -229,6 +232,7 @@ open class ActionCommand(val action: MissionAction) : MissionActionCommand {
                 MissionActionManager.stop()
             }
         }
+    }
 }
 
 data class RepositionAction(private val target: Coordinates3D, private val speed: Float) :

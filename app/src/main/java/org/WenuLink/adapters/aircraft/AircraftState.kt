@@ -48,19 +48,27 @@ data class AircraftState(
 
     fun isPowerOff() = mavlink == MAV_STATE.MAV_STATE_POWEROFF
 
-    fun resolveFrom(isFlying: Boolean): AircraftState {
-        // ARM/DISARM state will be updated only from StateTransition.
+    fun resolveFrom(isArmed: Boolean, isFlying: Boolean): AircraftState {
+        // Sync ARM/DISARM state.
+        val mavState = when {
+            isArmed -> MAV_STATE.MAV_STATE_ACTIVE
+            else -> MAV_STATE.MAV_STATE_STANDBY
+        }
 
-        // Sync of landed state = landing is triggered from the outside, and transitioned here
+        // Sync of landed state and transitions, Landing is updated from transition dispatch.
         val landedState = when {
-            !isArmed() && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-            isArmed() && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
-            isFlying && !isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
+            !isArmed && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            isArmed && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
+            isFlying && isLanding() -> MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
             !isFlying && isLanding() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            isFlying -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
             else -> this.landed
         }
 
-        return this.copy(landed = landedState)
+        return this.copy(
+            mavlink = mavState,
+            landed = landedState
+        )
     }
 }
 
@@ -94,7 +102,7 @@ object BootTransition : StateTransition {
 
 object StandbyTransition : StateTransition {
     override fun canTransition(from: AircraftState): UnitResult = when {
-        from.isFlying() -> CommandResult.error("Aircraft is flying")
+        !from.isOnTheGround() -> CommandResult.error("Not on the ground")
         else -> CommandResult.ok
     }
 
@@ -193,6 +201,7 @@ data class FlightModeTransition(private val flightMode: ArduCopterFlightMode) : 
     }
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
+        landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR,
         flightMode = this.flightMode
     )
 }
@@ -220,7 +229,8 @@ class AircraftStateMachine {
         syncArmState()
     }
 
-    fun hasLandedChanged(target: AircraftState) = state.landed != target.landed
+    fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||
+        state.landed != target.landed
 
     fun isStateTransition(target: StateTransition) = transition == target
 

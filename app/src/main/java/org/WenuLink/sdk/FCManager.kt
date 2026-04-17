@@ -99,30 +99,22 @@ object FCManager {
         }
     }
 
-    fun isFlying() = mInstance?.state?.isFlying == true
-
     fun needLandingConfirmation() = mInstance?.state?.isLandingConfirmationNeeded == true
 
     fun getAltitude(): Float = mInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
 
-    fun startTakeoff() = mInstance?.startTakeoff { }
+    fun startTakeoff(onResult: (String?) -> Unit) =
+        mInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
 
     fun confirmLanding(onResult: (String?) -> Unit) =
-        // for somehow these kind of actions does not return anything, possibly is a thread issue.
+        // for some reason these methods are not calling onResult, possibly is a thread issue.
         mInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
 
-    fun areMotorsArmed() = mInstance?.state?.areMotorsOn() == true
+    fun armMotors(onResult: (String?) -> Unit) =
+        mInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
 
-    fun armMotors() {
-        logger.d { "Arming motors" }
-        mInstance?.turnOnMotors { } // ignored callback, async wait for state change
-    }
-
-    fun disarmMotors() {
-        logger.d { "Disarming motors" }
-        // apparently ignores the callback and must wait for change to happen
-        mInstance?.turnOffMotors { }
-    }
+    fun disarmMotors(onResult: (String?) -> Unit) =
+        mInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
 
     fun sensorState(sensorState: SensorState?): AppSensorState = when (sensorState) {
         SensorState.DISCONNECTED,
