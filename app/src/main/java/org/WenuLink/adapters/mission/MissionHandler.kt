@@ -3,11 +3,13 @@ package org.WenuLink.adapters.mission
 import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
+import dji.sdk.mission.timeline.actions.MissionAction
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.messages.ConditionYawMessage
 import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
@@ -82,6 +84,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
+    private var lastActionKey: MissionActionManager.ActionCallbackKey? = null
     var flightSpeed = 5f
         private set
     var state = MissionState()
@@ -137,7 +140,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     fun clear() {
         state = state.reset()
-        MissionActionManager.clear()
+        MissionActionManager.clearScheduleAndListeners()
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
@@ -218,4 +221,43 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     fun uploadWaypoints(onResult: (UnitResult) -> Unit) =
         dispatchCommand(UploadMissionCommand(state.assembler, flightSpeed), onResult)
+
+    /**
+     * MissionActionManager methods
+     */
+
+    fun onActionError(description: String) {
+        logger.e { "Timeline error: $description" }
+        lastActionKey?.let { MissionActionManager.removeCallback(it) }
+        MissionActionManager.stop()
+    }
+
+    fun scheduleUrgentAction(action: MissionAction): UnitResult {
+        logger.d { "Scheduling $action with urgency" }
+        MissionActionManager.clearScheduleAndListeners()
+        val error = MissionActionManager.schedule(action)
+
+        if (error != null) {
+            return CommandResult.error("Error in $action: ${error.description}")
+        }
+
+        return CommandResult.ok
+    }
+
+    fun onActionFinish(action: MissionAction, onFinish: (UnitResult) -> Unit) {
+        lastActionKey = MissionActionManager.onFinish(action::class) {
+            onFinish(CommandResult.ok)
+            lastActionKey?.let { MissionActionManager.removeCallback(it) } // reset at the end
+        }
+    }
+
+    fun performAction(onError: (String) -> Unit) {
+        // start listeners and action
+        MissionActionManager.startListener {
+            onActionError(it)
+            onError(it)
+        }
+
+        MissionActionManager.start()
+    }
 }
