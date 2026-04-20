@@ -19,7 +19,6 @@ import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.WenuLinkCommand
 import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.aircraft.TelemetryMapper
-import org.WenuLink.adapters.camera.CameraCaptureStatus
 import org.WenuLink.adapters.camera.CameraMetadata
 import org.WenuLink.adapters.camera.ImageMetadata
 import org.WenuLink.adapters.camera.SetModeCommand
@@ -367,34 +366,30 @@ class CameraController(
             storage_usage = STORAGE_USAGE_FLAG.STORAGE_USAGE_FLAG_PHOTO.toShort()
         }
 
-    fun msgCaptureStatus(cameraInfo: CameraMetadata): msg_camera_capture_status {
+    fun msgCaptureStatus(cameraInfo: CameraMetadata): msg_camera_capture_status =
         // TODO: add proper updates
-        var imageStatus = CameraCaptureStatus.IDLE
-        var imageInterval = 0f
-        var videoStatus = CameraCaptureStatus.IDLE
-        var videoTime = 0L
-        if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_IMAGE) {
-            imageStatus = cameraInfo.state.captureStatus
-            imageInterval = cameraInfo.state.captureTime.toFloat()
-        } else if (cameraInfo.state.mavlinkMode == CAMERA_MODE.CAMERA_MODE_VIDEO) {
-            videoStatus = cameraInfo.state.captureStatus
-            videoTime = cameraInfo.state.captureTime
-        }
-        return msg_camera_capture_status().apply {
-            image_status = imageStatus.value.toShort()
-            video_status = videoStatus.value.toShort()
-            image_interval = imageInterval
-            recording_time_ms = videoTime
+        msg_camera_capture_status().apply {
+            when (cameraInfo.state.mavlinkMode) {
+                CAMERA_MODE.CAMERA_MODE_IMAGE -> {
+                    image_status = cameraInfo.state.captureStatus.value.toShort()
+                    image_interval = cameraInfo.state.captureTime.toFloat()
+                }
+
+                CAMERA_MODE.CAMERA_MODE_VIDEO -> {
+                    video_status = cameraInfo.state.captureStatus.value.toShort()
+                    recording_time_ms = cameraInfo.state.captureTime
+                }
+            }
+
             // TODO: read true value
             available_capacity = 4000f
             image_count = 0
             camera_device_id = cameraInfo.id.toShort()
         }
-    }
 
-    fun msgImageCaptured(imageInfo: ImageMetadata): msg_camera_image_captured {
-        val mavData = TelemetryMapper.toMavlink(imageInfo.telemetry)
-        return msg_camera_image_captured().apply {
+    fun msgImageCaptured(imageInfo: ImageMetadata): msg_camera_image_captured =
+        msg_camera_image_captured().apply {
+            val mavData = TelemetryMapper.toMavlink(imageInfo.telemetry)
             camera_id = imageInfo.cameraID.toShort()
             lat = mavData.latitude
             lon = mavData.longitude
@@ -409,5 +404,4 @@ class CameraController(
             capture_result = (if (imageInfo.captureOk) 1 else 0).toByte()
             file_url = "".toByteArray()
         }
-    }
 }
