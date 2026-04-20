@@ -111,13 +111,13 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                     coroutineScope {
                         // --- Sync real aircraft state ---
                         launch {
-                            aircraft.syncState()
-                            modeHooks()
+                            aircraft.syncSensors()
+                            if (aircraft.state.isFlying()) flyingModeHooks()
                         }
 
                         launch {
                             mission.syncState()
-                            missionHooks()
+                            if (mission.state.isActive()) activeMissionHooks()
                         }
 
                         launch {
@@ -206,7 +206,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
     fun dispatchControlAuthority(authority: ControlAuthorityType) {
         // Decide policy: reject or stop mission
-        if (!controlAuthority.isNewAuthority(authority)) return
+        if (!controlAuthority.isNewAuthority(authority) || controlAuthority.isRemote()) return
         // Always stop everything
         stopAllCommands()
         logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }
@@ -294,13 +294,17 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         this.stopCommand()
     }
 
-    fun stopAndDispatch(command: RequestCommand, onResult: (UnitResult) -> Unit = {}) {
+    fun stopAndDispatch(command: RequestCommand) {
         if (currentCommand == command) return
-        missionStop()
-        dispatchCommand(command, onResult)
+        stopAllCommands()
+        dispatchCommand(command) { result ->
+            if (result.hasError) {
+                logger.e { "Problem during command execution: ${result.errorReason}" }
+            }
+        }
     }
 
-    private fun modeHooks() = when (aircraft.state.flightMode) {
+    private fun flyingModeHooks() = when (aircraft.state.flightMode) {
         ArduCopterFlightMode.BRAKE -> missionPause()
         ArduCopterFlightMode.AUTO -> missionResume()
         ArduCopterFlightMode.LAND -> stopAndDispatch(RequestLand(true))
@@ -308,7 +312,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         else -> {}
     }
 
-    private fun missionHooks() = when {
+    private fun activeMissionHooks() = when {
         mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
         mission.state.unvisitedSequence -> mission.processNode()
         else -> {}

@@ -49,27 +49,20 @@ data class AircraftState(
     fun isPowerOff() = mavlink == MAV_STATE.MAV_STATE_POWEROFF
 
     fun resolveFrom(isArmed: Boolean, isFlying: Boolean): AircraftState {
-        val criticalStates = intArrayOf(
-            MAV_STATE.MAV_STATE_FLIGHT_TERMINATION,
-            MAV_STATE.MAV_STATE_CRITICAL,
-            MAV_STATE.MAV_STATE_EMERGENCY
-        )
+        // Sync ARM/DISARM state.
         val mavState = when {
-            this.mavlink in criticalStates -> this.mavlink
             isArmed -> MAV_STATE.MAV_STATE_ACTIVE
             else -> MAV_STATE.MAV_STATE_STANDBY
         }
 
+        // Sync of landed state and transitions, Landing is updated from transition dispatch.
         val landedState = when {
-            !isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
-
-            isFlying && this.landed == MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND ->
-                MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
-
+            !isArmed && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            isArmed && isOnTheGround() -> MAV_LANDED_STATE.MAV_LANDED_STATE_TAKEOFF
+            isFlying && isLanding() -> MAV_LANDED_STATE.MAV_LANDED_STATE_LANDING
+            !isFlying && isLanding() -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
             isFlying -> MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
-
-            else -> MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+            else -> this.landed
         }
 
         return this.copy(
@@ -109,7 +102,7 @@ object BootTransition : StateTransition {
 
 object StandbyTransition : StateTransition {
     override fun canTransition(from: AircraftState): UnitResult = when {
-        from.isFlying() -> CommandResult.error("Aircraft is flying")
+        !from.isOnTheGround() -> CommandResult.error("Not on the ground")
         else -> CommandResult.ok
     }
 
@@ -120,6 +113,7 @@ object StandbyTransition : StateTransition {
 }
 
 object ArmTransition : StateTransition {
+    // TODO: update with modes from https://ardupilot.org/copter/docs/arming_the_motors.html
     override fun canTransition(from: AircraftState): UnitResult = when {
         !from.isStandBy() -> CommandResult.error("Not ready to arm")
         else -> CommandResult.ok
@@ -130,9 +124,16 @@ object ArmTransition : StateTransition {
 }
 
 object TakeoffTransition : StateTransition {
+    // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
+    fun hasDelayedArmMode(from: AircraftState): Boolean = listOf(
+        ArduCopterFlightMode.GUIDED,
+        ArduCopterFlightMode.AUTO
+    ).any { it == from.flightMode }
+
     override fun canTransition(from: AircraftState): UnitResult = when {
-        !from.isArmed() -> CommandResult.error("Not armed")
-        !from.isOnTheGround() -> CommandResult.error("Not on the ground")
+        !hasDelayedArmMode(from) && !from.isArmed() ->
+            CommandResult.error("${from.flightMode} requires to be armed first")
+
         else -> CommandResult.ok
     }
 
@@ -221,6 +222,7 @@ class AircraftStateMachine {
 
     fun forceSet(target: AircraftState) {
         state = target
+        syncArmState()
     }
 
     fun hasStateChanged(target: AircraftState) = state.mavlink != target.mavlink ||

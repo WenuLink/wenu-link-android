@@ -121,7 +121,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     @Synchronized
     fun setCurrentSequence(sequence: Int): MissionState {
         state = state.updateItemSequence(sequence)
-        if (sequence == -1) state = state.setComplete().markVisited()
+        if (sequence == -1) state = state.updateItemSequence(null).setComplete().markVisited()
         return state
     }
 
