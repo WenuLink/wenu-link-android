@@ -243,12 +243,10 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         ).apply { flightSpeed = speed }
     ) {
     companion object {
-        fun fromParameters(params: DoRepositionCommandInt): RepositionAction {
-            return RepositionAction(
-                Coordinates3D(params.latitude, params.longitude, params.altitude),
-                if (params.speed == -1f) 1f else params.speed
-            )
-        }
+        fun fromParameters(params: DoRepositionCommandInt) = RepositionAction(
+            Coordinates3D(params.latitude, params.longitude, params.altitude),
+            params.speed
+        )
     }
 }
 
