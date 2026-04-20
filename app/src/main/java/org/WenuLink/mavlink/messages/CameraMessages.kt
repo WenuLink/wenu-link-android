@@ -54,6 +54,13 @@ data class ImageStartCaptureMessage(
     val totalImages: Int,
     val sequenceNumber: Int
 ) {
+    constructor(msg: msg_command_long) : this(
+        targetCameraId = msg.param1.toInt(),
+        intervalSec = msg.param2,
+        totalImages = msg.param3.toInt(),
+        sequenceNumber = msg.param4.toInt()
+    )
+
     constructor(msg: msg_mission_item_int) : this(
         targetCameraId = msg.param1.toInt(),
         intervalSec = msg.param2,
