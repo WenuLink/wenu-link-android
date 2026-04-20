@@ -112,20 +112,16 @@ class CommandController(override var client: MAVLinkClient, override val handler
 
     fun setMode(commandMsg: msg_command_long) {
         val params = DoSetModeCommandLong(commandMsg)
-        val customMode = ArduCopterFlightMode.from(params.customMode)
-
-        logger.d { "FlightMode requested: $customMode" }
-
-        if (customMode == null) {
-            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-            return
-        }
-
-        if (handler.aircraft.requestMode(customMode).isOk) {
-            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
-        } else {
-            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
-        }
+        ArduCopterFlightMode.from(params.customMode)
+            ?.let {
+                logger.d { "FlightMode requested: ${params.customMode}" }
+                if (handler.aircraft.requestMode(it).isOk) {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+                } else {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+                }
+            }
+            ?: sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {

@@ -29,11 +29,9 @@ suspend inline fun createValue(
          * Handling of create values.
          */
         override fun onCreateSuccess(description: SessionDescription?) {
-            if (description != null) {
-                it.resume(Result.success(description))
-            } else {
-                it.resume(Result.failure(RuntimeException("SessionDescription is null!")))
-            }
+            description
+                ?.let { desc -> it.resume(Result.success(desc)) }
+                ?: it.resume(Result.failure(RuntimeException("SessionDescription is null!")))
         }
 
         override fun onCreateFailure(message: String?) =

@@ -22,9 +22,8 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
 
     suspend fun setPhotoMode(cameraIdx: Int = 0): UnitResult {
         if (!CameraManager.isPhotoMode()) {
-            val error = CameraManager.setPhotoMode()
-            if (error != null) {
-                return CommandResult.error("setPhotoMode error: $error")
+            CameraManager.setPhotoMode()?.let {
+                return CommandResult.error("setPhotoMode error: $it")
             }
         }
 
@@ -33,9 +32,8 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
 
     suspend fun setVideoMode(cameraIdx: Int = 0): UnitResult {
         if (!CameraManager.isVideoMode()) {
-            val error = CameraManager.setVideoMode()
-            if (error != null) {
-                return CommandResult.error("setVideoMode error: $error")
+            CameraManager.setVideoMode()?.let {
+                return CommandResult.error("setVideoMode error: $it")
             }
         }
 
@@ -92,14 +90,15 @@ data class StartRecordCommand(val cameraIdx: Int) : CameraCommand {
         // mark IN_PROGRESS
         ctx.updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraIdx)
         // Trigger camera and wait for photo to be taken
-        val error = CameraManager.requestStartVideoRecording()
-        return if (error == null) {
-            ctx.captureTimestamp = System.currentTimeMillis()
-            CommandResult.ok
-        } else {
-            ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
-            CommandResult.error(error)
-        }
+        return CameraManager.requestStartVideoRecording()
+            ?.let {
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                CommandResult.error(it)
+            }
+            ?: let {
+                ctx.captureTimestamp = System.currentTimeMillis()
+                CommandResult.ok
+            }
     }
 }
 
@@ -112,14 +111,13 @@ data class StopRecordCommand(val cameraIdx: Int) : CameraCommand {
 
     override suspend fun execute(ctx: CameraHandler): UnitResult {
         // Trigger camera and wait for photo to be taken
-        val error = CameraManager.requestStopVideoRecording()
-        return if (error == null) {
-            // mark IDLE back
-            ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
-            CommandResult.ok
-        } else {
-            CommandResult.error(error)
-        }
+        return CameraManager.requestStopVideoRecording()
+            ?.let { CommandResult.error(it) }
+            ?: let {
+                // mark IDLE back
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                CommandResult.ok
+            }
     }
 }
 
@@ -131,11 +129,11 @@ data class StartIntervalShootCommand(val cameraIdx: Int, val intervalSeconds: In
     }
 
     override suspend fun execute(ctx: CameraHandler): UnitResult {
-        val modeError = CameraManager.setCaptureMode(SettingsDefinitions.ShootPhotoMode.INTERVAL)
-        if (modeError != null) return CommandResult.error(modeError)
+        CameraManager.setCaptureMode(SettingsDefinitions.ShootPhotoMode.INTERVAL)
+            ?.let { return CommandResult.error(it) }
 
-        val intervalError = CameraManager.setIntervalSeconds(intervalSeconds)
-        if (intervalError != null) return CommandResult.error(intervalError)
+        CameraManager.setIntervalSeconds(intervalSeconds)
+            ?.let { return CommandResult.error(it) }
 
         ctx.updateCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraIdx)
 
@@ -160,13 +158,11 @@ data class StopIntervalShootCommand(val cameraIdx: Int) : CameraCommand {
         else -> CommandResult.ok
     }
 
-    override suspend fun execute(ctx: CameraHandler): UnitResult {
-        val error = CameraManager.requestStopIntervalShoot()
-        return if (error == null) {
-            ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
-            CommandResult.ok
-        } else {
-            CommandResult.error(error)
-        }
-    }
+    override suspend fun execute(ctx: CameraHandler): UnitResult =
+        CameraManager.requestStopIntervalShoot()
+            ?.let { CommandResult.error(it) }
+            ?: let {
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                CommandResult.ok
+            }
 }

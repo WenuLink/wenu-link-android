@@ -162,17 +162,14 @@ class CameraController(
         }
     )
 
-    private fun getCamera(targetCamera: Int): CameraMetadata? {
-        val cameraInfo = handler.camera.getCamera(targetCamera)
-        if (cameraInfo == null) {
-            logger.d { "Camera index $targetCamera not found" }
+    private fun getCamera(targetCamera: Int): CameraMetadata? =
+        handler.camera.getCamera(targetCamera).also {
+            if (it == null) logger.d { "Camera index $targetCamera not found" }
         }
-        return cameraInfo
-    }
 
     private fun requestStartCapture(commandLongMsg: msg_command_long) {
         val params = ImageStartCaptureMessage(commandLongMsg)
-        val cameraInfo = getCamera(params.targetCameraId) ?: run {
+        val cameraInfo: CameraMetadata = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -215,7 +212,7 @@ class CameraController(
 
     private fun requestStopCapture(commandLongMsg: msg_command_long) {
         val params = ImageStopCaptureCommandLong(commandLongMsg)
-        val cameraInfo = getCamera(params.targetCameraId) ?: run {
+        val cameraInfo: CameraMetadata = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -231,6 +228,7 @@ class CameraController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
+
         handler.onImageCaptured = null
         handler.dispatchCommand(
             WenuLinkCommand.Camera(StopIntervalShootCommand(cameraInfo.id))
@@ -279,9 +277,7 @@ class CameraController(
 
     private fun requestStopRecording(commandLongMsg: msg_command_long) {
         val params = VideoStopCaptureCommandLong(commandLongMsg)
-        val cameraInfo: CameraMetadata? = getCamera(params.targetCameraId)
-
-        if (cameraInfo == null) {
+        val cameraInfo: CameraMetadata = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,

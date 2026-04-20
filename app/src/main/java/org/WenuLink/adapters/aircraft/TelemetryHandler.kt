@@ -124,28 +124,20 @@ class TelemetryHandler : IHandler<TelemetryHandler> {
         AircraftManager.stopListeners()
     }
 
-    suspend fun listenSimulation(listen: Boolean) {
-        var attempts = 0
-        if (listen) {
-            while (attempts < 3) {
-                val runError = SimManager.run() ?: break
-                logger.w { "Error in run simulation: $runError. Trying again" }
-                attempts++
-                delay(500L)
-            }
-            if (attempts < 3) {
+    suspend fun listenSimulation(listen: Boolean) = if (listen) {
+        for (i in 1..3) { // try 3 times
+            val error = SimManager.run() ?: run {
                 logger.i { "Simulation running." }
-            } else {
-                logger.e { "Unable to start simulation, 3 failed attempts. Stoping" }
+                return
             }
-        } else {
-            val stopError = SimManager.stop()
-            if (stopError == null) {
-                logger.i { "Simulation stopped." }
-            } else {
-                logger.e { "Unable to stop simulation: $stopError" }
-            }
+            logger.w { "Error in run simulation: $error. Trying again" }
+            delay(500L)
         }
+        logger.e { "Unable to start simulation, 3 failed attempts. Stopping" }
+    } else {
+        SimManager.stop()
+            ?.let { logger.e { "Unable to stop simulation: $it" } }
+            ?: logger.i { "Simulation stopped." }
     }
 
     suspend fun listenVehicleState(listen: Boolean) = if (mustRunSimulation) {
