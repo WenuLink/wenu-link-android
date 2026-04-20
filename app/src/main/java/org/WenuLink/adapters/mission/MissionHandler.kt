@@ -141,7 +141,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
-        logger.d { "Append mission item." }
+        logger.d { "Append action: ${itemMsg.command}" }
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF -> assembleTakeoffNode(itemMsg)
@@ -209,7 +209,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         }
 
         // Yaw
-        if (params.yaw != 0f) {
+        if (!params.yaw.isNaN()) {
             state.assembler.addActionToLast(RotateAction(params.yaw))
         }
 

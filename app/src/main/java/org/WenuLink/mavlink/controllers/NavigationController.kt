@@ -32,6 +32,7 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.DoRepositionCommandInt
 import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.MissionStartCommandLong
 import org.WenuLink.mavlink.messages.NavLandMissionItem
@@ -271,9 +272,10 @@ class NavigationController(
     }
 
     fun processDoReposition(commandIntMsg: msg_command_int) {
-        handler.dispatchCommand(
-            WenuLinkCommand.Request(
-                RequestMissionAction(RepositionAction.fromCommandInt(commandIntMsg))
+        val params = DoRepositionCommandInt(commandIntMsg)
+        val repositionAction = RepositionAction.fromParameters(
+            params.copy(
+                speed = if (params.speed == -1f) handler.mission.flightSpeed else params.speed
             )
         )
 
@@ -283,6 +285,12 @@ class NavigationController(
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
         )
+
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(RequestMissionAction(repositionAction))
+        ) { result ->
+            logger.d { "processDoReposition: $result" }
+        }
     }
 
 //    fun setCurrentMissionItem(msg: msg_mission_item_int, aircraft: AircraftHandler) {
