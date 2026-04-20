@@ -48,11 +48,10 @@ class ParameterController(
         logger.d { "Parameters list requested: $wasRequested" }
     }
 
-    private fun msgParam(spec: ParameterSpec, value: ParamValue): msg_param_value {
-        val pValue = spec.toMavlink(value)
-        return msg_param_value().apply {
+    private fun msgParam(spec: ParameterSpec, value: ParamValue): msg_param_value =
+        msg_param_value().apply {
             param_Id = spec.name
-            param_value = pValue.toFloat()
+            param_value = spec.toMavlink(value).toFloat()
             param_type = spec.type.toShort()
             param_count = handler.aircraft.parameters.size()
             param_index = if (spec.index == -1) {
@@ -61,7 +60,6 @@ class ParameterController(
                 spec.index
             }
         }
-    }
 
     fun sendParameter(spec: ParameterSpec, value: ParamValue) {
         val msg = msgParam(spec, value)
