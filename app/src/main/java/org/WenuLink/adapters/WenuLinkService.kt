@@ -73,13 +73,16 @@ class WenuLinkService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        var contentText = "No service enabled yet"
-        if (::mavlink.isInitialized) {
-            contentText = "Sending periodic heartbeats to GCS\n"
+        var contentText = if (::mavlink.isInitialized) {
+            "Sending periodic heartbeats to GCS"
+        } else {
+            "No service enabled yet"
         }
+
         if (::webRTC.isInitialized) {
-            contentText += "WebRTC streaming"
+            contentText += "\nWebRTC streaming"
         }
+
         // TODO: update according to each present service
         startForeground(
             1,
