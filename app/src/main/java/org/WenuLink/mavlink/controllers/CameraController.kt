@@ -14,6 +14,7 @@ import com.MAVLink.enums.STORAGE_STATUS
 import com.MAVLink.enums.STORAGE_TYPE
 import com.MAVLink.enums.STORAGE_USAGE_FLAG
 import io.getstream.log.taggedLogger
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import org.WenuLink.adapters.OrientationUtils
 import org.WenuLink.adapters.WenuLinkCommand
@@ -29,6 +30,7 @@ import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.ImageStopCaptureCommandLong
 import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.RequestCameraInformationCommandLong
@@ -170,7 +172,8 @@ class CameraController(
     }
 
     private fun requestStartCapture(commandLongMsg: msg_command_long) {
-        val cameraInfo = getCamera(commandLongMsg.param1.toInt()) ?: run {
+        val params = ImageStartCaptureMessage(commandLongMsg)
+        val cameraInfo = getCamera(params.targetCameraId) ?: run {
             client.sendMessage(
                 MessageUtils.msgCommandAck(
                     commandLongMsg.msgid,
@@ -180,11 +183,7 @@ class CameraController(
             return
         }
 
-        val intervalSeconds = commandLongMsg.param2.toInt()
-        val totalPhotos = commandLongMsg.param3.toInt()
-        val initSequence = commandLongMsg.param4.toInt()
-
-        handler.camera.photoSeqIndex = initSequence
+        handler.camera.photoSeqIndex = params.sequenceNumber
 
         // register callback for the duration of this capture session
         handler.onImageCaptured = fun(cameraId, seqIndex) {
@@ -192,10 +191,12 @@ class CameraController(
             client.sendMessage(msgImageCaptured(ImageMetadata(seqIndex, true, cameraId, telemetry)))
         }
 
-        val command = if (totalPhotos == 1) {
+        val command = if (params.totalImages == 1) {
             WenuLinkCommand.Camera(TakePhotoCommand(cameraInfo.id))
         } else {
-            WenuLinkCommand.Camera(StartIntervalShootCommand(cameraInfo.id, intervalSeconds))
+            WenuLinkCommand.Camera(
+                StartIntervalShootCommand(cameraInfo.id, params.intervalSec.roundToInt())
+            )
         }
 
         client.sendMessage(
@@ -207,11 +208,9 @@ class CameraController(
 
         handler.dispatchCommand(command) { result ->
             if (result.hasError) {
-                logger.w {
-                    "requestStartCapture error: ${result.errorReason}"
-                }
+                logger.w { "requestStartCapture error: ${result.errorReason}" }
             }
-            if (totalPhotos == 1) handler.onImageCaptured = null
+            if (params.totalImages == 1) handler.onImageCaptured = null
         }
     }
 

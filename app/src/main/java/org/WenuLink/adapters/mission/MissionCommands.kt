@@ -20,7 +20,7 @@ import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.messages.ConditionYawMessage
 import org.WenuLink.mavlink.messages.DoRepositionCommandInt
-import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.NavDelayMessage
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
@@ -312,7 +312,7 @@ data class PhotoAction(private val number: Int, private val intervalSeconds: Int
         }
     ) {
     companion object {
-        fun fromParameters(params: ImageStartCaptureMissionItem): PhotoAction =
+        fun fromParameters(params: ImageStartCaptureMessage): PhotoAction =
             PhotoAction(params.totalImages, params.intervalSec.toInt())
     }
 }
