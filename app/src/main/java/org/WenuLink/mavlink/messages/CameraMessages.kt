@@ -48,7 +48,7 @@ data class SetCameraModeCommandLong(val id: Int, val mode: Int) {
  *                          ID for each capture command to prevent double captures when a command is
  *                          re-transmitted.
  */
-data class ImageStartCaptureMissionItem(
+data class ImageStartCaptureMessage(
     val targetCameraId: Int,
     val intervalSec: Float,
     val totalImages: Int,

@@ -10,7 +10,7 @@ import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.messages.ConditionYawMessage
-import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.NavDelayMessage
 import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
 import org.WenuLink.mavlink.messages.NavWaypointMissionItem
@@ -157,7 +157,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
             )
 
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> state.assembler.addActionToLast(
-                PhotoAction.fromParameters(ImageStartCaptureMissionItem(itemMsg))
+                PhotoAction.fromParameters(ImageStartCaptureMessage(itemMsg))
             )
 
             MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE ->

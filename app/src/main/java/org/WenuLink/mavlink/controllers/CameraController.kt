@@ -29,6 +29,7 @@ import org.WenuLink.adapters.camera.StopIntervalShootCommand
 import org.WenuLink.adapters.camera.StopRecordCommand
 import org.WenuLink.adapters.camera.TakePhotoCommand
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.ImageStopCaptureCommandLong
 import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.RequestCameraInformationCommandLong
