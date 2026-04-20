@@ -86,17 +86,15 @@ object FCManager {
         latitude: Double? = null,
         longitude: Double? = null,
         onResult: (String?) -> Unit
-    ) {
-        if (latitude != null && longitude != null) {
-            mInstance?.setHomeLocation(
-                LocationCoordinate2D(latitude, longitude),
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            mInstance?.setHomeLocationUsingAircraftCurrentLocation(
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        }
+    ) = if (latitude != null && longitude != null) {
+        mInstance?.setHomeLocation(
+            LocationCoordinate2D(latitude, longitude),
+            SDKUtils.createCompletionCallback(onResult)
+        )
+    } else {
+        mInstance?.setHomeLocationUsingAircraftCurrentLocation(
+            SDKUtils.createCompletionCallback(onResult)
+        )
     }
 
     fun needLandingConfirmation() = mInstance?.state?.isLandingConfirmationNeeded == true
