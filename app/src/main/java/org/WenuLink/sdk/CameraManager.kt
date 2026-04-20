@@ -172,7 +172,6 @@ object CameraManager {
             mInstance?.setMode(
                 mode,
                 SDKUtils.createCompletionCallback { error ->
-
                     if (error == null) {
                         this@CameraManager.cameraMode = mode
                     }
@@ -202,7 +201,6 @@ object CameraManager {
             mInstance?.setShootPhotoMode(
                 mode,
                 SDKUtils.createCompletionCallback { error ->
-
                     if (error == null) {
                         this@CameraManager.captureMode = mode
                     }
