@@ -169,7 +169,7 @@ interface MissionActionCommand : MissionCommand {
         else -> CommandResult.ok
     }
 
-    override suspend fun onStop(ctx: MissionHandler) = ctx.onActionError("Stop invoked")
+    override suspend fun onStop(ctx: MissionHandler) = ctx.stopAction("Stop invoked")
 }
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
@@ -202,7 +202,7 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
     override suspend fun execute(ctx: MissionHandler): UnitResult {
         // schedule and register termination
-        val scheduleResult = ctx.scheduleUrgentAction(action)
+        val scheduleResult = ctx.scheduleImmediateAction(action)
         if (scheduleResult.hasError) return scheduleResult
 
         return suspendCancellableCoroutine { cont ->
@@ -215,7 +215,7 @@ open class ActionCommand(val action: MissionAction) : MissionActionCommand {
             }
 
             cont.invokeOnCancellation {
-                ctx.onActionError("Cancellation invoked")
+                ctx.stopAction("Cancellation invoked")
             }
         }
     }
@@ -226,7 +226,7 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         GoToAction(
             LocationCoordinate2D(target.lat, target.long),
             target.alt
-        ).apply { flightSpeed = speed.coerceIn(2f, 15f) } // value should be in the range [2, 15]
+        ).apply { flightSpeed = speed } // value should be in the range [2, 15]
     ) {
     companion object {
         fun fromParameters(params: DoRepositionCommandInt): RepositionAction {

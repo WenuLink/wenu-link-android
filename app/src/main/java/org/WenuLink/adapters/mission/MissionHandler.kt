@@ -226,38 +226,35 @@ class MissionHandler : CommandHandler<MissionHandler>() {
      * MissionActionManager methods
      */
 
-    fun onActionError(description: String) {
-        logger.e { "Timeline error: $description" }
-        lastActionKey?.let { MissionActionManager.removeCallback(it) }
-        MissionActionManager.stop()
-    }
+    fun teardownActions() = lastActionKey?.let { MissionActionManager.removeCallback(it) }
 
-    fun scheduleUrgentAction(action: MissionAction): UnitResult {
-        logger.d { "Scheduling $action with urgency" }
+    fun scheduleImmediateAction(action: MissionAction): UnitResult {
+        logger.d { "Scheduling $action" }
         MissionActionManager.clearScheduleAndListeners()
-        val error = MissionActionManager.schedule(action)
-
-        if (error != null) {
-            return CommandResult.error("Error in $action: ${error.description}")
-        }
-
-        return CommandResult.ok
+        return MissionActionManager.schedule(action)
+            ?.let {
+                CommandResult.error("Error in $action: ${it.description}")
+            }
+            ?: CommandResult.ok
     }
 
-    fun onActionFinish(action: MissionAction, onFinish: (UnitResult) -> Unit) {
+    fun onActionFinish(action: MissionAction, onFinish: () -> Unit) {
         lastActionKey = MissionActionManager.onFinish(action::class) {
-            onFinish(CommandResult.ok)
-            lastActionKey?.let { MissionActionManager.removeCallback(it) } // reset at the end
+            onFinish()
+            stopAction("Action finished")
         }
     }
 
     fun performAction(onError: (String) -> Unit) {
+        logger.i { "Timeline start" }
         // start listeners and action
-        MissionActionManager.startListener {
-            onActionError(it)
-            onError(it)
-        }
-
+        MissionActionManager.startListener(onError)
         MissionActionManager.start()
+    }
+
+    fun stopAction(description: String) {
+        logger.i { "Timeline stop: $description" }
+        if (MissionActionManager.isRunning) MissionActionManager.stop()
+        teardownActions()
     }
 }

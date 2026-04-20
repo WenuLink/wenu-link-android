@@ -24,6 +24,7 @@ import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
@@ -273,10 +274,21 @@ class NavigationController(
 
     fun processDoReposition(commandIntMsg: msg_command_int) {
         val params = DoRepositionCommandInt(commandIntMsg)
+        // mission flight speed is [-15, 15], so take its absolute
+        val flightSpeed = if (params.speed == -1f) {
+            logger.d { "Using default's mission flight speed: ${handler.mission.flightSpeed} m/s" }
+            handler.mission.flightSpeed.absoluteValue
+        } else {
+            params.speed
+        }
+        // TODO: move this kind of conversion to something centralized, not sure if
+        //  DoRepositionCommandInt should have it, since also happens with MissionHandler.flightSpeed
+        //  demanding and easy to find of SDK constraints regard to commands and actions.
+        // Ensure values [2, 15]
+        val range = 2f..15f
+        if (flightSpeed !in range) logger.w { "Clipped speed $flightSpeed to [$range]" }
         val repositionAction = RepositionAction.fromParameters(
-            params.copy(
-                speed = if (params.speed == -1f) handler.mission.flightSpeed else params.speed
-            )
+            params.copy(speed = flightSpeed.coerceIn(range))
         )
 
         client.sendMessage(
