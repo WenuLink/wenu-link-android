@@ -351,24 +351,23 @@ class CameraController(
         camera_device_id = cameraInfo.id.toShort()
     }
 
-    fun msgStorageInformation(): msg_storage_information =
+    fun msgStorageInformation(): msg_storage_information = msg_storage_information().apply {
         // TODO: get from https://developer.dji.com/api-reference/android-api/Components/Camera/DJICamera_DJICameraSDCardState.html
-        msg_storage_information().apply {
-            storage_id = 1
-            storage_count = 1
-            status = STORAGE_STATUS.STORAGE_STATUS_READY.toShort()
-            total_capacity = 4096f // MB
-            used_capacity = 0f // MB
-            read_speed = 0f // MB/s
-            write_speed = 0f // MB/s
-            type = STORAGE_TYPE.STORAGE_TYPE_MICROSD.toShort()
-            name = "FakeSDCard".toByteArray()
-            storage_usage = STORAGE_USAGE_FLAG.STORAGE_USAGE_FLAG_PHOTO.toShort()
-        }
+        storage_id = 1
+        storage_count = 1
+        status = STORAGE_STATUS.STORAGE_STATUS_READY.toShort()
+        total_capacity = 4096f // MB
+        used_capacity = 0f // MB
+        read_speed = 0f // MB/s
+        write_speed = 0f // MB/s
+        type = STORAGE_TYPE.STORAGE_TYPE_MICROSD.toShort()
+        name = "FakeSDCard".toByteArray()
+        storage_usage = STORAGE_USAGE_FLAG.STORAGE_USAGE_FLAG_PHOTO.toShort()
+    }
 
     fun msgCaptureStatus(cameraInfo: CameraMetadata): msg_camera_capture_status =
-        // TODO: add proper updates
         msg_camera_capture_status().apply {
+            // TODO: add proper updates
             when (cameraInfo.state.mavlinkMode) {
                 CAMERA_MODE.CAMERA_MODE_IMAGE -> {
                     image_status = cameraInfo.state.captureStatus.value.toShort()
