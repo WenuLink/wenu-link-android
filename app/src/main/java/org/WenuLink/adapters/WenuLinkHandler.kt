@@ -28,6 +28,7 @@ import org.WenuLink.adapters.mission.ResumeActionCommand
 import org.WenuLink.adapters.mission.ResumeWaypointMission
 import org.WenuLink.adapters.mission.StopWaypointMission
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
@@ -174,6 +175,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     suspend fun loadComponents(scope: CoroutineScope): UnitResult {
         // prevent cancel command when manualControl() after boot
         dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
+
         val bootResult = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(30_000L)))
         if (bootResult.isOk) {
             manualControl()
@@ -185,6 +187,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             AsyncUtils.waitTimeout(100L, 5000L) { camera.wasInitialized }
             startMonitorJob(scope)
         }
+
         return bootResult
     }
 
@@ -194,9 +197,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         camera.unload()
         onImageCaptured = null
         stopMonitor()
-        val shutdownError =
-            dispatchAndAwait(WenuLinkCommand.Aircraft(ShutdownCommand(strictTransition)))
-        return shutdownError
+        return dispatchAndAwait(WenuLinkCommand.Aircraft(ShutdownCommand(strictTransition)))
     }
 
     fun setAuthority(authority: ControlAuthorityType): ControlAuthority {
@@ -204,13 +205,20 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         return controlAuthority
     }
 
-    fun dispatchControlAuthority(authority: ControlAuthorityType) {
+    fun dispatchControlAuthority(authority: ControlAuthorityType): UnitResult {
         // Decide policy: reject or stop mission
-        if (!controlAuthority.isNewAuthority(authority) || controlAuthority.isRemote()) return
+        if (!controlAuthority.isNewAuthority(authority)) return CommandResult.ok
+
+        if (controlAuthority.isRemote()) {
+            logger.d { "Skip authority switch: remote active" }
+            return CommandResult.error("Remote pilot has authority")
+        }
+
         // Always stop everything
         stopAllCommands()
         logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }
         setAuthority(authority)
+        return CommandResult.ok
     }
 
     fun manualControl() {
