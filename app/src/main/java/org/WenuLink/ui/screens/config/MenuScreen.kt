@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VpnKey
@@ -77,7 +76,6 @@ fun MenuScreen(navController: NavController) {
                                 "IP Addressing" -> Icons.Default.Wifi
                                 "DJI API KEY" -> Icons.Default.VpnKey
                                 "Interface" -> Icons.Default.Palette
-                                "Flight Logs" -> Icons.Default.Description
                                 else -> Icons.Default.Settings
                             },
                             contentDescription = null
