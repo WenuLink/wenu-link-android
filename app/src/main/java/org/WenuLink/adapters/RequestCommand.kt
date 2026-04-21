@@ -1,6 +1,7 @@
 package org.WenuLink.adapters
 
 import org.WenuLink.adapters.aircraft.AircraftCommand
+import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmTransition
 import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.DisarmCommand
@@ -101,7 +102,7 @@ data class RequestStartMission(
     private val alreadyArmed: Boolean = false
 ) : RequestTransition(
     if (alreadyArmed) {
-        FlyingTransition
+        TakeoffTransition
     } else {
         ArmTransition
     }
@@ -110,13 +111,23 @@ data class RequestStartMission(
         val homeResult = checkHomePosition(ctx)
         if (homeResult.hasError) return homeResult
 
+        // Handle initial transitions
         super.execute(ctx)
-
         ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
 
+        // Triggers SDK start function
         ctx.mission.setStartSequence(startSequence)
+        val startResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
+        if (startResult.hasError) return startResult
 
-        return ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
+        // Wait initial altitude for mission start (5min top)
+        val initOk = ctx.mission.waitMissionStart(300_000L)
+        if (!initOk) return CommandResult.error("Mission did not started!")
+
+        // Handle final transition
+        ctx.aircraft.dispatchTransition(FlyingTransition)
+
+        return CommandResult.ok
     }
 }
 

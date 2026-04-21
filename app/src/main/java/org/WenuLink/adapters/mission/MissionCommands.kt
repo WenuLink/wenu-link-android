@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.mission
 
-import com.MAVLink.common.msg_command_int
 import dji.common.gimbal.Attitude
 import dji.common.model.LocationCoordinate2D
 import dji.sdk.mission.timeline.actions.AircraftYawAction
@@ -78,7 +77,7 @@ data object StartWaypointMission : MissionCommand {
 
 data object PauseWaypointMission : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        ctx.state.canPauseMission() -> CommandResult.ok
+        ctx.state.isActive() -> CommandResult.ok
         else -> CommandResult.error("Not started")
     }
 
@@ -98,7 +97,7 @@ data object PauseWaypointMission : MissionCommand {
 
 data object ResumeWaypointMission : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        ctx.state.canResumeMission() -> CommandResult.ok
+        ctx.state.isPaused() -> CommandResult.ok
         else -> CommandResult.error("Already in execution")
     }
 
@@ -139,6 +138,7 @@ data object StopWaypointMission : MissionCommand {
 data object PauseActionCommand : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
         !MissionActionManager.isRunning -> CommandResult.error("Timeline not running")
+        MissionActionManager.isPaused -> CommandResult.error("Timeline already paused")
         else -> CommandResult.ok
     }
 
@@ -152,7 +152,7 @@ data object PauseActionCommand : MissionCommand {
 
 data object ResumeActionCommand : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        MissionActionManager.isRunning -> CommandResult.error("Timeline already running")
+        !MissionActionManager.isPaused -> CommandResult.error("Timeline already running")
         else -> CommandResult.ok
     }
 

@@ -258,10 +258,13 @@ class NavigationController(
             WenuLinkCommand.Request(
                 RequestStartMission(
                     params.firstItem,
-                    params.lastItem
+                    params.lastItem,
+                    handler.aircraft.state.isArmed()
                 )
             )
-        )
+        ) { result ->
+            logger.d { "missionStart: $result" }
+        }
 
         client.sendMessage(
             MessageUtils.msgCommandAck(
@@ -314,9 +317,11 @@ class NavigationController(
 //    }
 
     fun msgMissionCurrent(): msg_mission_current = msg_mission_current().apply {
-        seq = handler.mission.state.currentSequence ?: 0
+        seq = handler.mission.state.targetSequence
+        total = handler.mission.state.assembler.size()
         mission_id = handler.mission.state.id.toLong()
         mission_state = handler.mission.state.mavlink.toShort()
+        mission_mode = if (handler.mission.state.isActive()) 1 else 2
     }
 
     // TODO: start, pause, and resume procedures

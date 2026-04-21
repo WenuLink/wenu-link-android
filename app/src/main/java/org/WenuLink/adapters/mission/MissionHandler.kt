@@ -6,6 +6,8 @@ import com.MAVLink.enums.MISSION_STATE
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.adapters.aircraft.ControlAuthority
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
 import org.WenuLink.commands.UnitResult
@@ -23,35 +25,35 @@ data class MissionState(
     val startSequence: Int = 1,
     val currentSequence: Int? = null,
     val assembler: MissionAssembler = MissionAssembler(),
-    val unvisitedSequence: Boolean = false
+    val unvisitedSequence: Boolean = true,
+    val isComplete: Boolean = false
 ) {
+    // Report the next sequence as target
+    val targetSequence: Int get() = currentSequence?.let { it + 1 } ?: 0
+
     fun totalNodes(): Int = assembler.size()
 
     fun isActive() = mavlink == MISSION_STATE.MISSION_STATE_ACTIVE
+
+    fun isPaused() = mavlink == MISSION_STATE.MISSION_STATE_PAUSED
 
     fun canCreateMission() = mavlink == MISSION_STATE.MISSION_STATE_NO_MISSION
 
     fun canStartMission() = mavlink == MISSION_STATE.MISSION_STATE_NOT_STARTED
 
-    fun canPauseMission() = mavlink == MISSION_STATE.MISSION_STATE_ACTIVE
-
-    fun canResumeMission() = mavlink == MISSION_STATE.MISSION_STATE_PAUSED
-
-    fun isComplete() = mavlink == MISSION_STATE.MISSION_STATE_COMPLETE
-
-    fun setStartSequence(sequence: Int): MissionState = copy(startSequence = sequence)
+    fun setStartSequence(sequence: Int): MissionState =
+        copy(startSequence = sequence, isComplete = false)
 
     fun updateItemSequence(sequence: Int?): MissionState =
         copy(currentSequence = sequence, unvisitedSequence = true)
 
-    fun nextItemSequence(): MissionState = updateItemSequence(currentSequence?.plus(1))
-
-    fun setComplete(): MissionState = copy(mavlink = MISSION_STATE.MISSION_STATE_COMPLETE)
+    fun setComplete(): MissionState = copy(isComplete = true)
 
     fun markVisited(): MissionState = copy(unvisitedSequence = false)
 
     fun fromMissionManager(): MissionState = copy(
         mavlink = when {
+            isComplete -> MISSION_STATE.MISSION_STATE_COMPLETE
             MissionManager.isWaitingMission() -> MISSION_STATE.MISSION_STATE_NO_MISSION
             MissionManager.isMissionReady() -> MISSION_STATE.MISSION_STATE_NOT_STARTED
             MissionManager.isMissionStarted() -> MISSION_STATE.MISSION_STATE_ACTIVE
@@ -60,12 +62,16 @@ data class MissionState(
         }
     )
 
-    fun reset(): MissionState {
-        assembler.reset()
-        return copy(startSequence = 1, currentSequence = null)
-            .fromMissionManager()
-            .markVisited()
-    }
+    fun mustProcessSequence() = isActive() && unvisitedSequence
+
+    fun reset(): MissionState = copy(
+        startSequence = 1,
+        currentSequence = null,
+        isComplete = false,
+        unvisitedSequence = true
+    ).fromMissionManager()
+
+    fun clearWaypoints() = assembler.reset()
 }
 
 class MissionHandler : CommandHandler<MissionHandler>() {
@@ -109,18 +115,25 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         if (!state.unvisitedSequence) return
 
         logger.d { "Processing WP ${state.currentSequence}" }
+        // Wait for AUTO mode on first waypoint
+        if (state.currentSequence == 1) {
+            dispatchCommand(PauseWaypointMission) { result ->
+                logger.d { "PauseWaypoint result: $result" }
+            }
+        }
+
         state = state.markVisited()
     }
 
     @Synchronized
     fun setStartSequence(sequence: Int): MissionState {
-        state = state.setStartSequence(sequence)
+        state = state.reset().setStartSequence(sequence)
         return state
     }
 
     @Synchronized
     fun setCurrentSequence(sequence: Int): MissionState {
-        state = state.updateItemSequence(sequence)
+        state = state.updateItemSequence(sequence + 1) // from 0- to 1-index
         if (sequence == -1) state = state.updateItemSequence(null).setComplete().markVisited()
         return state
     }
@@ -135,8 +148,13 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     fun hasWaypointNodes(): Boolean = state.assembler.hasNodes()
 
-    fun clear() {
+    fun resetState() {
         state = state.reset()
+    }
+
+    fun clear() {
+        resetState()
+        state.clearWaypoints()
         MissionActionManager.clear()
     }
 
@@ -216,6 +234,13 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         logger.d { "Waypoint: ($coordinates) (Yaw=${params.yaw}°) (Delay=${params.holdTimeSec}s)" }
     }
 
-    fun uploadWaypoints(onResult: (UnitResult) -> Unit) =
+    /**
+     * MissionManager methods
+     */
+
+    fun uploadWaypoints(onResult: (UnitResult) -> Unit) = // TODO: retry if no success
         dispatchCommand(UploadMissionCommand(state.assembler, flightSpeed), onResult)
+
+    suspend fun waitMissionStart(timeout: Long = 300_000L): Boolean =
+        AsyncUtils.waitTimeout(500L, timeout) { state.currentSequence != null }
 }
