@@ -1,6 +1,7 @@
 package org.WenuLink.adapters
 
 import org.WenuLink.adapters.aircraft.AircraftCommand
+import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmTransition
 import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.DisarmCommand
@@ -103,7 +104,7 @@ data class RequestStartMission(
     private val alreadyArmed: Boolean = false
 ) : RequestTransition(
     if (alreadyArmed) {
-        FlyingTransition
+        TakeoffTransition
     } else {
         ArmTransition
     }
@@ -112,14 +113,29 @@ data class RequestStartMission(
         val homeResult = checkHomePosition(ctx)
         if (homeResult.hasError) return homeResult
 
+        // Handle initial transitions
         super.execute(ctx)
 
         val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
         if (authorityResult.hasError) return authorityResult
 
+        // Triggers SDK start function
         ctx.mission.setStartSequence(startSequence)
+        val startResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
+        if (startResult.hasError) return startResult
 
-        return ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
+        // Wait arm and takeoff
+        val takeoffOk = ctx.aircraft.waitFlightState(true, 15_000L)
+        if (!takeoffOk) return CommandResult.error("Vehicle did not takeoff!")
+
+        // Wait initial altitude for mission start (5min top)
+        val initOk = ctx.mission.waitMissionStart(300_000L)
+        if (!initOk) return CommandResult.error("Mission did not start!")
+
+        // Handle final transition
+        ctx.aircraft.dispatchTransition(FlyingTransition)
+
+        return CommandResult.ok
     }
 }
 
@@ -131,7 +147,10 @@ open class RequestMissionAction(private val action: MissionActionCommand) :
         val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
         if (authorityResult.hasError) return authorityResult
 
-        return ctx.dispatchAndAwait(WenuLinkCommand.Mission(action))
+        val actionResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(action))
+        if (actionResult.hasError) return authorityResult
+
+        return ctx.dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
     }
 }
 

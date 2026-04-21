@@ -118,7 +118,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
 
                         launch {
                             mission.syncState()
-                            if (mission.state.isActive()) activeMissionHooks()
+                            if (controlAuthority.isWaypoint()) waypointMissionHooks()
                         }
 
                         launch {
@@ -208,14 +208,11 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     fun dispatchControlAuthority(authority: ControlAuthorityType): UnitResult {
         // Decide policy: reject or stop mission
         if (!controlAuthority.isNewAuthority(authority)) return CommandResult.ok
-
-        if (controlAuthority.isRemote()) {
-            logger.d { "Skip authority switch: remote active" }
-            return CommandResult.error("Remote pilot has authority")
+        // stop everything when non-remote authority
+        if (!controlAuthority.isRemote()) {
+            logger.d { "Authority switch to non-remote" }
+            stopAllCommands()
         }
-
-        // Always stop everything
-        stopAllCommands()
         logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }
         setAuthority(authority)
         return CommandResult.ok
@@ -231,10 +228,12 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun missionPause() {
+        if (!mission.state.isActive()) return
+
         logger.i { "Pause mission" }
         when {
             controlAuthority.isWaypoint() ->
-                mission.dispatchCommand(PauseWaypointMission) { result ->
+                dispatchCommand(WenuLinkCommand.Mission(PauseWaypointMission)) { result ->
                     if (result.hasError) {
                         logger.i {
                             "Unable to pause the mission at ${mission.state.currentSequence}: ${result.errorReason}"
@@ -243,7 +242,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                 }
 
             controlAuthority.isCommand() ->
-                mission.dispatchCommand(PauseActionCommand) { result ->
+                dispatchCommand(WenuLinkCommand.Mission(PauseActionCommand)) { result ->
                     if (result.hasError) {
                         logger.i { "Unable to pause the command: ${result.errorReason}" }
                     }
@@ -252,39 +251,36 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun missionResume() {
+        if (!mission.state.isPaused()) return
+
         logger.i { "Resume mission" }
         when {
             controlAuthority.isWaypoint() ->
-                mission.dispatchCommand(ResumeWaypointMission) { result ->
+                dispatchCommand(WenuLinkCommand.Mission(ResumeWaypointMission)) { result ->
                     if (result.hasError) {
-                        logger.i {
-                            "Unable to resume the mission: ${result.errorReason}"
-                        }
+                        logger.i { "Unable to resume the mission: ${result.errorReason}" }
                     }
                 }
 
             controlAuthority.isCommand() ->
-                mission.dispatchCommand(ResumeActionCommand) { result ->
+                dispatchCommand(WenuLinkCommand.Mission(ResumeActionCommand)) { result ->
                     if (result.hasError) {
-                        logger.i {
-                            "Unable to resume the command: ${result.errorReason}"
-                        }
+                        logger.i { "Unable to resume the command: ${result.errorReason}" }
                     }
                 }
         }
     }
 
     fun missionStop() {
+        if (!mission.state.isActive()) return
+
         when {
-            controlAuthority.isWaypoint() -> mission.dispatchCommand(
-                StopWaypointMission
-            ) { result ->
-                if (result.hasError) {
-                    logger.w {
-                        "Unable to stop the mission: ${result.errorReason}"
+            controlAuthority.isWaypoint() ->
+                dispatchCommand(WenuLinkCommand.Mission(StopWaypointMission)) { result ->
+                    if (result.hasError) {
+                        logger.w { "Unable to stop the mission: ${result.errorReason}" }
                     }
                 }
-            }
 
             controlAuthority.isCommand() -> mission.stopCommand()
         }
@@ -296,6 +292,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun stopAllCommands() {
+        logger.d { "stopAllCommands" }
         aircraft.stopCommand()
         missionStop()
         camera.stopCommand()
@@ -320,9 +317,15 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         else -> {}
     }
 
-    private fun activeMissionHooks() = when {
-        mission.state.isComplete() -> dispatchControlAuthority(ControlAuthorityType.NONE)
-        mission.state.unvisitedSequence -> mission.processNode()
+    private fun onMissionComplete() {
+        logger.i { "Mission completed" }
+        mission.resetState()
+        manualControl()
+    }
+
+    private fun waypointMissionHooks() = when {
+        mission.state.isComplete -> onMissionComplete()
+        mission.state.mustProcessSequence() -> mission.processNode()
         else -> {}
     }
 

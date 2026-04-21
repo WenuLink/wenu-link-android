@@ -231,6 +231,11 @@ class NavigationController(
                         result.errorReason,
                         MAV_SEVERITY.MAV_SEVERITY_ERROR
                     )
+                } else {
+                    sendStatusText(
+                        "Successful mission upload",
+                        MAV_SEVERITY.MAV_SEVERITY_INFO
+                    )
                 }
             }
             sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
@@ -244,10 +249,10 @@ class NavigationController(
         }
     )
 
-    fun sendStatusText(error: String, severity: Int) = client.sendMessage(
+    fun sendStatusText(status: String, severity: Int) = client.sendMessage(
         msg_statustext().apply {
             logger.d { "sendStatusText" }
-            text = error.toByteArray()
+            text = status.toByteArray()
             this.severity = severity.toShort()
         }
     )
@@ -255,21 +260,21 @@ class NavigationController(
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
         val params = MissionStartCommandLong(commandLongMsg)
+
+        client.sendMessage(
+            MessageUtils.msgCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        )
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(
                     params.firstItem,
-                    params.lastItem
+                    params.lastItem,
+                    handler.aircraft.state.isArmed()
                 )
             )
-        )
-
-        client.sendMessage(
-            MessageUtils.msgCommandAck(
-                MAV_CMD.MAV_CMD_MISSION_START,
-                MAV_RESULT.MAV_RESULT_ACCEPTED
-            )
-        )
+        ) { result ->
+            logger.d { "missionStart: $result" }
+        }
     }
 
     fun processDoReposition(commandIntMsg: msg_command_int) {
@@ -292,15 +297,14 @@ class NavigationController(
         )
 
         client.sendMessage(
-            MessageUtils.msgCommandAck(
-                MAV_CMD.MAV_CMD_DO_REPOSITION,
-                MAV_RESULT.MAV_RESULT_ACCEPTED
-            )
+            MessageUtils.msgCommandAck(commandIntMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         )
 
         handler.dispatchCommand(
             WenuLinkCommand.Request(RequestMissionAction(repositionAction))
-        )
+        ) { result ->
+            logger.d { "processDoReposition: $result" }
+        }
     }
 
 //    fun setCurrentMissionItem(msg: msg_mission_item_int, aircraft: AircraftHandler) {
@@ -324,9 +328,11 @@ class NavigationController(
 //    }
 
     fun msgMissionCurrent(): msg_mission_current = msg_mission_current().apply {
-        seq = handler.mission.state.currentSequence ?: 0
+        seq = handler.mission.state.targetSequence
+        total = handler.mission.state.assembler.size()
         mission_id = handler.mission.state.id.toLong()
         mission_state = handler.mission.state.mavlink.toShort()
+        mission_mode = if (handler.mission.state.isActive()) 1 else 2
     }
 
     // TODO: start, pause, and resume procedures

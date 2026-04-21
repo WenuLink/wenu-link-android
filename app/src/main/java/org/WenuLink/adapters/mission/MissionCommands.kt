@@ -77,7 +77,7 @@ data object StartWaypointMission : MissionCommand {
 
 data object PauseWaypointMission : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        ctx.state.canPauseMission() -> CommandResult.ok
+        ctx.state.isActive() -> CommandResult.ok
         else -> CommandResult.error("Not started")
     }
 
@@ -97,7 +97,7 @@ data object PauseWaypointMission : MissionCommand {
 
 data object ResumeWaypointMission : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        ctx.state.canResumeMission() -> CommandResult.ok
+        ctx.state.isPaused() -> CommandResult.ok
         else -> CommandResult.error("Already in execution")
     }
 
@@ -138,6 +138,7 @@ data object StopWaypointMission : MissionCommand {
 data object PauseActionCommand : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
         !MissionActionManager.isRunning -> CommandResult.error("Timeline not running")
+        MissionActionManager.isPaused -> CommandResult.error("Timeline already paused")
         else -> CommandResult.ok
     }
 
@@ -151,7 +152,7 @@ data object PauseActionCommand : MissionCommand {
 
 data object ResumeActionCommand : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        MissionActionManager.isRunning -> CommandResult.error("Timeline already running")
+        !MissionActionManager.isPaused -> CommandResult.error("Timeline not paused")
         else -> CommandResult.ok
     }
 
@@ -229,10 +230,10 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         ).apply { flightSpeed = speed } // value should be in the range [2, 15]
     ) {
     companion object {
-        fun fromParameters(params: DoRepositionCommandInt): RepositionAction {
-            val coordinates = Coordinates3D(params.latitude, params.longitude, params.altitude)
-            return RepositionAction(coordinates, params.speed)
-        }
+        fun fromParameters(params: DoRepositionCommandInt) = RepositionAction(
+            Coordinates3D(params.latitude, params.longitude, params.altitude),
+            params.speed
+        )
     }
 }
 

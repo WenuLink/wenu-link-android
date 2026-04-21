@@ -17,15 +17,11 @@ object MissionActionManager {
     )
 
     private val logger by taggedLogger(MissionActionManager::class.java.simpleName)
-
-    private val missionControl: MissionControl
-        get() = MissionControl.getInstance()
-
+    private val missionControl get() = MissionControl.getInstance()
     private var listener: MissionControl.Listener? = null
-    private val callbacks =
-        mutableMapOf<ActionCallbackKey, MutableList<() -> Unit>>()
-
+    private val callbacks = mutableMapOf<ActionCallbackKey, MutableList<() -> Unit>>()
     val isRunning get() = missionControl.isTimelineRunning
+    val isPaused get() = missionControl.isTimelinePaused
 
     // ---- Lifecycle ----
     fun clearScheduleAndListeners() {

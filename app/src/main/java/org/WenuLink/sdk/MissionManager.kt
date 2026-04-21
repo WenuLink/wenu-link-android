@@ -100,10 +100,7 @@ object MissionManager {
                         onResult(false, "Error uploading waypoint mission!")
                     }
                 } else {
-                    onResult(
-                        false,
-                        "Error uploading mission! $error ($currentState)"
-                    )
+                    onResult(false, "Error uploading mission! $error ($currentState)")
                 }
             }
         )
