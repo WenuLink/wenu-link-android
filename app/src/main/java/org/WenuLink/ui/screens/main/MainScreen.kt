@@ -173,7 +173,6 @@ private fun StatusSection(uiState: DashboardUiState) {
                 Column(modifier = Modifier.weight(1f)) {
                     StatusCheckItem("MAVLink Svc", uiState.isMAVLinkRunning)
                     StatusCheckItem("WebRTC Svc", uiState.isWebRTCRunning)
-                    StatusCheckItem("Data Flow", uiState.isDataFlowing)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
