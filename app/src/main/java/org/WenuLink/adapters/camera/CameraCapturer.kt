@@ -55,8 +55,7 @@ class CameraCapturer : VideoCapturer {
         width: Int,
         height: Int
     ) {
-        val videoFrame =
-            videoBuffer2VideoFrame(mediaFormat, videoBuffer, width, height)
+        val videoFrame = videoBuffer2VideoFrame(mediaFormat, videoBuffer, width, height)
         if (videoFrame != null && observer != null) {
             // If frame captured and observed present, feed it
             observer!!.onFrameCaptured(videoFrame)

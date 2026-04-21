@@ -59,7 +59,8 @@ data class RequestLand(val withLandingConfirmation: Boolean = true, val timeout:
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         super.execute(ctx)
 
-        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
+        val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
+        if (authorityResult.hasError) return authorityResult
 
         val landingResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(LandAction(true)))
         if (landingResult.hasError) return landingResult
@@ -80,7 +81,8 @@ data class RequestTakeoff(val altitude: Float = 2f, val timeout: Long = 15_000L)
 
         super.execute(ctx)
 
-        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
+        val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
+        if (authorityResult.hasError) return authorityResult
 
         val takeoffResult = ctx.dispatchAndAwait(WenuLinkCommand.Aircraft(TakeoffCommand(timeout)))
         if (takeoffResult.hasError) return takeoffResult
@@ -113,7 +115,9 @@ data class RequestStartMission(
 
         // Handle initial transitions
         super.execute(ctx)
-        ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
+
+        val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
+        if (authorityResult.hasError) return authorityResult
 
         // Triggers SDK start function
         ctx.mission.setStartSequence(startSequence)
@@ -136,9 +140,13 @@ open class RequestMissionAction(private val action: MissionActionCommand) :
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         super.execute(ctx)
 
-        ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
+        val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
+        if (authorityResult.hasError) return authorityResult
 
-        return ctx.dispatchAndAwait(WenuLinkCommand.Mission(action))
+        val actionResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(action))
+        if (actionResult.hasError) return authorityResult
+
+        return ctx.dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
     }
 }
 

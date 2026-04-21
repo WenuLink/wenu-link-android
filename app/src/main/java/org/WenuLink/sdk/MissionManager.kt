@@ -93,6 +93,7 @@ object MissionManager {
                             break
                         }
                     }
+
                     if (isMissionReady()) {
                         onResult(true, null)
                     } else {
@@ -137,12 +138,9 @@ object MissionManager {
         }
 
         builder.waypointCount(mission.nWaypoints)
-        val error = operator.loadMission(builder.build())
-        if (error != null) {
-            onResult(false, error.description)
-        } else {
-            uploadWaypointMission(onResult)
-        }
+        operator.loadMission(builder.build())
+            ?.let { onResult(false, it.description) }
+            ?: uploadWaypointMission(onResult)
     }
 
     private fun mapAction(action: MissionActionCommand): WaypointAction = when (action) {

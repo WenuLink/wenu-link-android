@@ -19,7 +19,7 @@ import org.WenuLink.commands.ICommand
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.messages.ConditionYawMessage
 import org.WenuLink.mavlink.messages.DoRepositionCommandInt
-import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.NavDelayMessage
 import org.WenuLink.sdk.MissionActionManager
 import org.WenuLink.sdk.MissionManager
@@ -170,7 +170,7 @@ interface MissionActionCommand : MissionCommand {
         else -> CommandResult.ok
     }
 
-    override suspend fun onStop(ctx: MissionHandler) = MissionActionManager.stop()
+    override suspend fun onStop(ctx: MissionHandler) = ctx.stopAction("Stop invoked")
 }
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
@@ -202,34 +202,21 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
 
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
     override suspend fun execute(ctx: MissionHandler): UnitResult {
-        MissionActionManager.clear()
-
-        val error = MissionActionManager.schedule(action)
-
-        if (error != null) {
-            return CommandResult.error("Error in $action: ${error.description}")
-        }
+        // schedule and register termination
+        val scheduleResult = ctx.scheduleImmediateAction(action)
+        if (scheduleResult.hasError) return scheduleResult
 
         return suspendCancellableCoroutine { cont ->
-            val actionKey = MissionActionManager.onFinish(action::class) {
-                if (cont.isActive) {
-                    cont.resume(CommandResult.ok)
-                }
+            ctx.onActionFinish(action) {
+                cont.resume(CommandResult.ok)
             }
 
-            MissionActionManager.startListener {
-                if (cont.isActive) {
-                    // onError
-                    cont.resume(CommandResult.error("Action failed: $it"))
-                }
+            ctx.performAction { error ->
+                cont.resume(CommandResult.error(error))
             }
-
-            MissionActionManager.start()
 
             cont.invokeOnCancellation {
-                // Add SDK cancel if available
-                MissionActionManager.removeCallback(actionKey)
-                MissionActionManager.stop()
+                ctx.stopAction("Cancellation invoked")
             }
         }
     }
@@ -240,7 +227,7 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         GoToAction(
             LocationCoordinate2D(target.lat, target.long),
             target.alt
-        ).apply { flightSpeed = speed }
+        ).apply { flightSpeed = speed } // value should be in the range [2, 15]
     ) {
     companion object {
         fun fromParameters(params: DoRepositionCommandInt) = RepositionAction(
@@ -309,7 +296,7 @@ data class PhotoAction(private val number: Int, private val intervalSeconds: Int
         }
     ) {
     companion object {
-        fun fromParameters(params: ImageStartCaptureMissionItem): PhotoAction =
+        fun fromParameters(params: ImageStartCaptureMessage): PhotoAction =
             PhotoAction(params.totalImages, params.intervalSec.toInt())
     }
 }

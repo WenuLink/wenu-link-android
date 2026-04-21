@@ -3,16 +3,17 @@ package org.WenuLink.adapters.mission
 import com.MAVLink.common.msg_mission_item_int
 import com.MAVLink.enums.MAV_CMD
 import com.MAVLink.enums.MISSION_STATE
+import dji.sdk.mission.timeline.actions.MissionAction
 import io.getstream.log.taggedLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
-import org.WenuLink.adapters.aircraft.ControlAuthority
 import org.WenuLink.adapters.aircraft.Coordinates3D
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.messages.ConditionYawMessage
-import org.WenuLink.mavlink.messages.ImageStartCaptureMissionItem
+import org.WenuLink.mavlink.messages.ImageStartCaptureMessage
 import org.WenuLink.mavlink.messages.NavDelayMessage
 import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
 import org.WenuLink.mavlink.messages.NavWaypointMissionItem
@@ -88,6 +89,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     }
 
     private val logger by taggedLogger(MissionHandler::class.java.simpleName)
+    private var lastActionKey: MissionActionManager.ActionCallbackKey? = null
     var flightSpeed = 5f
         private set
     var state = MissionState()
@@ -155,11 +157,11 @@ class MissionHandler : CommandHandler<MissionHandler>() {
     fun clear() {
         resetState()
         state.clearWaypoints()
-        MissionActionManager.clear()
+        MissionActionManager.clearScheduleAndListeners()
     }
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
-        logger.d { "Append action: ${itemMsg.command}" }
+        logger.d { "Append mission item." }
 
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF -> assembleTakeoffNode(itemMsg)
@@ -175,7 +177,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
             )
 
             MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE -> state.assembler.addActionToLast(
-                PhotoAction.fromParameters(ImageStartCaptureMissionItem(itemMsg))
+                PhotoAction.fromParameters(ImageStartCaptureMessage(itemMsg))
             )
 
             MAV_CMD.MAV_CMD_IMAGE_STOP_CAPTURE ->
@@ -243,4 +245,40 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     suspend fun waitMissionStart(timeout: Long = 300_000L): Boolean =
         AsyncUtils.waitTimeout(500L, timeout) { state.currentSequence != null }
+
+    /**
+     * MissionActionManager methods
+     */
+
+    fun teardownActions() = lastActionKey?.let { MissionActionManager.removeCallback(it) }
+
+    fun scheduleImmediateAction(action: MissionAction): UnitResult {
+        logger.d { "Scheduling $action" }
+        MissionActionManager.clearScheduleAndListeners()
+        return MissionActionManager.schedule(action)
+            ?.let {
+                CommandResult.error("Error in $action: ${it.description}")
+            }
+            ?: CommandResult.ok
+    }
+
+    fun onActionFinish(action: MissionAction, onFinish: () -> Unit) {
+        lastActionKey = MissionActionManager.onFinish(action::class) {
+            onFinish()
+            stopAction("Action finished")
+        }
+    }
+
+    fun performAction(onError: (String) -> Unit) {
+        logger.i { "Timeline start" }
+        // start listeners and action
+        MissionActionManager.startListener(onError)
+        MissionActionManager.start()
+    }
+
+    fun stopAction(description: String) {
+        logger.i { "Timeline stop: $description" }
+        if (MissionActionManager.isRunning) MissionActionManager.stop()
+        teardownActions()
+    }
 }

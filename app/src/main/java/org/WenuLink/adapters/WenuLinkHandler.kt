@@ -28,6 +28,7 @@ import org.WenuLink.adapters.mission.ResumeActionCommand
 import org.WenuLink.adapters.mission.ResumeWaypointMission
 import org.WenuLink.adapters.mission.StopWaypointMission
 import org.WenuLink.commands.CommandHandler
+import org.WenuLink.commands.CommandResult
 import org.WenuLink.commands.UnitResult
 
 class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
@@ -174,6 +175,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     suspend fun loadComponents(scope: CoroutineScope): UnitResult {
         // prevent cancel command when manualControl() after boot
         dispatchControlAuthority(ControlAuthorityType.REMOTE_CONTROLLER)
+
         val bootResult = dispatchAndAwait(WenuLinkCommand.Aircraft(BootCommand(30_000L)))
         if (bootResult.isOk) {
             manualControl()
@@ -185,6 +187,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
             AsyncUtils.waitTimeout(100L, 5000L) { camera.wasInitialized }
             startMonitorJob(scope)
         }
+
         return bootResult
     }
 
@@ -202,15 +205,17 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         return controlAuthority
     }
 
-    fun dispatchControlAuthority(authority: ControlAuthorityType) {
+    fun dispatchControlAuthority(authority: ControlAuthorityType): UnitResult {
         // Decide policy: reject or stop mission
-        if (!controlAuthority.isNewAuthority(authority)) return
+        if (!controlAuthority.isNewAuthority(authority)) return CommandResult.ok
         // stop everything when non-remote authority
         if (!controlAuthority.isRemote()) {
+            logger.d { "Authority switch to non-remote" }
             stopAllCommands()
         }
         logger.d { "Control transition: ${controlAuthority.authorityType}->$authority" }
         setAuthority(authority)
+        return CommandResult.ok
     }
 
     fun manualControl() {
@@ -287,6 +292,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     fun stopAllCommands() {
+        logger.d { "stopAllCommands" }
         aircraft.stopCommand()
         missionStop()
         camera.stopCommand()
