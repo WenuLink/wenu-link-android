@@ -124,9 +124,13 @@ data class RequestStartMission(
         val startResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
         if (startResult.hasError) return startResult
 
+        // Wait arm and takeoff
+        val takeoffOk = ctx.aircraft.waitFlightState(true, 15_000L)
+        if (!takeoffOk) return CommandResult.error("Vehicle did not takeoff!")
+
         // Wait initial altitude for mission start (5min top)
         val initOk = ctx.mission.waitMissionStart(300_000L)
-        if (!initOk) return CommandResult.error("Mission did not started!")
+        if (!initOk) return CommandResult.error("Mission did not start!")
 
         // Handle final transition
         ctx.aircraft.dispatchTransition(FlyingTransition)

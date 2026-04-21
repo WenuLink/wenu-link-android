@@ -120,7 +120,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         // Wait for AUTO mode on first waypoint
         if (state.currentSequence == 1) {
             dispatchCommand(PauseWaypointMission) { result ->
-                logger.d { "PauseWaypoint result: $result" }
+                if (result.hasError) logger.w { "PauseWaypoint error: $result" }
             }
         }
 
@@ -135,8 +135,11 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     @Synchronized
     fun setCurrentSequence(sequence: Int): MissionState {
-        state = state.updateItemSequence(sequence + 1) // from 0- to 1-index
-        if (sequence == -1) state = state.updateItemSequence(null).setComplete().markVisited()
+        state = if (sequence == -1) { // final sequence
+            state.updateItemSequence(null).setComplete().markVisited()
+        } else {
+            state.updateItemSequence(sequence + 1) // from 0- to 1-index
+        }
         return state
     }
 

@@ -231,6 +231,11 @@ class NavigationController(
                         result.errorReason,
                         MAV_SEVERITY.MAV_SEVERITY_ERROR
                     )
+                } else {
+                    sendStatusText(
+                        "Successful mission upload",
+                        MAV_SEVERITY.MAV_SEVERITY_INFO
+                    )
                 }
             }
             sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
@@ -244,10 +249,10 @@ class NavigationController(
         }
     )
 
-    fun sendStatusText(error: String, severity: Int) = client.sendMessage(
+    fun sendStatusText(status: String, severity: Int) = client.sendMessage(
         msg_statustext().apply {
             logger.d { "sendStatusText" }
-            text = error.toByteArray()
+            text = status.toByteArray()
             this.severity = severity.toShort()
         }
     )
@@ -255,6 +260,10 @@ class NavigationController(
     fun missionStart(commandLongMsg: msg_command_long) {
         // TODO: Process init seq to custom first handler.mission element
         val params = MissionStartCommandLong(commandLongMsg)
+
+        client.sendMessage(
+            MessageUtils.msgCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        )
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(
@@ -266,13 +275,6 @@ class NavigationController(
         ) { result ->
             logger.d { "missionStart: $result" }
         }
-
-        client.sendMessage(
-            MessageUtils.msgCommandAck(
-                MAV_CMD.MAV_CMD_MISSION_START,
-                MAV_RESULT.MAV_RESULT_ACCEPTED
-            )
-        )
     }
 
     fun processDoReposition(commandIntMsg: msg_command_int) {
@@ -295,10 +297,7 @@ class NavigationController(
         )
 
         client.sendMessage(
-            MessageUtils.msgCommandAck(
-                MAV_CMD.MAV_CMD_DO_REPOSITION,
-                MAV_RESULT.MAV_RESULT_ACCEPTED
-            )
+            MessageUtils.msgCommandAck(commandIntMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         )
 
         handler.dispatchCommand(

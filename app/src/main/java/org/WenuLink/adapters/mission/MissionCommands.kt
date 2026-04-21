@@ -152,7 +152,7 @@ data object PauseActionCommand : MissionCommand {
 
 data object ResumeActionCommand : MissionCommand {
     override fun validate(ctx: MissionHandler): UnitResult = when {
-        !MissionActionManager.isPaused -> CommandResult.error("Timeline already running")
+        !MissionActionManager.isPaused -> CommandResult.error("Timeline not paused")
         else -> CommandResult.ok
     }
 
