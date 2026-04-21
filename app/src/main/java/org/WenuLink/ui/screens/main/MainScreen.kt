@@ -2,7 +2,21 @@ package org.WenuLink.ui.screens.main
 
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,7 +25,21 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,8 +48,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.safeDrawing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +68,9 @@ fun MainScreen(
             CenterAlignedTopAppBar(
                 title = { Text("WenuLink Status") },
                 actions = {
-                    IconButton(onClick = onNavigateToConfig) { Icon(Icons.Default.Settings, "Config") }
+                    IconButton(onClick = onNavigateToConfig) {
+                        Icon(Icons.Default.Settings, "Config")
+                    }
                     IconButton(onClick = onNavigateToAbout) { Icon(Icons.Default.Info, "About") }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -92,8 +120,12 @@ private fun PortraitContent(
 
         if (uiState.isSDKRegistered && uiState.canRunService) {
             ActionsSection(
-                uiState.isServiceRunning, uiState.isMAVLinkRunning, uiState.isWebRTCRunning,
-                onServiceToggle, onMavlinkToggle, onWebRTCToggle
+                uiState.isServiceRunning,
+                uiState.isMAVLinkRunning,
+                uiState.isWebRTCRunning,
+                onServiceToggle,
+                onMavlinkToggle,
+                onWebRTCToggle
             )
         } else {
             PlaceholderBox()
@@ -123,8 +155,12 @@ private fun LandscapeContent(
             Spacer(modifier = Modifier.height(16.dp))
             if (uiState.isSDKRegistered && uiState.canRunService) {
                 ActionsSection(
-                    uiState.isServiceRunning, uiState.isMAVLinkRunning, uiState.isWebRTCRunning,
-                    onServiceToggle, onMavlinkToggle, onWebRTCToggle
+                    uiState.isServiceRunning,
+                    uiState.isMAVLinkRunning,
+                    uiState.isWebRTCRunning,
+                    onServiceToggle,
+                    onMavlinkToggle,
+                    onWebRTCToggle
                 )
             } else {
                 PlaceholderBox()
@@ -132,7 +168,11 @@ private fun LandscapeContent(
         }
 
         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            Text("System Logs", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(
+                "System Logs",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
             Spacer(modifier = Modifier.height(8.dp))
             LogSection(uiState.recentLogs)
         }
@@ -145,7 +185,10 @@ private fun PlaceholderBox() {
         modifier = Modifier.fillMaxWidth().height(80.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text("Waiting for Aircraft Connection...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Waiting for Aircraft Connection...",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -158,7 +201,12 @@ private fun StatusSection(uiState: DashboardUiState) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("STATUS:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "STATUS:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(uiState.workflowStatus, style = MaterialTheme.typography.bodyMedium)
             }
@@ -181,7 +229,13 @@ private fun StatusSection(uiState: DashboardUiState) {
                 shape = RoundedCornerShape(4.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(uiState.telemetrySummary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), fontFamily = FontFamily.Monospace, maxLines = 1)
+                Text(
+                    uiState.telemetrySummary,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(8.dp),
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -189,7 +243,10 @@ private fun StatusSection(uiState: DashboardUiState) {
 
 @Composable
 private fun StatusCheckItem(label: String, isActive: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
         Icon(
             imageVector = if (isActive) Icons.Filled.CheckCircle else Icons.Filled.Close,
             contentDescription = null,
@@ -197,7 +254,15 @@ private fun StatusCheckItem(label: String, isActive: Boolean) {
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall, color = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isActive) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     }
 }
 
@@ -214,13 +279,22 @@ private fun ActionsSection(
         Button(
             onClick = onServiceToggle,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = if (isServiceRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isServiceRunning) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
         ) {
             Text(if (isServiceRunning) "STOP DRONE SERVICE" else "START DRONE SERVICE")
         }
         if (isServiceRunning) {
             Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(onClick = onMavlinkToggle, modifier = Modifier.weight(1f)) {
                     Text(if (isMAVLinkRunning) "Stop MAVLink" else "Start MAVLink")
                 }
@@ -244,8 +318,16 @@ private fun LogSection(messages: List<String>) {
             contentPadding = PaddingValues(bottom = 8.dp)
         ) {
             items(messages) { message ->
-                Text(message, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 2.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                )
             }
         }
     }

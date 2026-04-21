@@ -1,11 +1,22 @@
 package org.WenuLink.ui.screens.config
 
 import android.content.pm.PackageManager
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -56,7 +67,9 @@ fun KeyScreen(navController: NavController) {
             },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = 0.3f
+                )
             )
         )
 
@@ -71,7 +84,10 @@ fun KeyScreen(navController: NavController) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "This key is defined in the application Manifest and cannot be changed at runtime. To update it, modify the 'values/keys.xml' file and rebuild the app",
+                text = """
+                    |This key is defined in the application Manifest and cannot be changed at runtime.
+                    |To update it, modify the 'local.properties' file and rebuild the app.
+                """.trimMargin(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )

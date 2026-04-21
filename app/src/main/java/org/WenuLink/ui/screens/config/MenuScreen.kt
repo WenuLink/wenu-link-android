@@ -2,23 +2,37 @@ package org.WenuLink.ui.screens.config
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import org.WenuLink.ui.navigation.Screen
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.safeDrawing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +73,7 @@ fun MenuScreen(navController: NavController) {
                     supportingContent = { Text(subtitle) },
                     leadingContent = {
                         Icon(
-                            imageVector = when(title) {
+                            imageVector = when (title) {
                                 "IP Addressing" -> Icons.Default.Wifi
                                 "DJI API KEY" -> Icons.Default.VpnKey
                                 "Interface" -> Icons.Default.Palette
@@ -70,7 +84,11 @@ fun MenuScreen(navController: NavController) {
                         )
                     },
                     trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            null,
+                            modifier = Modifier.size(16.dp)
+                        )
                     },
                     modifier = Modifier
                         .clickable { navController.navigate(screenRoute.route) },
@@ -82,7 +100,9 @@ fun MenuScreen(navController: NavController) {
                         supportingColor = MaterialTheme.colorScheme.secondary
                     )
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                )
             }
         }
     }

@@ -1,11 +1,37 @@
 package org.WenuLink.ui.screens.config
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,14 +65,24 @@ fun AddressScreen(
     var isEditing by remember { mutableStateOf(false) }
 
     ConfigScaffold("Connection Settings", navController) {
-
         if (isServiceRunning) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
             ) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Stop Drone Service to edit IP addresses",
@@ -58,14 +94,21 @@ fun AddressScreen(
             }
         } else {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
             ) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if(isEditing) "Editing Mode Active" else "View Only Mode",
+                        text = if (isEditing) "Editing Mode Active" else "View Only Mode",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -108,15 +151,27 @@ fun AddressScreen(
                     settingsViewModel.saveMavlinkIp(localMavlinkIp)
                     settingsViewModel.saveWebrtcIp(localWebrtcIp)
                     isEditing = false
-                    Toast.makeText(context, "Settings saved successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Settings saved successfully",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 } else {
                     isEditing = true
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (isEditing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                containerColor = if (isEditing) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                },
+                contentColor = if (isEditing) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                }
             )
         ) {
             Icon(
@@ -140,11 +195,19 @@ fun IpFieldItem(
     onCopy: () -> Unit
 ) {
     Column {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
             value = value,
-            onValueChange = if (isEditing) onValueChange else { {} },
+            onValueChange = if (isEditing) {
+                onValueChange
+            } else {
+                {}
+            },
             readOnly = !isEditing,
             placeholder = { Text(placeholder, color = Color.Gray) },
             modifier = Modifier.fillMaxWidth(),
@@ -153,15 +216,29 @@ fun IpFieldItem(
             trailingIcon = {
                 if (!isEditing) {
                     IconButton(onClick = onCopy) {
-                        Icon(Icons.Default.ContentCopy, "Copy", tint = MaterialTheme.colorScheme.outline)
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            "Copy",
+                            tint = MaterialTheme.colorScheme.outline
+                        )
                     }
                 } else {
                     Icon(Icons.Default.Edit, "Editing", tint = MaterialTheme.colorScheme.primary)
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = if(isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                unfocusedContainerColor = if(!isEditing) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent
+                focusedBorderColor = if (isEditing) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outline
+                },
+                unfocusedContainerColor = if (!isEditing) {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(
+                        alpha = 0.3f
+                    )
+                } else {
+                    Color.Transparent
+                }
             )
         )
     }

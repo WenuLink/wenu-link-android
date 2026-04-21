@@ -14,25 +14,20 @@ object PrefsManager {
     private val _themeFlow = MutableStateFlow<Int?>(null)
     val themeFlow = _themeFlow.asStateFlow()
 
-    private fun getPrefs(context: Context): SharedPreferences {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
+    private fun getPrefs(context: Context): SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun getMavlinkIp(context: Context): String {
-        return getPrefs(context).getString(KEY_MAVLINK_IP, "192.168.1.220") ?: "192.168.1.220"
-    }
+    fun getMavlinkIp(context: Context): String =
+        getPrefs(context).getString(KEY_MAVLINK_IP, "192.168.1.220") ?: "192.168.1.220"
 
-    fun saveMavlinkIp(context: Context, ip: String) {
+    fun saveMavlinkIp(context: Context, ip: String) =
         getPrefs(context).edit().putString(KEY_MAVLINK_IP, ip).apply()
-    }
 
-    fun getWebRtcIp(context: Context): String {
-        return getPrefs(context).getString(KEY_WEBRTC_IP, "192.168.1.100") ?: "192.168.1.100"
-    }
+    fun getWebRtcIp(context: Context): String =
+        getPrefs(context).getString(KEY_WEBRTC_IP, "192.168.1.100") ?: "192.168.1.100"
 
-    fun saveWebRtcIp(context: Context, ip: String) {
+    fun saveWebRtcIp(context: Context, ip: String) =
         getPrefs(context).edit().putString(KEY_WEBRTC_IP, ip).apply()
-    }
 
     fun getThemeMode(context: Context): Int {
         val mode = getPrefs(context).getInt(KEY_THEME, 0)
