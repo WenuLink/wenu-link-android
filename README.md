@@ -71,7 +71,7 @@ WenuLink is designed for:
 - **Angel Ayala Maldonado** — PhD in Computational Science at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil; Co-advisor of the [DeltaV Drones](https://deltavquad.github.io/) team.
 - **Maximilian Johenneken** — Researcher at the Hochschule Bonn-Rhein-Sieg (H-BRS), Germany; specialization in UAV systems, machine learning and computer vision.
 - **Eliton Sena de Souza** — Operational Leader of the [DeltaV Drones](https://deltavquad.github.io/) team; Computer Engineering student at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil.
-- **Timon Schreiber** - Software Developer (Placeholder)
+- **Timon Schreiber** - Computer Science Student (H-BRS)
 ---
 
 ## Contribute

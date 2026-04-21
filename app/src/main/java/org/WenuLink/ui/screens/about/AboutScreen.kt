@@ -62,7 +62,7 @@ fun AboutScreen(navController: NavController) {
             "PhD in Computational Science / Co-advisor at DeltaV Drones Team (POLI-UPE)",
         "Max Johenneken" to "Researcher in UAV Systems (H-BRS)",
         "Eliton Sena de Souza" to "Operational Leader at DeltaV Drones Team (POLI-UPE)",
-        "Timon Schreiber" to "Developer (Placeholder)" // TODO: add description
+        "Timon Schreiber" to "Computer Science Student (H-BRS)"
     )
 
     val onOpenGithub = {
