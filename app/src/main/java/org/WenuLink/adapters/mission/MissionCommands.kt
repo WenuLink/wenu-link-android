@@ -1,6 +1,5 @@
 package org.WenuLink.adapters.mission
 
-import com.MAVLink.common.msg_command_int
 import dji.common.gimbal.Attitude
 import dji.common.model.LocationCoordinate2D
 import dji.sdk.mission.timeline.actions.AircraftYawAction
@@ -170,7 +169,7 @@ interface MissionActionCommand : MissionCommand {
         else -> CommandResult.ok
     }
 
-    override suspend fun onStop(ctx: MissionHandler) = MissionActionManager.stop()
+    override suspend fun onStop(ctx: MissionHandler) = ctx.stopAction("Stop invoked")
 }
 
 data class DelayAction(val timeMillis: Long) : MissionActionCommand {
@@ -202,34 +201,21 @@ data class DelayAction(val timeMillis: Long) : MissionActionCommand {
 
 open class ActionCommand(val action: MissionAction) : MissionActionCommand {
     override suspend fun execute(ctx: MissionHandler): UnitResult {
-        MissionActionManager.clear()
-
-        val error = MissionActionManager.schedule(action)
-
-        if (error != null) {
-            return CommandResult.error("Error in $action: ${error.description}")
-        }
+        // schedule and register termination
+        val scheduleResult = ctx.scheduleImmediateAction(action)
+        if (scheduleResult.hasError) return scheduleResult
 
         return suspendCancellableCoroutine { cont ->
-            val actionKey = MissionActionManager.onFinish(action::class) {
-                if (cont.isActive) {
-                    cont.resume(CommandResult.ok)
-                }
+            ctx.onActionFinish(action) {
+                cont.resume(CommandResult.ok)
             }
 
-            MissionActionManager.startListener {
-                if (cont.isActive) {
-                    // onError
-                    cont.resume(CommandResult.error("Action failed: $it"))
-                }
+            ctx.performAction { error ->
+                cont.resume(CommandResult.error(error))
             }
-
-            MissionActionManager.start()
 
             cont.invokeOnCancellation {
-                // Add SDK cancel if available
-                MissionActionManager.removeCallback(actionKey)
-                MissionActionManager.stop()
+                ctx.stopAction("Cancellation invoked")
             }
         }
     }
@@ -240,15 +226,12 @@ data class RepositionAction(private val target: Coordinates3D, private val speed
         GoToAction(
             LocationCoordinate2D(target.lat, target.long),
             target.alt
-        ).apply { flightSpeed = speed }
+        ).apply { flightSpeed = speed } // value should be in the range [2, 15]
     ) {
     companion object {
-        fun fromCommandInt(commandIntMsg: msg_command_int): RepositionAction {
-            val params = DoRepositionCommandInt(commandIntMsg)
-            return RepositionAction(
-                Coordinates3D(params.latitude, params.longitude, params.altitude),
-                if (params.speed == -1f) 1f else params.speed
-            )
+        fun fromParameters(params: DoRepositionCommandInt): RepositionAction {
+            val coordinates = Coordinates3D(params.latitude, params.longitude, params.altitude)
+            return RepositionAction(coordinates, params.speed)
         }
     }
 }

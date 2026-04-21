@@ -155,9 +155,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processTakeoff: $commandMsg" }
         val params = NavTakeoffCommandLong(commandMsg)
         handler.dispatchCommand(
-            WenuLinkCommand.Request(
-                RequestTakeoff(params.altitude)
-            )
+            WenuLinkCommand.Request(RequestTakeoff(params.altitude))
         ) { result ->
             if (result.hasError) logger.e { "Takeoff error: ${result.errorReason}" }
         }
@@ -200,9 +198,7 @@ class CommandController(override var client: MAVLinkClient, override val handler
         logger.d { "processYaw: $commandMsg" }
         handler.dispatchCommand(
             WenuLinkCommand.Request(
-                RequestMissionAction(
-                    RotateAction.fromParameters(ConditionYawMessage(commandMsg))
-                )
+                RequestMissionAction(RotateAction.fromParameters(ConditionYawMessage(commandMsg)))
             )
         ) { result ->
             logger.d { "processYaw: $result" }

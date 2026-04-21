@@ -28,7 +28,7 @@ object MissionActionManager {
     val isRunning get() = missionControl.isTimelineRunning
 
     // ---- Lifecycle ----
-    fun clear() {
+    fun clearScheduleAndListeners() {
         missionControl.unscheduleEverything()
         stopListener()
     }

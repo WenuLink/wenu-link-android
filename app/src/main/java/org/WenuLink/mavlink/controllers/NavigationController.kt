@@ -24,6 +24,7 @@ import com.MAVLink.enums.MAV_MISSION_TYPE
 import com.MAVLink.enums.MAV_RESULT
 import com.MAVLink.enums.MAV_SEVERITY
 import io.getstream.log.taggedLogger
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import org.WenuLink.adapters.RequestMissionAction
 import org.WenuLink.adapters.RequestStartMission
@@ -32,6 +33,7 @@ import org.WenuLink.adapters.WenuLinkHandler
 import org.WenuLink.adapters.mission.MissionNode
 import org.WenuLink.adapters.mission.RepositionAction
 import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.DoRepositionCommandInt
 import org.WenuLink.mavlink.messages.MessageUtils
 import org.WenuLink.mavlink.messages.MissionStartCommandLong
 import org.WenuLink.mavlink.messages.NavLandMissionItem
@@ -271,10 +273,22 @@ class NavigationController(
     }
 
     fun processDoReposition(commandIntMsg: msg_command_int) {
-        handler.dispatchCommand(
-            WenuLinkCommand.Request(
-                RequestMissionAction(RepositionAction.fromCommandInt(commandIntMsg))
-            )
+        val params = DoRepositionCommandInt(commandIntMsg)
+        // mission flight speed is [-15, 15], so take its absolute
+        val flightSpeed = if (params.speed == -1f) {
+            logger.d { "Using default's mission flight speed: ${handler.mission.flightSpeed} m/s" }
+            handler.mission.flightSpeed.absoluteValue
+        } else {
+            params.speed
+        }
+        // TODO: move this kind of conversion to something centralized, not sure if
+        //  DoRepositionCommandInt should have it, since also happens with MissionHandler.flightSpeed
+        //  demanding and easy to find of SDK constraints regard to commands and actions.
+        // Ensure values [2, 15]
+        val range = 2f..15f
+        if (flightSpeed !in range) logger.w { "Clipped speed $flightSpeed to [$range]" }
+        val repositionAction = RepositionAction.fromParameters(
+            params.copy(speed = flightSpeed.coerceIn(range))
         )
 
         client.sendMessage(
@@ -282,6 +296,10 @@ class NavigationController(
                 MAV_CMD.MAV_CMD_DO_REPOSITION,
                 MAV_RESULT.MAV_RESULT_ACCEPTED
             )
+        )
+
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(RequestMissionAction(repositionAction))
         )
     }
 

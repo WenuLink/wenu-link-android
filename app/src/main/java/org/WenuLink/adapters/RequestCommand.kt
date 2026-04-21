@@ -125,7 +125,7 @@ open class RequestMissionAction(private val action: MissionActionCommand) :
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         super.execute(ctx)
 
-        ctx.dispatchControlAuthority(ControlAuthorityType.WAYPOINT_MISSION)
+        ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
 
         return ctx.dispatchAndAwait(WenuLinkCommand.Mission(action))
     }
