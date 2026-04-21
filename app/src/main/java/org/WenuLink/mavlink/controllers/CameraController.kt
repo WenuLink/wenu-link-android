@@ -164,7 +164,7 @@ class CameraController(
 
     private fun getCamera(targetCamera: Int): CameraMetadata? =
         handler.camera.getCamera(targetCamera).also {
-            if (it == null) logger.d { "Camera index $targetCamera not found" }
+            it ?: logger.d { "Camera index $targetCamera not found" }
         }
 
     private fun requestStartCapture(commandLongMsg: msg_command_long) {

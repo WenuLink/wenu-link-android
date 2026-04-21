@@ -121,7 +121,10 @@ class CommandController(override var client: MAVLinkClient, override val handler
                     sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
                 }
             }
-            ?: sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            ?: {
+                logger.d { "FlightMode ${params.customMode} not found" }
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            }
     }
 
     fun processArmDisarm(commandMsg: msg_command_long) {
