@@ -6,7 +6,6 @@ data class DashboardUiState(
     val isSDKRegistered: Boolean = false,
     val canRunService: Boolean = false,
     val isServiceRunning: Boolean = false,
-    val isDataFlowing: Boolean = false,
     val isMAVLinkRunning: Boolean = false,
     val isWebRTCRunning: Boolean = false,
     val telemetrySummary: String = "No Telemetry Data",
