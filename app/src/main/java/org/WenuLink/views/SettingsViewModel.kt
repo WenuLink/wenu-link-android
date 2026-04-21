@@ -5,29 +5,29 @@ import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.WenuLink.ui.utils.PrefsManager
+import org.WenuLink.WenuLinkPreferences
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _mavlinkIp = MutableStateFlow(PrefsManager.getMavlinkIp(application))
+    private val _mavlinkIp = MutableStateFlow(WenuLinkPreferences.getMavlinkIp(application))
     val mavlinkIp: StateFlow<String> = _mavlinkIp.asStateFlow()
 
-    private val _webrtcIp = MutableStateFlow(PrefsManager.getWebRtcIp(application))
+    private val _webrtcIp = MutableStateFlow(WenuLinkPreferences.getWebRtcIp(application))
     val webrtcIp: StateFlow<String> = _webrtcIp.asStateFlow()
 
-    val themeMode: StateFlow<Int?> = PrefsManager.themeFlow
+    val themeMode: StateFlow<Int?> = WenuLinkPreferences.themeFlow
 
     fun saveMavlinkIp(ip: String) {
-        PrefsManager.saveMavlinkIp(getApplication(), ip)
+        WenuLinkPreferences.saveMavlinkIp(getApplication(), ip)
         _mavlinkIp.value = ip
     }
 
     fun saveWebrtcIp(ip: String) {
-        PrefsManager.saveWebRtcIp(getApplication(), ip)
+        WenuLinkPreferences.saveWebRtcIp(getApplication(), ip)
         _webrtcIp.value = ip
     }
 
     fun saveThemeMode(mode: Int) {
-        PrefsManager.saveThemeMode(getApplication(), mode)
+        WenuLinkPreferences.saveThemeMode(getApplication(), mode)
     }
 }

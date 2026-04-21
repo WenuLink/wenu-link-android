@@ -1,11 +1,11 @@
-package org.WenuLink.ui.utils
+package org.WenuLink
 
 import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-// TODO: Reallocate preferences manager
-object PrefsManager {
+
+object WenuLinkPreferences {
     private const val PREFS_NAME = "wenulink_config"
     private const val KEY_MAVLINK_IP = "mavlink_ip"
     private const val KEY_WEBRTC_IP = "webrtc_ip"

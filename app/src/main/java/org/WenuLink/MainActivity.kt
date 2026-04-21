@@ -20,7 +20,6 @@ import java.util.Date
 import java.util.Locale
 import org.WenuLink.ui.navigation.AppNavigation
 import org.WenuLink.ui.theme.WenuLinkTheme
-import org.WenuLink.ui.utils.PrefsManager
 import org.WenuLink.views.ServicesViewModel
 import org.WenuLink.views.SettingsViewModel
 
@@ -71,8 +70,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
 
-            val initialTheme = remember { PrefsManager.getThemeMode(context) }
-            val themeMode by PrefsManager.themeFlow.collectAsState(initial = initialTheme)
+            val initialTheme = remember { WenuLinkPreferences.getThemeMode(context) }
+            val themeMode by WenuLinkPreferences.themeFlow.collectAsState(initial = initialTheme)
 
             val darkTheme = when (themeMode) {
                 1 -> false
