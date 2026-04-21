@@ -15,18 +15,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
-import io.getstream.log.taggedLogger
-import org.WenuLink.sdk.SDKManager
-import org.WenuLink.ui.navigation.AppNavigation
-import org.WenuLink.ui.theme.WenuLinkTheme
-import org.WenuLink.ui.utils.PrefsManager
-import org.WenuLink.views.HomeViewModel
-import org.WenuLink.views.ServicesViewModel
-import org.WenuLink.views.SettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.WenuLink.ui.navigation.AppNavigation
+import org.WenuLink.ui.theme.WenuLinkTheme
+import org.WenuLink.ui.utils.PrefsManager
+import org.WenuLink.views.ServicesViewModel
+import org.WenuLink.views.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -38,7 +34,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val logger by taggedLogger(MainActivity::class.java.simpleName)
     private lateinit var thisApp: WenuLinkApp
 
     private val servicesViewModel: ServicesViewModel by viewModels()
@@ -86,7 +81,9 @@ class MainActivity : ComponentActivity() {
             }
 
             WenuLinkTheme(darkTheme = darkTheme) {
-                var logMessages by remember { mutableStateOf(listOf("Waiting System Initialization...")) }
+                var logMessages by remember {
+                    mutableStateOf(listOf("Waiting System Initialization..."))
+                }
 
                 val addLog: (String) -> Unit = { message ->
                     val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
@@ -99,7 +96,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 AppNavigation(
-                    homeViewModel = homeViewModel,
+                    app = thisApp,
                     servicesViewModel = servicesViewModel,
                     settingsViewModel = settingsViewModel,
                     logMessages = logMessages,
