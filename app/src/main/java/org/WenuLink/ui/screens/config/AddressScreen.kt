@@ -186,7 +186,7 @@ fun AddressScreen(
 }
 
 @Composable
-fun IpFieldItem(
+private fun IpFieldItem(
     label: String,
     value: String,
     isEditing: Boolean,

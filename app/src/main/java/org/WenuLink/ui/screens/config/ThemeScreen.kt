@@ -26,7 +26,7 @@ import org.WenuLink.views.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThemeScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+private fun ThemeScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
     val currentMode by settingsViewModel.themeMode.collectAsState(initial = 0)
 
     ConfigScaffold("Appearance", navController) {
@@ -77,7 +77,7 @@ fun ThemeScreen(navController: NavController, settingsViewModel: SettingsViewMod
 }
 
 @Composable
-fun ThemeOptionItem(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ThemeOptionItem(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
