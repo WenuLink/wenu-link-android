@@ -1,5 +1,6 @@
 package org.WenuLink.ui.screens.config
 
+import android.content.ClipData
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,17 +32,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import org.WenuLink.views.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +55,8 @@ fun AddressScreen(
     isServiceRunning: Boolean
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     // config variable
     val currentMavlinkIp by settingsViewModel.mavlinkIp.collectAsState()
@@ -123,7 +127,9 @@ fun AddressScreen(
             placeholder = "e.g. 192.168.1.220",
             onValueChange = { localMavlinkIp = it },
             onCopy = {
-                clipboardManager.setText(AnnotatedString(currentMavlinkIp))
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentMavlinkIp)))
+                }
                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
         )
@@ -137,7 +143,9 @@ fun AddressScreen(
             placeholder = "e.g. 192.168.1.100",
             onValueChange = { localWebrtcIp = it },
             onCopy = {
-                clipboardManager.setText(AnnotatedString(currentWebrtcIp))
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentWebrtcIp)))
+                }
                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
         )
