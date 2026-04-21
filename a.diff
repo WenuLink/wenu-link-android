@@ -1,0 +1,121 @@
+diff --git a/app/src/main/java/org/WenuLink/WenuLinkPreferences.kt b/app/src/main/java/org/WenuLink/WenuLinkPreferences.kt
+index 02d4ed0..dccae52 100644
+--- a/app/src/main/java/org/WenuLink/WenuLinkPreferences.kt
++++ b/app/src/main/java/org/WenuLink/WenuLinkPreferences.kt
+@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
+ 
+ object WenuLinkPreferences {
+     private const val PREFS_NAME = "wenulink_config"
+-    private const val KEY_MAVLINK_IP = "mavlink_ip"
+-    private const val KEY_WEBRTC_IP = "webrtc_ip"
++    private const val KEY_MAVLINK_GCS_ADDR = "mavlink_gcs_addr"
++    private const val KEY_WEBRTC_SIGNAL_ADDR = "webrtc_signal_addr"
+     private const val KEY_THEME = "app_theme_mode"
+ 
+     private val _themeFlow = MutableStateFlow<Int?>(null)
+@@ -18,16 +18,18 @@ object WenuLinkPreferences {
+         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+ 
+     fun getMavlinkIp(context: Context): String =
+-        getPrefs(context).getString(KEY_MAVLINK_IP, "192.168.1.220") ?: "192.168.1.220"
++        getPrefs(context).getString(KEY_MAVLINK_GCS_ADDR, "192.168.1.220:14550")
++            ?: "192.168.1.220:14550"
+ 
+     fun saveMavlinkIp(context: Context, ip: String) =
+-        getPrefs(context).edit().putString(KEY_MAVLINK_IP, ip).apply()
++        getPrefs(context).edit().putString(KEY_MAVLINK_GCS_ADDR, ip).apply()
+ 
+     fun getWebRtcIp(context: Context): String =
+-        getPrefs(context).getString(KEY_WEBRTC_IP, "192.168.1.100") ?: "192.168.1.100"
++        getPrefs(context).getString(KEY_WEBRTC_SIGNAL_ADDR, "192.168.1.100:8090")
++            ?: "192.168.1.100:8090"
+ 
+     fun saveWebRtcIp(context: Context, ip: String) =
+-        getPrefs(context).edit().putString(KEY_WEBRTC_IP, ip).apply()
++        getPrefs(context).edit().putString(KEY_WEBRTC_SIGNAL_ADDR, ip).apply()
+ 
+     fun getThemeMode(context: Context): Int {
+         val mode = getPrefs(context).getInt(KEY_THEME, 0)
+diff --git a/app/src/main/java/org/WenuLink/ui/navigation/AppNavigation.kt b/app/src/main/java/org/WenuLink/ui/navigation/AppNavigation.kt
+index bc2bfda..9b9592f 100644
+--- a/app/src/main/java/org/WenuLink/ui/navigation/AppNavigation.kt
++++ b/app/src/main/java/org/WenuLink/ui/navigation/AppNavigation.kt
+@@ -107,10 +107,10 @@ fun AppNavigation(
+         composable(Screen.ConfigMenu.route) {
+             MenuScreen(navController)
+         }
+-        composable(Screen.ConfigIp.route) {
++        composable(Screen.ConfigMAVLink.route) {
+             AddressScreen(navController, settingsViewModel, isServiceRunning)
+         }
+-        composable(Screen.ConfigDji.route) {
++        composable(Screen.ConfigWebRTC.route) {
+             KeyScreen(navController)
+         }
+         composable(Screen.ConfigTheme.route) {
+diff --git a/app/src/main/java/org/WenuLink/ui/navigation/Screen.kt b/app/src/main/java/org/WenuLink/ui/navigation/Screen.kt
+index 91f3640..2178c67 100644
+--- a/app/src/main/java/org/WenuLink/ui/navigation/Screen.kt
++++ b/app/src/main/java/org/WenuLink/ui/navigation/Screen.kt
+@@ -5,7 +5,7 @@ sealed class Screen(val route: String) {
+     object About : Screen("about")
+ 
+     object ConfigMenu : Screen("config_menu")
+-    object ConfigIp : Screen("config_ip")
+-    object ConfigDji : Screen("config_dji")
++    object ConfigMAVLink : Screen("config_mavlink")
++    object ConfigWebRTC : Screen("config_webrtc")
+     object ConfigTheme : Screen("config_theme")
+ }
+diff --git a/app/src/main/java/org/WenuLink/ui/screens/config/AddressScreen.kt b/app/src/main/java/org/WenuLink/ui/screens/config/AddressScreen.kt
+index 55d8728..fd3826d 100644
+--- a/app/src/main/java/org/WenuLink/ui/screens/config/AddressScreen.kt
++++ b/app/src/main/java/org/WenuLink/ui/screens/config/AddressScreen.kt
+@@ -121,7 +121,7 @@ fun AddressScreen(
+         }
+ 
+         IpFieldItem(
+-            label = "MAVLink GCS IP Address",
++            label = "MAVLink GCS Address",
+             value = localMavlinkIp,
+             isEditing = isEditing,
+             placeholder = "e.g. 192.168.1.220",
+@@ -137,7 +137,7 @@ fun AddressScreen(
+         Spacer(modifier = Modifier.height(16.dp))
+ 
+         IpFieldItem(
+-            label = "WebRTC Signaling IP Address",
++            label = "WebRTC Signaling Address",
+             value = localWebrtcIp,
+             isEditing = isEditing,
+             placeholder = "e.g. 192.168.1.100",
+diff --git a/app/src/main/java/org/WenuLink/ui/screens/config/MenuScreen.kt b/app/src/main/java/org/WenuLink/ui/screens/config/MenuScreen.kt
+index 4d7145d..1ee347f 100644
+--- a/app/src/main/java/org/WenuLink/ui/screens/config/MenuScreen.kt
++++ b/app/src/main/java/org/WenuLink/ui/screens/config/MenuScreen.kt
+@@ -37,9 +37,9 @@ import org.WenuLink.ui.navigation.Screen
+ @Composable
+ fun MenuScreen(navController: NavController) {
+     val settingsItems = listOf(
+-        Triple("IP Addressing", "MAVLink and WebRTC IP Settings", Screen.ConfigIp),
+-        Triple("DJI API KEY", "DJI Registration Details", Screen.ConfigDji),
+-        Triple("Interface", "Theme & Display", Screen.ConfigTheme)
++        Triple("MAVLink protocol", "MAVLink Protocol Settings", Screen.ConfigMAVLink),
++        Triple("WebRTC streaming", "WebRTC Streaming Settings", Screen.ConfigWebRTC),
++        Triple("WenuLink Interface", "Theme & Display", Screen.ConfigTheme)
+     )
+ 
+     Scaffold(
+@@ -73,9 +73,9 @@ fun MenuScreen(navController: NavController) {
+                     leadingContent = {
+                         Icon(
+                             imageVector = when (title) {
+-                                "IP Addressing" -> Icons.Default.Wifi
+-                                "DJI API KEY" -> Icons.Default.VpnKey
+-                                "Interface" -> Icons.Default.Palette
++                                "MAVLink protocol" -> Icons.Default.Wifi
++                                "WebRTC streaming" -> Icons.Default.VpnKey
++                                "WenuLink Interface" -> Icons.Default.Palette
+                                 else -> Icons.Default.Settings
+                             },
+                             contentDescription = null
