@@ -26,7 +26,7 @@ import org.WenuLink.views.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ThemeScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+fun ThemeScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
     val currentMode by settingsViewModel.themeMode.collectAsState(initial = 0)
 
     ConfigScaffold("Appearance", navController) {
