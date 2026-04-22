@@ -45,30 +45,53 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
+import org.WenuLink.ui.navigation.AddressTarget
 import org.WenuLink.views.SettingsViewModel
+
+private data class AddressScreenConfig(
+    val title: String,
+    val label: String,
+    val placeholder: String,
+    val onSave: () -> Unit
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddressScreen(
     navController: NavController,
     settingsViewModel: SettingsViewModel,
-    isServiceRunning: Boolean
+    isServiceRunning: Boolean,
+    target: AddressTarget
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
 
     // config variable
-    val currentMavlinkIp by settingsViewModel.mavlinkIp.collectAsState()
-    val currentWebrtcIp by settingsViewModel.webrtcIp.collectAsState()
+    val currentAddress by when (target) {
+        is AddressTarget.MAVLink -> settingsViewModel.mavlinkIp.collectAsState()
+        is AddressTarget.WebRTC -> settingsViewModel.webrtcIp.collectAsState()
+    }
 
-    // temp variable
-    var localMavlinkIp by remember(currentMavlinkIp) { mutableStateOf(currentMavlinkIp) }
-    var localWebrtcIp by remember(currentWebrtcIp) { mutableStateOf(currentWebrtcIp) }
+    var localAddress by remember(currentAddress) { mutableStateOf(currentAddress) }
 
     var isEditing by remember { mutableStateOf(false) }
 
-    ConfigScaffold("Connection Settings", navController) {
+    val config: AddressScreenConfig = when (target) {
+        is AddressTarget.MAVLink -> AddressScreenConfig(
+            "MAVLink Protocol",
+            "MAVLink GCS Address",
+            "e.g. 192.168.1.220:14550"
+        ) { settingsViewModel.saveMavlinkIp(localAddress) }
+
+        is AddressTarget.WebRTC -> AddressScreenConfig(
+            "WebRTC Streaming",
+            "WebRTC Signaling Address",
+            "e.g. 192.168.1.100:8090"
+        ) { settingsViewModel.saveWebrtcIp(localAddress) }
+    }
+
+    ConfigScaffold(config.title, navController) {
         if (isServiceRunning) {
             Card(
                 colors = CardDefaults.cardColors(
@@ -89,7 +112,7 @@ fun AddressScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Stop Drone Service to edit IP addresses",
+                        text = "Stop Drone Service to edit addresses",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         fontWeight = FontWeight.Bold
@@ -121,30 +144,14 @@ fun AddressScreen(
         }
 
         IpFieldItem(
-            label = "MAVLink GCS IP Address",
-            value = localMavlinkIp,
+            label = config.label,
+            value = localAddress,
             isEditing = isEditing,
-            placeholder = "e.g. 192.168.1.220",
-            onValueChange = { localMavlinkIp = it },
+            placeholder = config.placeholder,
+            onValueChange = { localAddress = it },
             onCopy = {
                 scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentMavlinkIp)))
-                }
-                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-            }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        IpFieldItem(
-            label = "WebRTC Signaling IP Address",
-            value = localWebrtcIp,
-            isEditing = isEditing,
-            placeholder = "e.g. 192.168.1.100",
-            onValueChange = { localWebrtcIp = it },
-            onCopy = {
-                scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentWebrtcIp)))
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentAddress)))
                 }
                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
@@ -156,17 +163,14 @@ fun AddressScreen(
             enabled = !isServiceRunning,
             onClick = {
                 if (isEditing) {
-                    settingsViewModel.saveMavlinkIp(localMavlinkIp)
-                    settingsViewModel.saveWebrtcIp(localWebrtcIp)
-                    isEditing = false
+                    config.onSave()
                     Toast.makeText(
                         context,
                         "Settings saved successfully",
                         Toast.LENGTH_SHORT
                     ).show()
-                } else {
-                    isEditing = true
                 }
+                isEditing = !isEditing
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
@@ -211,18 +215,22 @@ private fun IpFieldItem(
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
             value = value,
-            onValueChange = if (isEditing) {
-                onValueChange
-            } else {
-                {}
-            },
+            onValueChange = onValueChange,
             readOnly = !isEditing,
             placeholder = { Text(placeholder, color = Color.Gray) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = FontFamily.Monospace
+            ),
             trailingIcon = {
-                if (!isEditing) {
+                if (isEditing) {
+                    Icon(
+                        Icons.Default.Edit,
+                        "Editing",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else {
                     IconButton(onClick = onCopy) {
                         Icon(
                             Icons.Default.ContentCopy,
@@ -230,8 +238,6 @@ private fun IpFieldItem(
                             tint = MaterialTheme.colorScheme.outline
                         )
                     }
-                } else {
-                    Icon(Icons.Default.Edit, "Editing", tint = MaterialTheme.colorScheme.primary)
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
@@ -240,12 +246,12 @@ private fun IpFieldItem(
                 } else {
                     MaterialTheme.colorScheme.outline
                 },
-                unfocusedContainerColor = if (!isEditing) {
+                unfocusedContainerColor = if (isEditing) {
+                    Color.Transparent
+                } else {
                     MaterialTheme.colorScheme.surfaceVariant.copy(
                         alpha = 0.3f
                     )
-                } else {
-                    Color.Transparent
                 }
             )
         )

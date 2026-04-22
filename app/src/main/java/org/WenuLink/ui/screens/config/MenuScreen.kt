@@ -11,9 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -28,18 +27,41 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import org.WenuLink.ui.navigation.Screen
 
+private data class SettingsItem(
+    val title: String,
+    val subtitle: String,
+    val screen: Screen,
+    val icon: ImageVector
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuScreen(navController: NavController) {
     val settingsItems = listOf(
-        Triple("IP Addressing", "MAVLink and WebRTC IP Settings", Screen.ConfigIp),
-        Triple("DJI API KEY", "DJI Registration Details", Screen.ConfigDji),
-        Triple("Interface", "Theme & Display", Screen.ConfigTheme)
+        SettingsItem(
+            "MAVLink protocol",
+            "MAVLink Protocol Settings",
+            Screen.ConfigMAVLink,
+            Icons.Default.Wifi
+        ),
+        SettingsItem(
+            "WebRTC streaming",
+            "WebRTC Streaming Settings",
+            Screen.ConfigWebRTC,
+            Icons.Default.CellTower
+        ),
+        SettingsItem(
+            "WenuLink Interface",
+            "Theme & Display",
+            Screen.ConfigTheme,
+            Icons.Default.Palette
+        )
     )
 
     Scaffold(
@@ -66,21 +88,11 @@ fun MenuScreen(navController: NavController) {
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            items(settingsItems) { (title, subtitle, screenRoute) ->
+            items(settingsItems) { (title, subtitle, screen, icon) ->
                 ListItem(
                     headlineContent = { Text(title, fontWeight = FontWeight.Medium) },
                     supportingContent = { Text(subtitle) },
-                    leadingContent = {
-                        Icon(
-                            imageVector = when (title) {
-                                "IP Addressing" -> Icons.Default.Wifi
-                                "DJI API KEY" -> Icons.Default.VpnKey
-                                "Interface" -> Icons.Default.Palette
-                                else -> Icons.Default.Settings
-                            },
-                            contentDescription = null
-                        )
-                    },
+                    leadingContent = { Icon(imageVector = icon, contentDescription = null) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForwardIos,
@@ -89,7 +101,7 @@ fun MenuScreen(navController: NavController) {
                         )
                     },
                     modifier = Modifier
-                        .clickable { navController.navigate(screenRoute.route) },
+                        .clickable { navController.navigate(screen.route) },
 
                     colors = ListItemDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.background,

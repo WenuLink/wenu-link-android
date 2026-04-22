@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 object WenuLinkPreferences {
     private const val PREFS_NAME = "wenulink_config"
-    private const val KEY_MAVLINK_IP = "mavlink_ip"
-    private const val KEY_WEBRTC_IP = "webrtc_ip"
+    private const val KEY_MAVLINK_GCS_ADDR = "mavlink_gcs_addr"
+    private const val KEY_WEBRTC_SIGNAL_ADDR = "webrtc_signal_addr"
     private const val KEY_THEME = "app_theme_mode"
 
     private val _themeFlow = MutableStateFlow<Int?>(null)
@@ -18,16 +18,18 @@ object WenuLinkPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun getMavlinkIp(context: Context): String =
-        getPrefs(context).getString(KEY_MAVLINK_IP, "192.168.1.220") ?: "192.168.1.220"
+        getPrefs(context).getString(KEY_MAVLINK_GCS_ADDR, "192.168.1.220:14550")
+            ?: "192.168.1.220:14550"
 
     fun saveMavlinkIp(context: Context, ip: String) =
-        getPrefs(context).edit().putString(KEY_MAVLINK_IP, ip).apply()
+        getPrefs(context).edit().putString(KEY_MAVLINK_GCS_ADDR, ip).apply()
 
     fun getWebRtcIp(context: Context): String =
-        getPrefs(context).getString(KEY_WEBRTC_IP, "192.168.1.100") ?: "192.168.1.100"
+        getPrefs(context).getString(KEY_WEBRTC_SIGNAL_ADDR, "192.168.1.100:8090")
+            ?: "192.168.1.100:8090"
 
     fun saveWebRtcIp(context: Context, ip: String) =
-        getPrefs(context).edit().putString(KEY_WEBRTC_IP, ip).apply()
+        getPrefs(context).edit().putString(KEY_WEBRTC_SIGNAL_ADDR, ip).apply()
 
     fun getThemeMode(context: Context): Int {
         val mode = getPrefs(context).getInt(KEY_THEME, 0)

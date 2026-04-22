@@ -106,11 +106,11 @@ fun AppNavigation(
         composable(Screen.ConfigMenu.route) {
             MenuScreen(navController)
         }
-        composable(Screen.ConfigIp.route) {
-            AddressScreen(navController, settingsViewModel, isServiceRunning)
+        composable(Screen.ConfigMAVLink.route) {
+            AddressScreen(navController, settingsViewModel, isServiceRunning, AddressTarget.MAVLink)
         }
-        composable(Screen.ConfigDji.route) {
-            KeyScreen(navController)
+        composable(Screen.ConfigWebRTC.route) {
+            AddressScreen(navController, settingsViewModel, isServiceRunning, AddressTarget.WebRTC)
         }
         composable(Screen.ConfigTheme.route) {
             ThemeScreen(navController, settingsViewModel)
