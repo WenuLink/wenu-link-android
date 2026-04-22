@@ -12,7 +12,6 @@ import androidx.navigation.compose.rememberNavController
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.ui.screens.about.AboutScreen
 import org.WenuLink.ui.screens.config.AddressScreen
-import org.WenuLink.ui.screens.config.KeyScreen
 import org.WenuLink.ui.screens.config.MenuScreen
 import org.WenuLink.ui.screens.config.ThemeScreen
 import org.WenuLink.ui.screens.main.DashboardUiState
