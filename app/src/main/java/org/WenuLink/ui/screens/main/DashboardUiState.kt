@@ -4,6 +4,8 @@ data class DashboardUiState(
     val workflowStatus: String = "Idle",
     val isPermissionsGranted: Boolean = false,
     val isSDKRegistered: Boolean = false,
+    val isAircraftPresent: Boolean = false,
+    val isSimulationReady: Boolean = false,
     val canRunService: Boolean = false,
     val isServiceRunning: Boolean = false,
     val isMAVLinkRunning: Boolean = false,

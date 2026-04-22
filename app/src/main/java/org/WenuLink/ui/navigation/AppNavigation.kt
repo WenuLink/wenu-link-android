@@ -32,8 +32,9 @@ fun AppNavigation(
     val workflowStatus by app.workflowStatus.collectAsState()
     val isPermissionsGranted by app.isPermissionsGranted.collectAsState()
     val isRegistered by app.isRegistered.collectAsState()
+    val isAircraftPresent by app.isAircraftPresent.collectAsState()
+    val isSimulationReady by app.isSimulationReady.collectAsState()
     val canRunService by app.isAircraftBoot.collectAsState()
-
     val isServiceRunning by servicesViewModel.isServiceUp.collectAsState()
     val isMAVLinkRunning by servicesViewModel.isMAVLinkRunning.collectAsState()
     val isWebRTCRunning by servicesViewModel.isWebRTCRunning.collectAsState()
@@ -51,6 +52,8 @@ fun AppNavigation(
         workflowStatus = workflowStatus,
         isPermissionsGranted = isPermissionsGranted,
         isSDKRegistered = isRegistered,
+        isAircraftPresent = isAircraftPresent,
+        isSimulationReady = isSimulationReady,
         canRunService = canRunService,
         isServiceRunning = isServiceRunning,
         isMAVLinkRunning = isMAVLinkRunning,
@@ -59,6 +62,13 @@ fun AppNavigation(
         // telemetrySummary = telemetrySummary,
         recentLogs = logMessages
     )
+
+    val onConnectAircraft: () -> Unit = { servicesViewModel.loadAircraft(!canRunService) }
+    val onUseSimulation: () -> Unit = { servicesViewModel.loadAircraft(true, simEnabled = true) }
+    val onServiceToggle: () -> Unit = { servicesViewModel.runService(!isServiceRunning) }
+    val onForceStop: () -> Unit = { servicesViewModel.forceStop() }
+    val onMavlinkToggle: () -> Unit = { servicesViewModel.runMAVLink(!isMAVLinkRunning) }
+    val onWebRTCToggle: () -> Unit = { servicesViewModel.runWebRTC(!isWebRTCRunning) }
 
     NavHost(
         navController = navController,
@@ -92,9 +102,12 @@ fun AppNavigation(
         composable(Screen.Main.route) {
             MainScreen(
                 uiState = uiState,
-                onServiceToggle = { servicesViewModel.runService(!isServiceRunning) },
-                onMavlinkToggle = { servicesViewModel.runMAVLink(!isMAVLinkRunning) },
-                onWebRTCToggle = { servicesViewModel.runWebRTC(!isWebRTCRunning) },
+                onConnectAircraft = onConnectAircraft,
+                onUseSimulation = onUseSimulation,
+                onServiceToggle = onServiceToggle,
+                onForceStop = onForceStop,
+                onMavlinkToggle = onMavlinkToggle,
+                onWebRTCToggle = onWebRTCToggle,
                 onNavigateToConfig = { navController.navigate(Screen.ConfigMenu.route) },
                 onNavigateToAbout = { navController.navigate(Screen.About.route) }
             )

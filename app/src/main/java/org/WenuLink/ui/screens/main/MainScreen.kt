@@ -53,7 +53,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MainScreen(
     uiState: DashboardUiState,
+    onConnectAircraft: () -> Unit,
+    onUseSimulation: () -> Unit,
     onServiceToggle: () -> Unit,
+    onForceStop: () -> Unit,
     onMavlinkToggle: () -> Unit,
     onWebRTCToggle: () -> Unit,
     onNavigateToConfig: () -> Unit,
@@ -87,7 +90,10 @@ fun MainScreen(
             LandscapeContent(
                 modifier = modifier.padding(innerPadding),
                 uiState = uiState,
+                onConnectAircraft = onConnectAircraft,
+                onUseSimulation = onUseSimulation,
                 onServiceToggle = onServiceToggle,
+                onForceStop = onForceStop,
                 onMavlinkToggle = onMavlinkToggle,
                 onWebRTCToggle = onWebRTCToggle
             )
@@ -95,7 +101,10 @@ fun MainScreen(
             PortraitContent(
                 modifier = modifier.padding(innerPadding),
                 uiState = uiState,
+                onConnectAircraft = onConnectAircraft,
+                onUseSimulation = onUseSimulation,
                 onServiceToggle = onServiceToggle,
+                onForceStop = onForceStop,
                 onMavlinkToggle = onMavlinkToggle,
                 onWebRTCToggle = onWebRTCToggle
             )
@@ -107,7 +116,10 @@ fun MainScreen(
 private fun PortraitContent(
     modifier: Modifier,
     uiState: DashboardUiState,
+    onConnectAircraft: () -> Unit,
+    onUseSimulation: () -> Unit,
     onServiceToggle: () -> Unit,
+    onForceStop: () -> Unit,
     onMavlinkToggle: () -> Unit,
     onWebRTCToggle: () -> Unit
 ) {
@@ -117,20 +129,27 @@ private fun PortraitContent(
     ) {
         StatusSection(uiState)
         Spacer(modifier = Modifier.height(16.dp))
-
-        if (uiState.isSDKRegistered && uiState.canRunService) {
-            ActionsSection(
-                uiState.isServiceRunning,
-                uiState.isMAVLinkRunning,
-                uiState.isWebRTCRunning,
-                onServiceToggle,
-                onMavlinkToggle,
-                onWebRTCToggle
+        if (uiState.isSDKRegistered && uiState.isAircraftPresent) {
+            ConnectionSection(
+                canRunService = uiState.canRunService,
+                isSimulationReady = uiState.isSimulationReady,
+                onConnectAircraft = onConnectAircraft,
+                onUseSimulation = onUseSimulation
             )
+            if (uiState.canRunService) {
+                ActionsSection(
+                    isServiceRunning = uiState.isServiceRunning,
+                    isMAVLinkRunning = uiState.isMAVLinkRunning,
+                    isWebRTCRunning = uiState.isWebRTCRunning,
+                    onServiceToggle = onServiceToggle,
+                    onForceStop = onForceStop,
+                    onMavlinkToggle = onMavlinkToggle,
+                    onWebRTCToggle = onWebRTCToggle
+                )
+            }
         } else {
             PlaceholderBox()
         }
-
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(8.dp))
@@ -142,7 +161,10 @@ private fun PortraitContent(
 private fun LandscapeContent(
     modifier: Modifier,
     uiState: DashboardUiState,
+    onConnectAircraft: () -> Unit,
+    onUseSimulation: () -> Unit,
     onServiceToggle: () -> Unit,
+    onForceStop: () -> Unit,
     onMavlinkToggle: () -> Unit,
     onWebRTCToggle: () -> Unit
 ) {
@@ -153,20 +175,28 @@ private fun LandscapeContent(
         ) {
             StatusSection(uiState)
             Spacer(modifier = Modifier.height(16.dp))
-            if (uiState.isSDKRegistered && uiState.canRunService) {
-                ActionsSection(
-                    uiState.isServiceRunning,
-                    uiState.isMAVLinkRunning,
-                    uiState.isWebRTCRunning,
-                    onServiceToggle,
-                    onMavlinkToggle,
-                    onWebRTCToggle
+            if (uiState.isSDKRegistered && uiState.isAircraftPresent) {
+                ConnectionSection(
+                    canRunService = uiState.canRunService,
+                    isSimulationReady = uiState.isSimulationReady,
+                    onConnectAircraft = onConnectAircraft,
+                    onUseSimulation = onUseSimulation
                 )
+                if (uiState.canRunService) {
+                    ActionsSection(
+                        isServiceRunning = uiState.isServiceRunning,
+                        isMAVLinkRunning = uiState.isMAVLinkRunning,
+                        isWebRTCRunning = uiState.isWebRTCRunning,
+                        onServiceToggle = onServiceToggle,
+                        onForceStop = onForceStop,
+                        onMavlinkToggle = onMavlinkToggle,
+                        onWebRTCToggle = onWebRTCToggle
+                    )
+                }
             } else {
                 PlaceholderBox()
             }
         }
-
         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
             Text(
                 "System Logs",
@@ -272,9 +302,11 @@ private fun ActionsSection(
     isMAVLinkRunning: Boolean,
     isWebRTCRunning: Boolean,
     onServiceToggle: () -> Unit,
+    onForceStop: () -> Unit,
     onMavlinkToggle: () -> Unit,
     onWebRTCToggle: () -> Unit
 ) {
+    Spacer(modifier = Modifier.height(8.dp))
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
             onClick = onServiceToggle,
@@ -290,6 +322,17 @@ private fun ActionsSection(
             Text(if (isServiceRunning) "STOP DRONE SERVICE" else "START DRONE SERVICE")
         }
         if (isServiceRunning) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onForceStop,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Text("FORCE STOP")
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -328,6 +371,39 @@ private fun LogSection(messages: List<String>) {
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.surfaceVariant
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionSection(
+    canRunService: Boolean,
+    isSimulationReady: Boolean,
+    onConnectAircraft: () -> Unit,
+    onUseSimulation: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Button(
+            onClick = onConnectAircraft,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (canRunService) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
+        ) {
+            Text(if (canRunService) "DISCONNECT AIRCRAFT" else "CONNECT AIRCRAFT")
+        }
+        if (isSimulationReady && !canRunService) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onUseSimulation,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("USE SIMULATION")
             }
         }
     }
