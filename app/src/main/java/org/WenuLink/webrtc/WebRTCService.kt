@@ -5,6 +5,7 @@ import io.getstream.log.taggedLogger
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -56,17 +57,11 @@ class WebRTCService {
 
     // Signaling configuration
     private lateinit var signalingServer: ServiceAddress
-    var isServiceUp = false
-        private set
     var isStreaming = false
         private set
 
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
-
-    fun runProcess(isRunning: Boolean) {
-        _isRunning.value = isRunning
-    }
 
     // used to send local video track to the fragment
     private val _localVideoTrackFlow = MutableSharedFlow<VideoTrack>()
@@ -128,17 +123,11 @@ class WebRTCService {
             peerConnectionFactory.eglBaseContext
         )
 
-        isRunning.distinctUntilChangedBy { it }
-            .onEach {
-                if (it) run(context) else disconnect()
-                logger.d { "isRunning: $it" }
-            }
-            .launchIn(this.serviceScope)
+        run(context)
+        _isRunning.value = true
     }
 
-    fun run(context: Context) {
-        if (isServiceUp) return
-
+    private fun run(context: Context) {
         runningJob = serviceScope.launch {
             webRTCClient.signalingCommandFlow.collect { (command, value) ->
                 handleSignalingCommand(command, value, context)
@@ -203,11 +192,9 @@ class WebRTCService {
         }
     }
 
-    fun disconnect() {
-        if (!isServiceUp) return
-
+    private suspend fun stopClient() {
         try {
-            runningJob?.cancel()
+            runningJob?.cancelAndJoin()
             runningJob = null
             // dispose video tracks
             localVideoTrackFlow.replayCache.forEach { it.dispose() }
@@ -231,8 +218,13 @@ class WebRTCService {
             webRTCClient.dispose()
         } finally {
             isStreaming = false
-            isServiceUp = false
         }
+    }
+
+    suspend fun stopService() {
+        logger.d { "Request to stop WebRTXService." }
+        stopClient()
+        _isRunning.value = false
     }
 
     private suspend fun sendAnswer() {
