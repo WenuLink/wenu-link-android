@@ -20,14 +20,13 @@ class MissionAssembler {
         nWaypoints = 0
     }
 
-    fun addTakeoff(coordinates: Coordinates3D) {
+    fun addTakeoff(coordinates: Coordinates3D): Boolean =
         nodes.add(MissionNode.Takeoff(coordinates))
-    }
 
-    fun addWaypoint(coordinates: Coordinates3D) {
-        nodes.add(MissionNode.Waypoint(coordinates))
-        nWaypoints += 1
-    }
+    fun addWaypoint(coordinates: Coordinates3D): Boolean =
+        nodes.add(MissionNode.Waypoint(coordinates)).also {
+            nWaypoints += 1
+        }
 
     fun addActionToLast(missionAction: MissionActionCommand) {
         (nodes.lastOrNull() as? MissionNode.Waypoint)
