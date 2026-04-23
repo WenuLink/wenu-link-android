@@ -145,4 +145,7 @@ dependencies {
     implementation(libs.okhttp)
     // Log
     implementation(libs.stream.log)
+    // UI Rework
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.material.icons.extended)
 }

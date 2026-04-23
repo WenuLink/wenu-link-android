@@ -42,8 +42,6 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun runMAVLink(run: Boolean) {
-        // TODO: Update GCS server address from user input
-        // mavlink.initClient("192.168.1.220", 14550)
         viewModelScope.launch {
             if (run) {
                 thisApp.wenuLinkService?.startMAVLinkService { result ->
@@ -56,8 +54,6 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun runWebRTC(run: Boolean) {
-        // TODO: Update signaling server address from user input
-        // WebRTCService.getInstance().updateServerAddress("ws://192.168.1.220:8090")
         viewModelScope.launch {
             if (run) {
                 thisApp.wenuLinkService?.startWebRTCService()

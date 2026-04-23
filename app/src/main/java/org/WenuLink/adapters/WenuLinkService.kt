@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
+import org.WenuLink.WenuLinkPreferences
 import org.WenuLink.commands.UnitResult
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
@@ -45,10 +46,12 @@ class WenuLinkService : Service() {
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady()) {
             webRTC = WebRTCService.getInstance()
+            webRTC.updateServerAddress(WenuLinkPreferences.getWebRtcIp(applicationContext))
         }
         // create MAVLink instance
         if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
             mavlink = MAVLinkService(handler)
+            mavlink.updateGCSAddress(WenuLinkPreferences.getMavlinkIp(applicationContext))
         }
     }
 

@@ -8,33 +8,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import io.getstream.log.taggedLogger
+import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import org.WenuLink.ui.navigation.AppNavigation
 import org.WenuLink.ui.theme.WenuLinkTheme
 import org.WenuLink.views.ServicesViewModel
+import org.WenuLink.views.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -46,10 +33,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val logger by taggedLogger(MainActivity::class.java.simpleName)
     private lateinit var thisApp: WenuLinkApp
 
     private val servicesViewModel: ServicesViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     private fun checkAndRequestPermissions() {
         thisApp.updateWorkflow("Checking permissions")
@@ -73,29 +60,47 @@ class MainActivity : ComponentActivity() {
         requestPermissionLauncher.launch(thisApp.missingPermissions.toTypedArray())
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         thisApp = (application as WenuLinkApp)
 
         checkAndRequestPermissions()
-
         enableEdgeToEdge()
+
         setContent {
-            WenuLinkTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        TopAppBar(title = { Text("WenuLink status") })
-                    }
-                ) { innerPadding ->
-                    MainScreen(
-                        viewModel = servicesViewModel,
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                    )
+            val context = LocalContext.current
+
+            val initialTheme = remember { WenuLinkPreferences.getThemeMode(context) }
+            val themeMode by WenuLinkPreferences.themeFlow.collectAsState(initial = initialTheme)
+
+            val darkTheme = when (themeMode) {
+                1 -> false
+                2 -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            WenuLinkTheme(darkTheme = darkTheme) {
+                var logMessages by remember {
+                    mutableStateOf(listOf("Waiting System Initialization..."))
                 }
+
+                val addLog: (String) -> Unit = { message ->
+                    val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                    val formattedMessage = "[$time] $message"
+
+                    logMessages = buildList {
+                        add(formattedMessage)
+                        addAll(logMessages.take(49))
+                    }
+                }
+
+                AppNavigation(
+                    app = thisApp,
+                    servicesViewModel = servicesViewModel,
+                    settingsViewModel = settingsViewModel,
+                    logMessages = logMessages,
+                    addLog = addLog
+                )
             }
         }
     }
@@ -105,132 +110,6 @@ class MainActivity : ComponentActivity() {
         // Deinitialize sdk only when no service is running
         if (!thisApp.isAircraftBoot.value) {
             thisApp.apiDestroy()
-        }
-        // TODO: display warning to force exit
-    }
-
-    @Composable
-    fun MainScreen(viewModel: ServicesViewModel, modifier: Modifier = Modifier) {
-        // Basic
-        val isPermissionsGranted by viewModel.isPermissionsGranted.collectAsState(false)
-        val workflowStatus by viewModel.workflowStatus.collectAsState("Idle")
-        val sdkStatus by viewModel.sdkStatus.collectAsState("Idle")
-
-        // DJI
-        val isSDKOk by viewModel.isRegistered.collectAsState(false)
-//        val bindingState by viewModel.bindingState.collectAsState("Waiting Binding")
-//        val activationState by viewModel.activationState.collectAsState("Waiting Activation")
-        val isAircraftPresent by viewModel.isAircraftPresent.collectAsState(false)
-        val isSimulationReady by viewModel.isSimReady.collectAsState(false)
-        val isAircraftUp by viewModel.isAircraftBoot.collectAsState(false)
-        // services
-        val isServiceUp by viewModel.isServiceUp.collectAsState(false)
-        val isMAVLinkRunning by viewModel.isMAVLinkRunning.collectAsState(false)
-        val isWebRTCRunning by viewModel.isWebRTCRunning.collectAsState(false)
-        // Logs
-        var logMessages by remember { mutableStateOf(listOf<String>()) }
-
-        fun buttonLabel(isRunning: Boolean): String = if (isRunning) "Stop" else "Start"
-
-        // UI code here using telemetry and status
-        Column(
-            modifier = modifier.padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("App status:")
-            Text(workflowStatus)
-            if (isPermissionsGranted) {
-                Spacer(Modifier.height(4.dp))
-                Text("SDK registered?: $isSDKOk")
-                Spacer(Modifier.height(2.dp))
-                Text("Aircraft present?: $isAircraftPresent")
-                Spacer(Modifier.height(2.dp))
-                Text("Aircraft boot?: $isAircraftUp")
-                Spacer(Modifier.height(2.dp))
-                Text("Simulation ready?: $isSimulationReady")
-                Spacer(Modifier.height(2.dp))
-                Text("MAVLinkService up?: $isMAVLinkRunning")
-                Spacer(Modifier.height(2.dp))
-                Text("WebRTCService up?: $isWebRTCRunning")
-                Spacer(Modifier.height(8.dp))
-                Text("SDK status:")
-                Text(sdkStatus)
-            }
-
-            if (isSDKOk && isAircraftPresent) {
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = {
-                    servicesViewModel.loadAircraft(!isAircraftUp, false)
-                }) {
-                    Text("${if (!isAircraftUp) "Connect" else "Disconnect"} aircraft")
-                }
-
-                if (isSimulationReady && !isAircraftUp) {
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = {
-                        servicesViewModel.loadAircraft(true, simEnabled = true)
-                    }) {
-                        Text("Use simulation")
-                    }
-                }
-
-                if (isAircraftUp) {
-                    HorizontalDivider()
-                    Button(onClick = {
-                        servicesViewModel.runService(!isServiceUp)
-                    }) {
-                        Text("${buttonLabel(isServiceUp)} WenuLink Service")
-                    }
-                }
-
-                if (isServiceUp) {
-                    HorizontalDivider()
-
-                    Button(onClick = {
-                        servicesViewModel.forceStop()
-                    }) {
-                        Text("FORCE STOP")
-                    }
-
-                    HorizontalDivider()
-
-                    Button(onClick = {
-                        servicesViewModel.runMAVLink(!isMAVLinkRunning)
-                    }) {
-                        Text("${buttonLabel(isMAVLinkRunning)} MAVLink")
-                    }
-
-                    Button(onClick = {
-                        servicesViewModel.runWebRTC(!isWebRTCRunning)
-                    }) {
-                        Text("${buttonLabel(isWebRTCRunning)} WebRTC")
-                    }
-                }
-            }
-
-            HorizontalDivider()
-
-            Button(
-                onClick = {
-                    logMessages = logMessages + "Manual Log at ${System.currentTimeMillis()}"
-                },
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Text("Add Test Log")
-            }
-
-            Card(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.padding(8.dp),
-                    reverseLayout = true
-                ) {
-                    items(logMessages) { message ->
-                        Text(text = message, modifier = Modifier.padding(4.dp))
-                        HorizontalDivider()
-                    }
-                }
-            }
         }
     }
 }
