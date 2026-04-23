@@ -221,7 +221,12 @@ class NavigationController(
         }
 
         // Store item and request next or upload the mission
-        handler.mission.addWaypointNode(itemMsg)
+        val accepted = handler.mission.addWaypointNode(itemMsg)
+        if (!accepted) {
+            logger.w { "Unsupported mission command: ${itemMsg.command}" }
+            sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED)
+            return
+        }
         ackReceivedItem(nextExpectedSeq)
         nextExpectedSeq += 1
 
