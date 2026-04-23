@@ -165,13 +165,13 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): Boolean {
         logger.d { "Append mission item." }
-
         when (itemMsg.command) {
             MAV_CMD.MAV_CMD_NAV_TAKEOFF -> assembleTakeoffNode(itemMsg)
 
             MAV_CMD.MAV_CMD_NAV_WAYPOINT -> assembleWaypointNode(itemMsg)
 
-            MAV_CMD.MAV_CMD_NAV_DELAY -> state.assembler.addActionToLast(
+            MAV_CMD.MAV_CMD_NAV_DELAY,
+            MAV_CMD.MAV_CMD_CONDITION_DELAY -> state.assembler.addActionToLast(
                 DelayAction.fromParameters(NavDelayMessage(itemMsg))
             )
 
@@ -197,7 +197,6 @@ class MissionHandler : CommandHandler<MissionHandler>() {
 
             else -> return false
         }
-
         return true
     }
 
@@ -259,9 +258,7 @@ class MissionHandler : CommandHandler<MissionHandler>() {
         logger.d { "Scheduling $action" }
         MissionActionManager.clearScheduleAndListeners()
         return MissionActionManager.schedule(action)
-            ?.let {
-                CommandResult.error("Error in $action: ${it.description}")
-            }
+            ?.let { CommandResult.error("Error in $action: ${it.description}") }
             ?: CommandResult.ok
     }
 
