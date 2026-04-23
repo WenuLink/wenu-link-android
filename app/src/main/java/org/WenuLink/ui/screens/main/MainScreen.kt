@@ -243,14 +243,15 @@ private fun StatusSection(uiState: DashboardUiState) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
-                    StatusCheckItem("Permissions", uiState.isPermissionsGranted)
-                    StatusCheckItem("SDK Register", uiState.isSDKRegistered)
-                    StatusCheckItem("Drone Linked", uiState.canRunService)
+                    StatusCheckItem("Permissions Granted", uiState.isPermissionsGranted)
+                    StatusCheckItem("SDK Registered", uiState.isSDKRegistered)
+                    StatusCheckItem("Aircraft Present", uiState.isAircraftPresent)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    StatusCheckItem("MAVLink Svc", uiState.isMAVLinkRunning)
-                    StatusCheckItem("WebRTC Svc", uiState.isWebRTCRunning)
+                    StatusCheckItem("Aircraft Connected", uiState.canRunService)
+                    StatusCheckItem("MAVLink Running", uiState.isMAVLinkRunning)
+                    StatusCheckItem("WebRTC Running", uiState.isWebRTCRunning)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
