@@ -55,7 +55,7 @@ class WebRTCService {
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
 
     // Signaling configuration
-    private var signalingServer = ServiceAddress("192.168.1.220", 8090, "WS")
+    private lateinit var signalingServer: ServiceAddress
     var isServiceUp = false
         private set
     var isStreaming = false

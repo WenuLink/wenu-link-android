@@ -25,7 +25,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
 
     private var client: MAVLinkClient? = null
     private var controller = MAVLinkController(handler)
-    private var groundControlStation = ServiceAddress("192.168.1.220", 14550, "UDP")
+    private lateinit var groundControlStation: ServiceAddress
     private var messagesScope: CoroutineScope? = null
     private var listeningJob: Job? = null
     private var sendingJob: Job? = null
