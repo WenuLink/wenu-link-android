@@ -41,7 +41,7 @@ import org.WenuLink.mavlink.messages.NavTakeoffMissionItem
 import org.WenuLink.mavlink.messages.NavWaypointMissionItem
 
 /**
- * MAVLinkController class to deal with the handler.mission service and related MAVLink messages.
+ * MAVLinkController class to deal with the mission service and related MAVLink messages.
  *
  * https://mavlink.io/en/services/handler.mission.html
  *
@@ -58,6 +58,7 @@ class NavigationController(
     private var maxRetryTimes = 5
     private var currentRetryTimes = 0
     private var numberOfExpectedItems = -1
+    private var nextExpectedSeq = 0
     var wasRequested = false
         private set
 
@@ -179,14 +180,16 @@ class NavigationController(
 
         if (!handler.mission.state.canCreateMission()) return
 
-        // TODO: Stop handler.mission execution first if needed
+        // TODO: Stop mission execution first if needed
         numberOfExpectedItems = missionMsg.count
+        currentRetryTimes = 0
+        nextExpectedSeq = 0
 
-        // Only creates a new handler.mission if has elements on it
+        // Only creates a new mission if has elements on it
         if (numberOfExpectedItems > 0) {
             // ask for the first item an iterate over count
-            logger.d { "Creating new handler.mission with ${missionMsg.count} items" }
-            // Request first handler.mission item...
+            logger.d { "Creating new mission with ${missionMsg.count} items" }
+            // Request first mission item...
             requestMissionItem(0)
             // TODO: timeout waiting start?
         }
@@ -203,28 +206,35 @@ class NavigationController(
         logger.d { "processMissionItem" }
         val itemMsg = msg as msg_mission_item_int
         logger.d { "\t$itemMsg" }
+
         // Validate sequence
-        val expectedSeq = handler.mission.state.totalNodes()
-        if (itemMsg.seq != expectedSeq) {
-            logger.e { "Received item #${itemMsg.seq} instead #$expectedSeq, re-requesting..." }
+        if (itemMsg.seq != nextExpectedSeq) {
+            logger.e { "Received item #${itemMsg.seq} instead #$nextExpectedSeq, re-requesting..." }
             if (currentRetryTimes < maxRetryTimes) {
-                requestMissionItem(expectedSeq)
+                requestMissionItem(nextExpectedSeq)
                 currentRetryTimes += 1
             } else {
                 logger.w { "Max re-requesting attempts reached" }
+                sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_INVALID_SEQUENCE)
             }
-
             return
         }
-        // Store item and request next or upload the handler.mission
-        handler.mission.addWaypointNode(itemMsg)
-        ackReceivedItem(expectedSeq)
+
+        // Store item and request next or upload the mission
+        val accepted = handler.mission.addWaypointNode(itemMsg)
+        if (!accepted) {
+            logger.w { "Unsupported mission command: ${itemMsg.command}" }
+            sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED)
+            return
+        }
+        ackReceivedItem(nextExpectedSeq)
+        nextExpectedSeq += 1
 
         if (itemMsg.seq < numberOfExpectedItems - 1) {
-            // request next handler.mission item
-            requestMissionItem(expectedSeq + 1)
+            // request next mission item
+            requestMissionItem(nextExpectedSeq)
         } else {
-            // reached the end of the handler.mission items
+            // reached the end of the mission items
             handler.mission.uploadWaypoints { result ->
                 if (result.hasError) {
                     sendStatusText(
@@ -258,7 +268,7 @@ class NavigationController(
     )
 
     fun missionStart(commandLongMsg: msg_command_long) {
-        // TODO: Process init seq to custom first handler.mission element
+        // TODO: Process init seq to custom first mission element
         val params = MissionStartCommandLong(commandLongMsg)
 
         client.sendMessage(
@@ -313,7 +323,7 @@ class NavigationController(
 //        val reset = msg.param2 == 1f
 //        val requestedSeq = msg.param1.toInt()
 //
-//        // TODO; stop first if must, update currentItemSequence, and current handler.mission in aircraft(?)
+//        // TODO; stop first if must, update currentItemSequence, and current mission in aircraft(?)
 //
 //        currentItemSequence = if (requestedSeq == -1 || reset) 0 else requestedSeq
 //        startMission { error ->
