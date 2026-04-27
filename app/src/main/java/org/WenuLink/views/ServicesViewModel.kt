@@ -58,7 +58,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
             if (run) {
                 thisApp.wenuLinkService?.startWebRTCService()
             } else {
-                thisApp.wenuLinkService?.stopWebRTCService()
+                thisApp.wenuLinkService?.stopWebRTCService()?.join()
             }
         }
     }

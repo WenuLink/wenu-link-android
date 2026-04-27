@@ -143,7 +143,6 @@ class WenuLinkService : Service() {
         }
 
         webRTC.startClient(serviceScope, applicationContext)
-        webRTC.runProcess(true) // autostart
         logger.i { "WebRTC service started" }
     }
 
@@ -157,12 +156,10 @@ class WenuLinkService : Service() {
         if (!isWebRTCReady()) return null
 
         return serviceScope.launch {
-            webRTC.runProcess(false)
+            webRTC.stopService()
             logger.i { "WebRTC service stop." }
         }
     }
-
-    fun isWebRTCUp() = isWebRTCReady() && webRTC.isServiceUp
 
     fun isMAVLinkReady() = ::mavlink.isInitialized
 

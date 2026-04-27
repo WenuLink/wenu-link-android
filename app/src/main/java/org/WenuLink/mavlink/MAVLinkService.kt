@@ -140,7 +140,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         }
     }
 
-    suspend fun stopClient() {
+    private suspend fun stopClient() {
         if (isServiceStop()) return // nothing to stop
 
         messagesScope?.launch {
