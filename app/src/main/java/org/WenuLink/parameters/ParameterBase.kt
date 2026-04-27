@@ -1,6 +1,12 @@
 package org.WenuLink.parameters
 
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 
 enum class SemanticType {
     BOOL,
@@ -76,30 +82,24 @@ class ParameterRegistry(private val providers: List<ParameterProvider>) {
     private lateinit var byIndex: Map<Int, WenuLinkParameter>
     private lateinit var byName: Map<String, WenuLinkParameter>
 
-    suspend fun filterAvailable(parameters: List<ParameterSpec>): List<WenuLinkParameter> {
-        val availableParams = mutableListOf<WenuLinkParameter>()
-        var index = 0
-        var counter = 0
-        parameters.forEach { spec ->
-            spec.read { value ->
-                if (value != null) {
-                    spec.index = index
-                    index += 1
-                    availableParams += WenuLinkParameter(
-                        spec,
-                        value
-                    )
+    suspend fun filterAvailable(parameters: List<ParameterSpec>): List<WenuLinkParameter> =
+        coroutineScope {
+            parameters
+                .map { spec ->
+                    async {
+                        val value = suspendCoroutine { cont ->
+                            spec.read { cont.resume(it) }
+                        }
+                        value?.let { spec to it }
+                    }
                 }
-                counter += 1
-            }
+                .awaitAll()
+                .filterNotNull()
+                .mapIndexed { i, (spec, value) ->
+                    spec.index = i
+                    WenuLinkParameter(spec, value)
+                }
         }
-
-        while (counter < parameters.size) {
-            delay(500)
-        }
-
-        return availableParams
-    }
 
     fun isLoaded() = ::params.isInitialized && ::byName.isInitialized
 
