@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.WenuLink.mavlink.BridgeHealth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -261,11 +262,10 @@ private fun StatusSection(uiState: DashboardUiState) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    uiState.telemetrySummary,
+                    text = formatBridgeHealth(uiState.bridgeHealth, uiState.isMAVLinkRunning),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(8.dp),
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
@@ -408,4 +408,14 @@ private fun ConnectionSection(
             }
         }
     }
+}
+
+private fun formatBridgeHealth(h: BridgeHealth, isRunning: Boolean): String {
+    if (!isRunning) return "idle"
+
+    val gcs = h.lastGcsHeartbeatAt
+        ?.let { "%.1fs".format((System.currentTimeMillis() - it) / 1000.0) }
+        ?: "—"
+
+    return "gcs $gcs | tx ${h.txPerSec}/s rx ${h.rxPerSec}/s | err ${h.parseErrors}"
 }
