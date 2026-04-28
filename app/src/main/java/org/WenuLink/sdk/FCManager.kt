@@ -12,6 +12,11 @@ import org.WenuLink.adapters.aircraft.GPSMapper
 import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
 import org.WenuLink.adapters.aircraft.TelemetryData
 
+private fun Double.finiteOrNull(): Double? = takeIf { isFinite() }
+private fun Float.finiteOrNull(): Float? = takeIf { isFinite() }
+private fun Double.finiteOr(default: Double): Double = if (isFinite()) this else default
+private fun Float.finiteOr(default: Float): Float = if (isFinite()) this else default
+
 object FCManager {
     private val logger by taggedLogger(FCManager::class.java.simpleName)
 
@@ -45,20 +50,20 @@ object FCManager {
         }
 
     fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
-        roll = state.attitude.roll,
-        pitch = state.attitude.pitch,
-        yaw = state.attitude.yaw,
-        latitude = state.aircraftLocation.latitude,
-        longitude = state.aircraftLocation.longitude,
+        roll = state.attitude.roll.finiteOr(0.0),
+        pitch = state.attitude.pitch.finiteOr(0.0),
+        yaw = state.attitude.yaw.finiteOr(0.0),
+        latitude = state.aircraftLocation.latitude.finiteOrNull(),
+        longitude = state.aircraftLocation.longitude.finiteOrNull(),
         positionX = 0f,
         positionY = 0f,
         positionZ = 0f,
-        velocityX = state.velocityX,
-        velocityY = state.velocityY,
-        velocityZ = state.velocityZ,
+        velocityX = state.velocityX.finiteOr(0f),
+        velocityY = state.velocityY.finiteOr(0f),
+        velocityZ = state.velocityZ.finiteOr(0f),
         flightTime = state.flightTimeInSeconds,
-        takeOffAltitude = state.takeoffLocationAltitude,
-        relativeAltitude = state.aircraftLocation.altitude,
+        takeOffAltitude = state.takeoffLocationAltitude.finiteOrNull(),
+        relativeAltitude = state.aircraftLocation.altitude.finiteOrNull(),
         isFlying = state.isFlying,
         motorsOn = state.areMotorsOn(),
         satelliteCount = state.satelliteCount,
