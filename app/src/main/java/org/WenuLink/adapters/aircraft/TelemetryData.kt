@@ -15,8 +15,8 @@ data class TelemetryData(
     val roll: Double,
     val pitch: Double,
     val yaw: Double,
-    val latitude: Double,
-    val longitude: Double,
+    val latitude: Double?,
+    val longitude: Double?,
     val positionX: Float,
     val positionY: Float,
     val positionZ: Float,
@@ -24,9 +24,13 @@ data class TelemetryData(
     val velocityY: Float,
     val velocityZ: Float,
     val flightTime: Int,
-    val takeOffAltitude: Float,
-    val relativeAltitude: Float,
-    val altitude: Float = takeOffAltitude + relativeAltitude,
+    val takeOffAltitude: Float?,
+    val relativeAltitude: Float?,
+    val altitude: Float? = if (takeOffAltitude != null && relativeAltitude != null) {
+        takeOffAltitude + relativeAltitude
+    } else {
+        null
+    },
     val isFlying: Boolean,
     val motorsOn: Boolean,
     val satelliteCount: Int,
@@ -58,10 +62,18 @@ object TelemetryMapper {
         roll = source.roll.toFloat(),
         pitch = source.pitch.toFloat(),
         yaw = source.yaw.toFloat(),
-        latitude = MessageUtils.coordinateDJI2MAVLink(source.latitude),
-        longitude = MessageUtils.coordinateDJI2MAVLink(source.longitude),
-        relativeAltitude = MessageUtils.altitudeDJI2MAVLink(source.relativeAltitude),
-        takeOffAltitude = MessageUtils.altitudeDJI2MAVLink(source.takeOffAltitude),
+        latitude = source.latitude
+            ?.let { MessageUtils.coordinateDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        longitude = source.longitude
+            ?.let { MessageUtils.coordinateDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        relativeAltitude = source.relativeAltitude
+            ?.let { MessageUtils.altitudeDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        takeOffAltitude = source.takeOffAltitude
+            ?.let { MessageUtils.altitudeDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
         velocityX = (source.velocityX * 100).roundToInt().toShort(),
         velocityY = (source.velocityY * 100).roundToInt().toShort(),
         velocityZ = (source.velocityZ * 100).roundToInt().toShort(),
