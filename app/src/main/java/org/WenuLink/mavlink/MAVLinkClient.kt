@@ -10,6 +10,7 @@ import java.net.InetAddress
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,6 +27,14 @@ class MAVLinkClient(
     private val clientScope = CoroutineScope(Dispatchers.IO) // TODO: Use mavlinkScope
     val mustReceiveMessages = AtomicBoolean(false)
     val mustSendMessages = AtomicBoolean(false)
+    val rxCount = AtomicLong(0L)
+    val txCount = AtomicLong(0L)
+    val parseErrors = AtomicLong(0L)
+
+    @Volatile
+    var lastObservedPeer: String? = null
+        private set
+
     var systemID = 1
         private set
 
@@ -53,6 +62,7 @@ class MAVLinkClient(
                     val received = mavlinkParser.mavlink_parse_char(byte.toInt() and 0xFF)
                     received?.let {
                         val message = it.unpack()
+                        rxCount.incrementAndGet()
                         onMessageReceived.invoke(message)
                     }
                 }
@@ -61,6 +71,7 @@ class MAVLinkClient(
             } catch (e: SocketException) {
                 logger.w { "Socket closed with exception: ${e.message}" }
             } catch (e: Exception) {
+                parseErrors.incrementAndGet()
                 logger.e { "Error receiving MAVLink: ${e.message}" }
             }
         }
@@ -101,6 +112,7 @@ class MAVLinkClient(
             val datagram = DatagramPacket(bytes, bytes.size, address, targetPort)
             try {
                 socket.send(datagram)
+                txCount.incrementAndGet()
             } catch (e: Exception) {
                 logger.e { "Failed to send: ${e.message}" }
             }

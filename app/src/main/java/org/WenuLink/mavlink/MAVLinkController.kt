@@ -172,6 +172,8 @@ class MAVLinkController(private val handler: WenuLinkHandler) {
 
     fun isStationConnected(): Boolean = connectionController.isGCSPresent
 
+    fun getLastGcsHeartbeatAt(): Long? = connectionController.lastHeartbeatAt
+
     suspend fun waitGroundStation(timeout: Long = 5000L): Boolean {
         // prevent to send data before initialization
         telemetryController.stopBroadcast()
