@@ -183,7 +183,7 @@ class CameraController(
 
         // register callback for the duration of this capture session
         handler.onImageCaptured = fun(cameraId, seqIndex) {
-            val telemetry = handler.aircraft.telemetry.getData() ?: return
+            val telemetry = handler.aircraft.currentTelemetry ?: return
             client.sendMessage(msgImageCaptured(ImageMetadata(seqIndex, true, cameraId, telemetry)))
         }
 

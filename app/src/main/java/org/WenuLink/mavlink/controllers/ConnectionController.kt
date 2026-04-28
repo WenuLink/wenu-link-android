@@ -167,7 +167,7 @@ class ConnectionController(
     }
 
     fun msgAttitude(): MAVLinkMessage? = msg_attitude().apply {
-        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
         // TODO: this next line causes an exception
         // msg.time_boot_ms = getTimestampMilliseconds();
         roll = (telemetryData.roll * Math.PI / 180).toFloat()
@@ -180,9 +180,10 @@ class ConnectionController(
     }
 
     fun msgAltitude(): MAVLinkMessage? = msg_altitude().apply {
-        val data = handler.aircraft.telemetry.getData() ?: return null
+        val data = handler.aircraft.currentTelemetry ?: return null
+        val alt = data.altitude ?: return null
 
-        altitude_relative = data.altitude
+        altitude_relative = alt
 //        client.sendMessage(msg)
     }
 
@@ -190,7 +191,8 @@ class ConnectionController(
     fun msgVibration(): MAVLinkMessage = msg_vibration()
 
     fun msgHUD(): MAVLinkMessage? = msg_vfr_hud().apply {
-        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
+        val altitude = telemetryData.altitude ?: return null
         val rcData = handler.aircraft.telemetry.getRCData()?.toMAVLink() ?: return null
 
         // Mavlink: Current airspeed in m/s
@@ -207,7 +209,7 @@ class ConnectionController(
         this.heading = heading.toInt().toShort()
         // vertical info
         throttle = rcData.throttleSetting
-        alt = -telemetryData.altitude
+        alt = -altitude
         // Mavlink: Current climb rate in meters/second
         // DJI: m/s, positive values down
         climb = -telemetryData.velocityZ

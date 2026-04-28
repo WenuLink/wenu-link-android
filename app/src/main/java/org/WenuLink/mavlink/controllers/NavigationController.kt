@@ -348,25 +348,32 @@ class NavigationController(
     // TODO: start, pause, and resume procedures
 
     fun msgHomePosition(): MAVLinkMessage? = msg_home_position().apply {
-        val coordinates = handler.aircraft.state.homeCoordinates ?: return null
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
+        val latVal = telemetryData.latitude ?: return null
+        val lonVal = telemetryData.longitude ?: return null
+        val altVal = telemetryData.altitude ?: return null
 
-        latitude = MessageUtils.coordinateDJI2MAVLink(coordinates.lat)
-        longitude = MessageUtils.coordinateDJI2MAVLink(coordinates.long)
-        altitude = MessageUtils.altitudeDJI2MAVLink(coordinates.alt)
+        latitude = MessageUtils.coordinateDJI2MAVLink(latVal)
+        longitude = MessageUtils.coordinateDJI2MAVLink(lonVal)
+        altitude = MessageUtils.altitudeDJI2MAVLink(altVal)
     }
 
     fun msgGlobalPositionInt(): MAVLinkMessage? = msg_global_position_int().apply {
-        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
+        val latVal = telemetryData.latitude ?: return null
+        val lonVal = telemetryData.longitude ?: return null
+        val altVal = telemetryData.altitude ?: return null
+        val relAltVal = telemetryData.relativeAltitude ?: return null
 
-        lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
-        lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
-        alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.altitude)
+        lat = MessageUtils.coordinateDJI2MAVLink(latVal)
+        lon = MessageUtils.coordinateDJI2MAVLink(lonVal)
+        alt = MessageUtils.altitudeDJI2MAVLink(altVal)
         // NOTE: Commented out this field, because relative_alt seems to be intended for
         // altitude above the current terrain, but DJI reports altitude above home point.
         // Mavlink: Millimeters above ground (unspecified: presumably above home point?)
         // DJI: relative altitude of the aircraft relative to take off location, measured by
         // barometer, in meters.
-        relative_alt = MessageUtils.altitudeDJI2MAVLink(telemetryData.relativeAltitude)
+        relative_alt = MessageUtils.altitudeDJI2MAVLink(relAltVal)
         vx = (telemetryData.velocityX * 100).roundToInt().toShort()
         vy = (telemetryData.velocityY * 100).roundToInt().toShort()
         vz = (telemetryData.velocityZ * 100).roundToInt().toShort()
@@ -377,22 +384,24 @@ class NavigationController(
     }
 
     fun msgRawGPSInt(): MAVLinkMessage? = msg_gps_raw_int().apply {
-        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
-
         if (handler.aircraft.telemetry.isSimulationActive) {
             fix_type = GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX.toShort()
             return@apply
         }
 
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
+        val latVal = telemetryData.latitude ?: return null
+        val lonVal = telemetryData.longitude ?: return null
+
         time_usec = MessageUtils.getMicroTime()
-        lat = MessageUtils.coordinateDJI2MAVLink(telemetryData.latitude)
-        lon = MessageUtils.coordinateDJI2MAVLink(telemetryData.longitude)
+        lat = MessageUtils.coordinateDJI2MAVLink(latVal)
+        lon = MessageUtils.coordinateDJI2MAVLink(lonVal)
         satellites_visible = telemetryData.satelliteCount.toShort()
         fix_type = telemetryData.gpsFixType.toShort()
     }
 
     fun msgLocalPositionNed(): MAVLinkMessage? = msg_local_position_ned().apply {
-        val telemetryData = handler.aircraft.telemetry.getData() ?: return null
+        val telemetryData = handler.aircraft.currentTelemetry ?: return null
 
         time_boot_ms = handler.systemBootTime
         x = telemetryData.positionX
