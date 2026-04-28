@@ -92,9 +92,8 @@ class WebRTCService {
         onIceCandidateRequest = { iceCandidate, _ -> webRTCClient!!.sendCandidate(iceCandidate) }
     )
 
-    fun updateServerAddress(serverAddress: String) {
-        val (ip, port) = serverAddress.split(":")
-        signalingServer = ServiceAddress(ip, port.toInt(), "WS")
+    fun updateServerAddress(ip: String, port: Int) {
+        signalingServer = ServiceAddress(ip, port, "WS")
     }
 
     fun canStartClient() = CameraCapturer.hasCameraPresent() && isEnabled
