@@ -20,6 +20,7 @@ import org.WenuLink.MainActivity
 import org.WenuLink.WenuLinkApp
 import org.WenuLink.WenuLinkPreferences
 import org.WenuLink.commands.UnitResult
+import org.WenuLink.mavlink.BridgeHealth
 import org.WenuLink.mavlink.MAVLinkService
 import org.WenuLink.webrtc.WebRTCService
 
@@ -32,6 +33,9 @@ class WenuLinkService : Service() {
     private lateinit var thisApp: WenuLinkApp
     val mavlinkStateFlow: StateFlow<Boolean>?
         get() = if (isMAVLinkReady()) mavlink.isRunning else null
+    val mavlinkBridgeHealth: StateFlow<BridgeHealth>?
+        get() = if (isMAVLinkReady()) mavlink.bridgeHealth else null
+
     val webRTCStateFlow: StateFlow<Boolean>?
         get() = if (isWebRTCReady()) webRTC.isRunning else null
 

@@ -6,9 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.WenuLink.adapters.AsyncUtils
 import org.WenuLink.adapters.ServiceAddress
@@ -36,6 +38,11 @@ class MAVLinkService(handler: WenuLinkHandler) {
 
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+
+    private val _bridgeHealth = MutableStateFlow(BridgeHealth.idle)
+    val bridgeHealth: StateFlow<BridgeHealth> = _bridgeHealth.asStateFlow()
+
+    private var healthJob: Job? = null
 
     fun updateGCSAddress(ip: String, port: Int) {
         groundControlStation = ServiceAddress(ip, port, "UDP")
@@ -97,6 +104,7 @@ class MAVLinkService(handler: WenuLinkHandler) {
         messagesScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         listeningJob = launchListeningJob()
         sendingJob = launchSendingJob()
+        healthJob = launchHealthTicker()
 
         logger.d {
             "MAVLinkService (ready?=$isReady) " +
@@ -158,6 +166,8 @@ class MAVLinkService(handler: WenuLinkHandler) {
         messagesScope?.cancel()
         sendingJob = null
         listeningJob = null
+        healthJob = null
+        _bridgeHealth.value = BridgeHealth.idle
     }
 
     suspend fun stopService() {
@@ -167,5 +177,31 @@ class MAVLinkService(handler: WenuLinkHandler) {
         destroyClient()
         _isRunning.value = false
         isReady = false
+    }
+
+    private fun buildHealthSnapshot(rxDelta: Long, txDelta: Long, parseErrors: Long): BridgeHealth =
+        BridgeHealth(
+            rxDelta.toInt(),
+            txDelta.toInt(),
+            controller.getLastGcsHeartbeatAt(),
+            parseErrors
+        )
+
+    private fun launchHealthTicker(): Job = messagesScope!!.launch {
+        var lastRx = 0L
+        var lastTx = 0L
+        while (isActive) {
+            delay(1000L)
+            val c = client ?: continue
+            val rxNow = c.rxCount.get()
+            val txNow = c.txCount.get()
+            _bridgeHealth.value = buildHealthSnapshot(
+                rxDelta = rxNow - lastRx,
+                txDelta = txNow - lastTx,
+                parseErrors = c.parseErrors.get()
+            )
+            lastRx = rxNow
+            lastTx = txNow
+        }
     }
 }
