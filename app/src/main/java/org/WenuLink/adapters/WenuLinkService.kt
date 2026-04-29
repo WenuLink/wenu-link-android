@@ -46,12 +46,18 @@ class WenuLinkService : Service() {
         // create WebRTC instance
         if (WebRTCService.isEnabled && !isWebRTCReady()) {
             webRTC = WebRTCService.getInstance()
-            webRTC.updateServerAddress(WenuLinkPreferences.getWebRtcIp(applicationContext))
+            webRTC.updateServerAddress(
+                WenuLinkPreferences.getWebRtcIp(applicationContext),
+                WenuLinkPreferences.getWebRtcPort(applicationContext)
+            )
         }
         // create MAVLink instance
         if (MAVLinkService.isEnabled && !isMAVLinkReady()) {
             mavlink = MAVLinkService(handler)
-            mavlink.updateGCSAddress(WenuLinkPreferences.getMavlinkIp(applicationContext))
+            mavlink.updateGCSAddress(
+                WenuLinkPreferences.getMavlinkIp(applicationContext),
+                WenuLinkPreferences.getMavlinkPort(applicationContext)
+            )
         }
     }
 

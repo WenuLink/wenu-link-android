@@ -37,9 +37,8 @@ class MAVLinkService(handler: WenuLinkHandler) {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    fun updateGCSAddress(serverAddress: String) {
-        val (ip, port) = serverAddress.split(":")
-        groundControlStation = ServiceAddress(ip, port.toInt(), "UDP")
+    fun updateGCSAddress(ip: String, port: Int) {
+        groundControlStation = ServiceAddress(ip, port, "UDP")
     }
 
     fun clientExists() = client != null

@@ -1,58 +1,46 @@
 package org.WenuLink.ui.screens.config
 
-import android.content.ClipData
-import android.widget.Toast
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import kotlinx.coroutines.launch
 import org.WenuLink.ui.navigation.AddressTarget
 import org.WenuLink.views.SettingsViewModel
 
 private data class AddressScreenConfig(
     val title: String,
-    val label: String,
-    val placeholder: String,
-    val onSave: () -> Unit
+    val ipLabel: String,
+    val ipPlaceholder: String,
+    val portPlaceholder: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,33 +51,46 @@ fun AddressScreen(
     isServiceRunning: Boolean,
     target: AddressTarget
 ) {
-    val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
-    // config variable
-    val currentAddress by when (target) {
+    val currentIp by when (target) {
         is AddressTarget.MAVLink -> settingsViewModel.mavlinkIp.collectAsState()
         is AddressTarget.WebRTC -> settingsViewModel.webrtcIp.collectAsState()
     }
+    val currentPort by when (target) {
+        is AddressTarget.MAVLink -> settingsViewModel.mavlinkPort.collectAsState()
+        is AddressTarget.WebRTC -> settingsViewModel.webrtcPort.collectAsState()
+    }
+    val saveIp: (String) -> Unit = when (target) {
+        is AddressTarget.MAVLink -> settingsViewModel::saveMavlinkIp
+        is AddressTarget.WebRTC -> settingsViewModel::saveWebrtcIp
+    }
+    val savePort: (Int) -> Unit = when (target) {
+        is AddressTarget.MAVLink -> settingsViewModel::saveMavlinkPort
+        is AddressTarget.WebRTC -> settingsViewModel::saveWebrtcPort
+    }
 
-    var localAddress by remember(currentAddress) { mutableStateOf(currentAddress) }
-
-    var isEditing by remember { mutableStateOf(false) }
-
-    val config: AddressScreenConfig = when (target) {
+    val config = when (target) {
         is AddressTarget.MAVLink -> AddressScreenConfig(
-            "MAVLink Protocol",
-            "MAVLink GCS Address",
-            "e.g. 192.168.1.220:14550"
-        ) { settingsViewModel.saveMavlinkIp(localAddress) }
+            title = "MAVLink Protocol",
+            ipLabel = "MAVLink GCS Address",
+            ipPlaceholder = "e.g. 192.168.1.220",
+            portPlaceholder = "14550"
+        )
 
         is AddressTarget.WebRTC -> AddressScreenConfig(
-            "WebRTC Streaming",
-            "WebRTC Signaling Address",
-            "e.g. 192.168.1.100:8090"
-        ) { settingsViewModel.saveWebrtcIp(localAddress) }
+            title = "WebRTC Streaming",
+            ipLabel = "WebRTC Signaling Address",
+            ipPlaceholder = "e.g. 192.168.1.100",
+            portPlaceholder = "8090"
+        )
     }
+
+    var ipInput by remember(currentIp) { mutableStateOf(currentIp) }
+    var portInput by remember(currentPort) { mutableStateOf(currentPort.toString()) }
+
+    val ipError = validateIp(ipInput)
+    val portError = validatePort(portInput)
 
     ConfigScaffold(config.title, navController) {
         if (isServiceRunning) {
@@ -112,148 +113,100 @@ fun AddressScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Stop Drone Service to edit addresses",
+                        text = "Stop Drone Service to edit address",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-        } else {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isEditing) "Editing Mode Active" else "View Only Mode",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
 
-        IpFieldItem(
-            label = config.label,
-            value = localAddress,
-            isEditing = isEditing,
-            placeholder = config.placeholder,
-            onValueChange = { localAddress = it },
-            onCopy = {
-                scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentAddress)))
-                }
-                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-            }
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            enabled = !isServiceRunning,
-            onClick = {
-                if (isEditing) {
-                    config.onSave()
-                    Toast.makeText(
-                        context,
-                        "Settings saved successfully",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                isEditing = !isEditing
-            },
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isEditing) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.secondaryContainer
-                },
-                contentColor = if (isEditing) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                }
-            )
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                imageVector = if (isEditing) Icons.Default.Save else Icons.Default.Edit,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
+            OutlinedTextField(
+                value = ipInput,
+                onValueChange = { input ->
+                    ipInput = input.filter { !it.isWhitespace() }
+                },
+                label = { Text(config.ipLabel) },
+                placeholder = { Text(config.ipPlaceholder) },
+                singleLine = true,
+                isError = ipError != null,
+                supportingText = { Text(ipError.orEmpty()) },
+                enabled = !isServiceRunning,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Next,
+                    autoCorrectEnabled = false
+                ),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged { focus ->
+                        if (!focus.isFocused &&
+                            validateIp(ipInput) == null &&
+                            ipInput != currentIp
+                        ) {
+                            saveIp(ipInput)
+                        }
+                    }
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(if (isEditing) "SAVE CONFIGURATION" else "EDIT CONFIGURATION")
+            OutlinedTextField(
+                value = portInput,
+                onValueChange = { input ->
+                    if (input.length <= 5 && input.all(Char::isDigit)) {
+                        portInput = input
+                    }
+                },
+                label = { Text("Port") },
+                placeholder = { Text(config.portPlaceholder) },
+                singleLine = true,
+                isError = portError != null,
+                supportingText = { Text(portError.orEmpty()) },
+                enabled = !isServiceRunning,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                modifier = Modifier
+                    .width(120.dp)
+                    .onFocusChanged { focus ->
+                        if (!focus.isFocused) {
+                            val parsed = portInput.toIntOrNull()
+                            if (parsed != null &&
+                                parsed in 1..65535 &&
+                                parsed != currentPort
+                            ) {
+                                savePort(parsed)
+                            }
+                        }
+                    }
+            )
         }
     }
 }
 
-@Composable
-private fun IpFieldItem(
-    label: String,
-    value: String,
-    isEditing: Boolean,
-    placeholder: String,
-    onValueChange: (String) -> Unit,
-    onCopy: () -> Unit
-) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            readOnly = !isEditing,
-            placeholder = { Text(placeholder, color = Color.Gray) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                fontFamily = FontFamily.Monospace
-            ),
-            trailingIcon = {
-                if (isEditing) {
-                    Icon(
-                        Icons.Default.Edit,
-                        "Editing",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    IconButton(onClick = onCopy) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            "Copy",
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = if (isEditing) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline
-                },
-                unfocusedContainerColor = if (isEditing) {
-                    Color.Transparent
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.3f
-                    )
-                }
-            )
-        )
-    }
+private fun validateIp(input: String): String? = when {
+    input.isEmpty() -> "Address required"
+    input.contains(':') -> "Remove the colon, port is separate"
+    input.contains('/') -> "Don't include the scheme prefix"
+    else -> null
+}
+
+private fun validatePort(input: String): String? {
+    if (input.isEmpty()) return "Port required"
+    val port = input.toIntOrNull() ?: return "Invalid number"
+    return if (port !in 1..65535) "Port must be 1–65535" else null
 }
