@@ -86,7 +86,9 @@ class CameraHandler : CommandHandler<CameraHandler>() {
             )
         )
         // set mode as a command avoid thread issues
-        dispatchCommand(SetModeCommand(CAMERA_MODE.CAMERA_MODE_IMAGE, 1))
+        dispatchCommand(
+            SetModeCommand(CAMERA_MODE.CAMERA_MODE_IMAGE, availableCameras.first().id)
+        )
 
         // TODO: grab current number of photos in storage
 
@@ -159,9 +161,9 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         cameraId
     )
 
-    fun canPhotoInVideo(cameraId: Int): Boolean = CameraManager.canTakePhotoInVideo()
+    fun canTakePhotoInVideo(cameraId: Int): Boolean = CameraManager.canTakePhotoInVideo()
 
-    fun updateCaptureTimestamp(timestamp: Long, cameraId: Int) =
+    fun updateCaptureTimestamp(timestamp: Long?, cameraId: Int) =
         getCameraWithIndex(cameraId)?.let { (idx, camera) ->
             logger.d { "updateTimestamp" }
             availableCameras[idx] = camera.copy(

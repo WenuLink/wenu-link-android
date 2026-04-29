@@ -56,7 +56,7 @@ data class SetModeCommand(val newMode: Int, val cameraId: Int) : CameraCommand {
 
 data class TakePhotoCommand(val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        ctx.isVideoMode(cameraId) && ctx.canPhotoInVideo(cameraId) -> CommandResult.ok
+        ctx.isVideoMode(cameraId) && ctx.canTakePhotoInVideo(cameraId) -> CommandResult.ok
         !ctx.isPhotoMode(cameraId) -> CommandResult.error("Not in photo mode!")
         !ctx.captureIdle(cameraId) -> CommandResult.error("Busy")
         else -> CommandResult.ok
@@ -115,7 +115,7 @@ data class StopRecordCommand(val cameraId: Int) : CameraCommand {
             ?: let {
                 // mark IDLE back
                 ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
-                ctx.updateCaptureTimestamp(-1, cameraId)
+                ctx.updateCaptureTimestamp(null, cameraId)
                 CommandResult.ok
             }
     }
