@@ -52,6 +52,7 @@ class WenuLinkApp : Application() {
     val isAircraftPresent = MutableStateFlow(false)
     val isSimulationReady = MutableStateFlow(false)
     val isAircraftBoot = MutableStateFlow(false)
+    val isUsingSimulation = MutableStateFlow(false)
     val isServiceUp = MutableStateFlow(false)
 
     private val permissionsList by lazy {
@@ -236,6 +237,7 @@ class WenuLinkApp : Application() {
                 updateWorkflow("Boot error: ${bootResult.errorReason}")
             } else {
                 isAircraftBoot.value = true
+                isUsingSimulation.value = useSimulation
                 updateWorkflow("Connected and ready for services")
             }
         }
@@ -252,6 +254,7 @@ class WenuLinkApp : Application() {
                 updateWorkflow("Shutdown error: ${shutdownResult.errorReason}")
             } else {
                 isAircraftBoot.value = false
+                isUsingSimulation.value = false
             }
             wenuLinkHandler.enableSimulation(false)
         }
