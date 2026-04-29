@@ -38,15 +38,7 @@ fun AppNavigation(
     val isServiceRunning by servicesViewModel.isServiceUp.collectAsState()
     val isMAVLinkRunning by servicesViewModel.isMAVLinkRunning.collectAsState()
     val isWebRTCRunning by servicesViewModel.isWebRTCRunning.collectAsState()
-    // val telemetry by servicesViewModel.telemetryData.observeAsState()
-
-//    val telemetrySummary = if (telemetry != null) {
-//        "R:${"%.1f".format(
-//            telemetry!!.roll
-//        )} P:${"%.1f".format(telemetry!!.pitch)} Y:${"%.1f".format(telemetry!!.yaw)}"
-//    } else {
-//        "No Telemetry Data"
-//    }
+    val bridgeHealth by servicesViewModel.mavlinkBridgeHealth.collectAsState()
 
     val uiState = DashboardUiState(
         workflowStatus = workflowStatus,
@@ -58,8 +50,7 @@ fun AppNavigation(
         isServiceRunning = isServiceRunning,
         isMAVLinkRunning = isMAVLinkRunning,
         isWebRTCRunning = isWebRTCRunning,
-        // TODO: decide if we want telemetry in the frontend
-        // telemetrySummary = telemetrySummary,
+        bridgeHealth = bridgeHealth,
         recentLogs = logMessages
     )
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.WenuLink.WenuLinkApp
+import org.WenuLink.mavlink.BridgeHealth
 
 class ServicesViewModel(application: Application) : AndroidViewModel(application) {
     private val logger by taggedLogger(ServicesViewModel::class.java.simpleName)
@@ -30,6 +31,9 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     // To expose the StateFlow for MAVLink
     val isMAVLinkRunning: StateFlow<Boolean>
         get() = thisApp.wenuLinkService?.mavlinkStateFlow ?: MutableStateFlow(false)
+
+    val mavlinkBridgeHealth: StateFlow<BridgeHealth>
+        get() = thisApp.wenuLinkService?.mavlinkBridgeHealth ?: MutableStateFlow(BridgeHealth.idle)
 
     // To expose the StateFlow for WebRTC
     val isWebRTCRunning: StateFlow<Boolean>

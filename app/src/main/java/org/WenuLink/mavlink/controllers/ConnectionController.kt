@@ -44,6 +44,8 @@ class ConnectionController(
             val isRecent = (System.currentTimeMillis() - gcsLastTimestamp) < 5000L
             return hasGCS && isRecent
         }
+    val lastHeartbeatAt: Long?
+        get() = gcsLastTimestamp.takeIf { it > 0L }
 
     // TODO: update with sensors from AircraftHandler
     private val sensorsPresent = MAV_SYS_STATUS_SENSOR.MAV_SYS_STATUS_SENSOR_3D_GYRO or

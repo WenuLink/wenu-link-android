@@ -1,5 +1,7 @@
 package org.WenuLink.ui.screens.main
 
+import org.WenuLink.mavlink.BridgeHealth
+
 data class DashboardUiState(
     val workflowStatus: String = "Idle",
     val isPermissionsGranted: Boolean = false,
@@ -10,7 +12,7 @@ data class DashboardUiState(
     val isServiceRunning: Boolean = false,
     val isMAVLinkRunning: Boolean = false,
     val isWebRTCRunning: Boolean = false,
-    val telemetrySummary: String = "No Telemetry Data",
+    val bridgeHealth: BridgeHealth = BridgeHealth.idle,
     // TODO: Logging feature
     val recentLogs: List<String> = listOf("TODO: Logging feature...")
 )
