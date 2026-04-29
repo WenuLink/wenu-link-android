@@ -1,32 +1,27 @@
 package org.WenuLink.sdk
 
-import android.util.Log
-import org.WenuLink.adapters.BatteryData
-import org.WenuLink.adapters.RCData
-import dji.common.remotecontroller.BatteryState
 import dji.sdk.remotecontroller.RemoteController
+import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.aircraft.BatteryData
+import org.WenuLink.adapters.aircraft.RCData
 
 object RCManager {
-    private val TAG: String = RCManager::class.java.simpleName
+    private val logger by taggedLogger(RCManager::class.java.simpleName)
     private var lastData: RCData? = null
-    private val lastBatteryData: BatteryData = BatteryData()
+    private var lastBatteryData = BatteryData()
     private var rcInstance: RemoteController? = null
 
     @Synchronized
-    fun init(remoteController: RemoteController)  {
+    fun init(remoteController: RemoteController) {
         rcInstance = remoteController
-        Log.i(TAG, "Remote Controller connected")
+        logger.i { "Remote Controller present" }
     }
 
     @Synchronized
-    fun isUpdated(): Boolean {
-        return lastData != null && lastBatteryData.percentCharge > -1
-    }
+    fun isUpdated() = lastData != null && lastBatteryData.percentCharge != null
 
     @Synchronized
-    fun isRCConnected(): Boolean {
-        return rcInstance != null
-    }
+    fun isRCConnected() = rcInstance != null
 
     fun startListeners() {
         startHardwareListener()
@@ -39,40 +34,41 @@ object RCManager {
     }
 
     @Synchronized
-    fun getBatteryData(): BatteryData {
-        return lastBatteryData
-    }
+    fun getBatteryData(): BatteryData = lastBatteryData
 
     @Synchronized
-    fun getHardwareData(): RCData? {
-        return lastData
-    }
+    fun getHardwareData(): RCData? = lastData
 
     @Synchronized
     private fun updateData(data: RCData?) {
-        // TODO: safety: bajar MAVLink si detecta control de usuario
         lastData = data
     }
 
     @Synchronized
-    private fun updateBatteryData(battery: BatteryData) {
-        lastBatteryData.updateFrom(battery)
+    private fun updateBatteryData(percentCharge: Int) {
+        // simulated 2S LiPo, equal cell distribution
+        val cellVoltage = 3700 * percentCharge / 100
+        lastBatteryData = lastBatteryData.merge(
+            percentCharge = percentCharge,
+            voltage = 7400,
+            current = 6,
+            voltageCells = listOf(cellVoltage, cellVoltage)
+        )
     }
 
     private fun startHardwareListener() {
-        Log.d(TAG, "Starting RC HardwareListener")
-        rcInstance?.setHardwareStateCallback { hardwareState -> // DJI: range [-660,660]
+        logger.d { "Starting RC HardwareListener" }
+        rcInstance?.setHardwareStateCallback { hardwareState ->
             updateData(
                 RCData(
-                    throttleSetting = (hardwareState.leftStick!!.verticalPosition + 660) / 1320,
-                    // Mavlink: 1000 to 2000 with 1500 = 1.5ms as center...
-                    leftStickVertical = (hardwareState.leftStick!!.verticalPosition * 0.8).toInt() + 1500,
-                    leftStickHorizontal = (hardwareState.leftStick!!.horizontalPosition * 0.8).toInt() + 1500,
-                    rightStickVertical = (hardwareState.rightStick!!.verticalPosition * 0.8).toInt() + 1500,
-                    rightStickHorizontal = (hardwareState.rightStick!!.horizontalPosition * 0.8).toInt() + 1500,
-                    buttonC1 = hardwareState.c1Button?.isClicked ?: false,
-                    buttonC2 = hardwareState.c2Button?.isClicked ?: false,
-                    buttonC3 = hardwareState.c3Button?.isClicked ?: false,
+                    throttleSetting = hardwareState.leftStick!!.verticalPosition,
+                    leftStickVertical = hardwareState.leftStick!!.verticalPosition,
+                    leftStickHorizontal = hardwareState.leftStick!!.horizontalPosition,
+                    rightStickVertical = hardwareState.rightStick!!.verticalPosition,
+                    rightStickHorizontal = hardwareState.rightStick!!.horizontalPosition,
+                    buttonC1 = hardwareState.c1Button?.isClicked == true,
+                    buttonC2 = hardwareState.c2Button?.isClicked == true,
+                    buttonC3 = hardwareState.c3Button?.isClicked == true,
                     mode = hardwareState.flightModeSwitch
                 )
             )
@@ -80,23 +76,21 @@ object RCManager {
     }
 
     private fun stopHardwareListener() {
-        Log.d(TAG, "Stoping RC HardwareListener")
-        rcInstance?.setHardwareStateCallback { null }
+        logger.d { "Stoping RC HardwareListener" }
+        rcInstance?.setHardwareStateCallback { }
         updateData(null)
     }
 
     private fun startBatteryListener() {
-        Log.d(TAG, "Starting RC BatteryListener")
-        rcInstance?.setChargeRemainingCallback { batteryState: BatteryState ->
-            updateBatteryData(
-                BatteryData(batteryState.remainingChargeInPercent)
-            )
+        logger.d { "Starting RC BatteryListener" }
+        rcInstance?.setChargeRemainingCallback { state ->
+            updateBatteryData(state.remainingChargeInPercent)
         }
     }
 
     private fun stopBatteryListener() {
-        Log.d(TAG, "Stopping RC BatteryListener")
-        rcInstance?.setChargeRemainingCallback { null }
-        updateBatteryData(BatteryData())
+        logger.d { "Stopping RC BatteryListener" }
+        rcInstance?.setChargeRemainingCallback { }
+        lastBatteryData = BatteryData()
     }
 }

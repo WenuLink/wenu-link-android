@@ -1,0 +1,163 @@
+name: Problem Report
+description: Report problems during development test of a given MAVLink microservice and a drone model to discuss possible bugs.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing to WenuLink! Please fill in all details about the development process and performed test.
+        For the test steps, we encourage you to detail each step as much as possible, and to upload relevant log lines.
+
+  - type: input
+    id: app-version
+    attributes:
+      label: WenuLink App Version
+      description: The version or commit hash of the WenuLink app you tested with.
+      placeholder: e.g. v0.1.0 or commit abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: drone-model
+    attributes:
+      label: Drone Model
+      description: The DJI drone model you tested with.
+      placeholder: e.g. DJI Mavic 2 Pro
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Test Environment
+      description: Was the test performed against real hardware or the DJI simulator?
+      options:
+        - Real drone
+        - DJI Simulator
+    validations:
+      required: true
+
+  - type: input
+    id: android-device
+    attributes:
+      label: Android Device (running WenuLink)
+      description: The Android device running the WenuLink app.
+      placeholder: e.g. Samsung Galaxy S21
+    validations:
+      required: true
+
+  - type: input
+    id: android-version
+    attributes:
+      label: Android Version
+      description: The Android OS version on the device running WenuLink.
+      placeholder: e.g. Android 13
+    validations:
+      required: true
+
+  - type: input
+    id: remote-controller
+    attributes:
+      label: Remote Controller (if separate)
+      description: Only fill in if a remote controller is used in addition to the Android host above.
+      placeholder: e.g. DJI RC231
+    validations:
+      required: false
+
+  - type: input
+    id: gcs-software
+    attributes:
+      label: GCS Software & Version
+      description: The ground control station software used (if applicable).
+      placeholder: e.g. QGroundControl 5.0.8
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: mavlink-microservice
+    attributes:
+      label: Related MAVLink Microservice
+      description: Which [microservice](https://mavlink.io/en/services/) did you test? Select any that apply; use the MAVLink message field below for services not listed here.
+      options:
+        - label: "Heartbeat/Connection"
+        - label: "Mission"
+        - label: "Parameter"
+        - label: "Command"
+        - label: "Camera"
+        - label: "Other (describe below)"
+    validations:
+      required: true
+
+  - type: input
+    id: mavlink-message
+    attributes:
+      label: Related MAVLink Message(s)
+      description: Did you focus on any specific [message](https://mavlink.io/en/messages/common.html)?
+      placeholder: e.g. MAV_CMD_NAV_TAKEOFF, MAV_CMD_COMPONENT_ARM_DISARM
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Major details about the performed test sequence to replicate the issue if possible.
+      placeholder: |
+        1. Launch app
+        2. Connect drone (or simulation)
+        3. Start services
+        4. Press the takeoff button in QGC
+        5. Press the land button in QGC
+        ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      description: How consistently the mentioned steps can reproduce the issue?
+      options:
+        - Always
+        - Sometimes
+        - Rarely
+        - No idea, I ran a single test
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: e.g. The drone should have taken off to the altitude configured in QGC and hovered.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include any error messages shown in the app or GCS.
+      placeholder: e.g. The drone armed but did not take off; QGC reported "Command denied".
+    validations:
+      required: true
+
+  - type: textarea
+    id: result-logs
+    attributes:
+      label: Logs
+      description: Attach or paste relevant logs. Logcat output from the WenuLink app is especially helpful; flight log files (.tlog, .bin, DJI logs) can also be dragged in here.
+      placeholder: Drag and drop log files here, or paste relevant Logcat excerpts.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: Additional Notes
+      description: Anything else worth mentioning (workarounds, environment details, suggestions).
+    validations:
+      required: false

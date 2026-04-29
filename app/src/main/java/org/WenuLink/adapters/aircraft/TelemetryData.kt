@@ -1,0 +1,261 @@
+package org.WenuLink.adapters.aircraft
+
+import com.MAVLink.enums.GPS_FIX_TYPE
+import dji.common.flightcontroller.GPSSignalLevel
+import dji.common.remotecontroller.HardwareState.FlightModeSwitch
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+import org.WenuLink.mavlink.messages.MessageUtils
+
+/**
+ * Data class to hold telemetry info.
+ */
+data class TelemetryData(
+    val timestamp: Long = System.currentTimeMillis(),
+    val roll: Double,
+    val pitch: Double,
+    val yaw: Double,
+    val latitude: Double?,
+    val longitude: Double?,
+    val positionX: Float,
+    val positionY: Float,
+    val positionZ: Float,
+    val velocityX: Float,
+    val velocityY: Float,
+    val velocityZ: Float,
+    val flightTime: Int,
+    val takeOffAltitude: Float?,
+    val relativeAltitude: Float?,
+    val altitude: Float? = if (takeOffAltitude != null && relativeAltitude != null) {
+        takeOffAltitude + relativeAltitude
+    } else {
+        null
+    },
+    val isFlying: Boolean,
+    val motorsOn: Boolean,
+    val satelliteCount: Int,
+    // DJI reports signal quality on a scale of 0-10 and None
+    // Mavlink has fix types from 0-8.
+    val gpsFixType: Int
+)
+
+data class MAVLinkTelemetryData(
+    val timestamp: Long,
+    val roll: Float,
+    val pitch: Float,
+    val yaw: Float,
+    val latitude: Int, // scaled 1E7
+    val longitude: Int, // scaled 1E7
+    val relativeAltitude: Int, // millimeters
+    val takeOffAltitude: Int, // millimeters
+    val altitude: Int = relativeAltitude + takeOffAltitude, // millimeters
+    val velocityX: Short,
+    val velocityY: Short,
+    val velocityZ: Short,
+    val satelliteCount: Int,
+    val gpsFixType: Int
+)
+
+object TelemetryMapper {
+    fun toMavlink(source: TelemetryData): MAVLinkTelemetryData = MAVLinkTelemetryData(
+        timestamp = source.timestamp,
+        roll = source.roll.toFloat(),
+        pitch = source.pitch.toFloat(),
+        yaw = source.yaw.toFloat(),
+        latitude = source.latitude
+            ?.let { MessageUtils.coordinateDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        longitude = source.longitude
+            ?.let { MessageUtils.coordinateDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        relativeAltitude = source.relativeAltitude
+            ?.let { MessageUtils.altitudeDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        takeOffAltitude = source.takeOffAltitude
+            ?.let { MessageUtils.altitudeDJI2MAVLink(it) }
+            ?: Int.MAX_VALUE,
+        velocityX = (source.velocityX * 100).roundToInt().toShort(),
+        velocityY = (source.velocityY * 100).roundToInt().toShort(),
+        velocityZ = (source.velocityZ * 100).roundToInt().toShort(),
+        satelliteCount = source.satelliteCount,
+        gpsFixType = source.gpsFixType
+    )
+}
+
+data class RCData(
+    val throttleSetting: Int,
+    val leftStickVertical: Int,
+    val leftStickHorizontal: Int,
+    val rightStickVertical: Int,
+    val rightStickHorizontal: Int,
+    val buttonC1: Boolean,
+    val buttonC2: Boolean,
+    val buttonC3: Boolean,
+    val mode: FlightModeSwitch?
+) {
+    private fun stickValue2Percent(value: Int): Int =
+        // transform from DJI range [-660, 660] => [0, 100]
+        (((value + 660) / 1320f) * 100).roundToInt()
+
+    private fun stickValue2RcValue(value: Int): Int =
+        // transform from DJI range [-660, 660] => [1000, 2000]
+        ((value / 660f) * 500).roundToInt() + 1500
+
+    fun toMAVLink(): RCData = this.copy(
+        throttleSetting = stickValue2Percent(this.throttleSetting),
+        leftStickVertical = stickValue2RcValue(this.leftStickVertical),
+        leftStickHorizontal = stickValue2RcValue(this.leftStickHorizontal),
+        rightStickVertical = stickValue2RcValue(this.rightStickVertical),
+        rightStickHorizontal = stickValue2RcValue(this.rightStickHorizontal)
+    )
+
+    fun hasCenteredJoystick(): Boolean = listOf(
+        this.leftStickVertical,
+        this.leftStickHorizontal,
+        this.rightStickVertical,
+        this.rightStickHorizontal
+    ).all { it == 0 }
+}
+
+data class BatteryData(
+    val percentCharge: Int? = null,
+    val voltage: Int? = null,
+    val current: Int? = null,
+    val fullChargeCapacity: Int? = null,
+    val chargeRemaining: Int? = null,
+    val temperature: Float? = null,
+    val voltageCells: List<Int>? = null
+) {
+    fun merge(
+        percentCharge: Int? = null,
+        voltage: Int? = null,
+        current: Int? = null,
+        fullChargeCapacity: Int? = null,
+        chargeRemaining: Int? = null,
+        temperature: Float? = null,
+        voltageCells: List<Int>? = null
+    ): BatteryData = copy(
+        percentCharge = percentCharge ?: this.percentCharge,
+        voltage = voltage ?: this.voltage,
+        current = current ?: this.current,
+        fullChargeCapacity = fullChargeCapacity ?: this.fullChargeCapacity,
+        chargeRemaining = chargeRemaining ?: this.chargeRemaining,
+        temperature = temperature ?: this.temperature,
+        voltageCells = voltageCells ?: this.voltageCells
+    )
+
+    override fun toString(): String = "BatteryData(" +
+        "percentCharge=$percentCharge%, " +
+        "voltage=$voltage mV, " +
+        "current=$current mA, " +
+        "fullChargeCapacity=$fullChargeCapacity mAh, " +
+        "chargeRemaining=$chargeRemaining mAh, " +
+        "temperature=$temperature °C, " +
+        "voltageCells=${voltageCells?.joinToString()})"
+}
+
+data class MAVLinkBatteryData(
+    // mAh, -1 = unknown
+    val currentConsumed: Int,
+    // cdegC, INT16_MAX = unknown
+    val temperature: Short,
+    // mV
+    val voltages: List<Int>,
+    // cA, -1 = unknown
+    val currentBattery: Short,
+    // %, -1 = unknown
+    val batteryRemaining: Byte,
+    // mV, -1 = unknown
+    val voltagesBattery: Int,
+    /* 10mA, -1 = unknown */
+    val currentBatteryRaw: Short
+)
+
+object BatteryMapper {
+    private const val UNKNOWN_INT = -1
+    private const val UNKNOWN_SHORT = Short.MAX_VALUE // INT16_MAX per MAVLink spec
+
+    fun toMavlink(source: BatteryData): MAVLinkBatteryData {
+        val fullCharge = source.fullChargeCapacity
+        val remaining = source.chargeRemaining
+        return MAVLinkBatteryData(
+            currentConsumed = if (fullCharge != null && remaining != null) {
+                fullCharge - remaining
+            } else {
+                UNKNOWN_INT
+            },
+            temperature = source.temperature
+                ?.let { (it * 100).toInt().toShort() }
+                ?: UNKNOWN_SHORT,
+            voltages = source.voltageCells ?: emptyList(),
+            currentBattery = source.current
+                ?.let { (it * 10).toShort() }
+                ?: UNKNOWN_INT.toShort(),
+            batteryRemaining = if (fullCharge != null && remaining != null) {
+                ((remaining * 100f) / fullCharge).toInt().toByte()
+            } else {
+                UNKNOWN_INT.toByte()
+            },
+            voltagesBattery = source.voltage ?: UNKNOWN_INT,
+            currentBatteryRaw = source.current?.toShort() ?: UNKNOWN_INT.toShort()
+        )
+    }
+}
+
+object GPSMapper {
+
+    /** DJI reports signal quality as level 0-11 and None; mapped to Mavlink 0-8 fix types. */
+    fun toMavlinkFixType(level: GPSSignalLevel): Int = when (level) {
+        GPSSignalLevel.LEVEL_0,
+        GPSSignalLevel.LEVEL_1 -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX
+
+        GPSSignalLevel.LEVEL_2 -> GPS_FIX_TYPE.GPS_FIX_TYPE_2D_FIX
+
+        GPSSignalLevel.LEVEL_3,
+        GPSSignalLevel.LEVEL_4,
+        GPSSignalLevel.LEVEL_5 -> GPS_FIX_TYPE.GPS_FIX_TYPE_3D_FIX
+
+        GPSSignalLevel.LEVEL_6, // TODO: Pick a fix type for 6 and above
+        GPSSignalLevel.LEVEL_7,
+        GPSSignalLevel.LEVEL_8,
+        GPSSignalLevel.LEVEL_9,
+        GPSSignalLevel.LEVEL_10 -> GPS_FIX_TYPE.GPS_FIX_TYPE_DGPS
+
+        GPSSignalLevel.NONE -> GPS_FIX_TYPE.GPS_FIX_TYPE_NO_FIX
+    }
+}
+
+data class Coordinates3D(val lat: Double, val long: Double, val alt: Float)
+
+data class MessageRate(
+    val messageID: Int,
+    var microSecondsInterval: Long,
+    var lastUpdateStamp: Long = 0
+)
+
+enum class SensorState {
+    BOOT, // Boot states
+    CALIBRATION_NEEDED, // Calibration needed states
+    OK // Ok states
+}
+
+data class IMUState(
+    val gyroscope: MutableList<SensorState> = mutableListOf(),
+    val accelerometer: MutableList<SensorState> = mutableListOf()
+)
+
+data class Quaternion(val w: Double, val x: Double, val y: Double, val z: Double) {
+    fun normalized(): Quaternion {
+        val norm = sqrt(w * w + x * x + y * y + z * z)
+        return Quaternion(w / norm, x / norm, y / norm, z / norm)
+    }
+
+    fun toFloatArray(): FloatArray = floatArrayOf(
+        w.toFloat(),
+        x.toFloat(),
+        y.toFloat(),
+        z.toFloat()
+    )
+}
+
+data class SignalQuality(val downlink: Int?, val uplink: Int?)

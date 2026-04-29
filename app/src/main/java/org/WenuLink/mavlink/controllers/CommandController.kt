@@ -1,0 +1,207 @@
+package org.WenuLink.mavlink.controllers
+
+import com.MAVLink.Messages.MAVLinkMessage
+import com.MAVLink.common.msg_autopilot_version
+import com.MAVLink.common.msg_command_long
+import com.MAVLink.enums.FIRMWARE_VERSION_TYPE
+import com.MAVLink.enums.MAV_CMD
+import com.MAVLink.enums.MAV_PROTOCOL_CAPABILITY
+import com.MAVLink.enums.MAV_RESULT
+import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.RequestMissionAction
+import org.WenuLink.adapters.RequestTakeoff
+import org.WenuLink.adapters.WenuLinkCommand
+import org.WenuLink.adapters.WenuLinkHandler
+import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
+import org.WenuLink.adapters.aircraft.ArmCommand
+import org.WenuLink.adapters.aircraft.DisarmCommand
+import org.WenuLink.adapters.mission.DelayAction
+import org.WenuLink.adapters.mission.RotateAction
+import org.WenuLink.mavlink.MAVLinkClient
+import org.WenuLink.mavlink.messages.ComponentArmDisarmCommandLong
+import org.WenuLink.mavlink.messages.ConditionYawMessage
+import org.WenuLink.mavlink.messages.DoSetModeCommandLong
+import org.WenuLink.mavlink.messages.MessageUtils
+import org.WenuLink.mavlink.messages.NavDelayMessage
+import org.WenuLink.mavlink.messages.NavTakeoffCommandLong
+
+/**
+ * MAVLinkController class to deal with the command service and related MAVLink messages.
+ *
+ * https://mavlink.io/en/services/command.html
+ *
+ * https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#incoming-commands
+ */
+class CommandController(override var client: MAVLinkClient, override val handler: WenuLinkHandler) :
+    IController {
+    private val logger by taggedLogger(CommandController::class.java.simpleName)
+
+    private val autopilotCapabilities = listOf(
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MISSION_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_COMMAND_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION,
+        MAV_PROTOCOL_CAPABILITY.MAV_PROTOCOL_CAPABILITY_MAVLINK2
+    ).fold(0L) { acc, value -> acc or value.toLong() }
+
+    private val messageRegistry: Map<Int, (MAVLinkMessage) -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to { sendAutopilotAck() }
+    )
+
+    private val commandLongRegistry: Map<Int, (msg_command_long) -> Unit> = mapOf(
+        MAV_CMD.MAV_CMD_DO_SET_MODE to ::setMode,
+        MAV_CMD.MAV_CMD_COMPONENT_ARM_DISARM to ::processArmDisarm,
+        MAV_CMD.MAV_CMD_NAV_TAKEOFF to ::processTakeoff,
+        MAV_CMD.MAV_CMD_NAV_LAND to ::processLanding,
+        MAV_CMD.MAV_CMD_NAV_RETURN_TO_LAUNCH to ::processReturn,
+        MAV_CMD.MAV_CMD_NAV_DELAY to ::processDelay,
+        MAV_CMD.MAV_CMD_CONDITION_YAW to ::processYaw
+    )
+
+    private val requestLongRegistry: Map<Int, () -> Unit> = mapOf(
+        msg_autopilot_version.MAVLINK_MSG_ID_AUTOPILOT_VERSION to ::sendAutopilotVersion
+    )
+
+    override fun processMessage(msg: MAVLinkMessage): Boolean {
+        messageRegistry[msg.msgid]?.invoke(msg) ?: return false
+        return true
+    }
+
+    override fun processCommandLong(commandLongMsg: msg_command_long): Boolean {
+        if (commandLongMsg.msgid != msg_command_long.MAVLINK_MSG_ID_COMMAND_LONG) return false
+
+        commandLongRegistry[commandLongMsg.command]?.invoke(commandLongMsg) ?: return false
+        return true
+    }
+
+    // https://ardupilot.org/copter/docs/ArduCopter_MAVLink_Messages.html#requestable-messages
+    override fun processRequestLong(commandLongMsg: msg_command_long): Boolean {
+        if (commandLongMsg.command != MAV_CMD.MAV_CMD_REQUEST_MESSAGE) return false
+
+        requestLongRegistry[commandLongMsg.param1.toInt()]?.invoke() ?: return false
+        return true
+    }
+
+    fun sendCommandAck(
+        messageID: Int,
+        result: Int = MAV_RESULT.MAV_RESULT_UNSUPPORTED,
+        progress: Int = -1
+    ) = client.sendMessage(MessageUtils.msgCommandAck(messageID, result, progress))
+
+    fun sendAutopilotAck() = sendCommandAck(
+        MAV_CMD.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+        MAV_RESULT.MAV_RESULT_ACCEPTED
+    )
+
+    fun sendAutopilotVersion() = client.sendMessage(
+        msg_autopilot_version().apply {
+            capabilities = autopilotCapabilities
+            flight_sw_version = MessageUtils.packVersion(
+                4,
+                18,
+                23,
+                FIRMWARE_VERSION_TYPE.FIRMWARE_VERSION_TYPE_DEV
+            ) // Match SDK version
+            // TODO: Identify SDK and Aircraft too
+            os_sw_version = 0 // Possibly Android version
+            middleware_sw_version = 0 // Possibly WenuLink version
+        }
+    )
+
+    fun setMode(commandMsg: msg_command_long) {
+        val params = DoSetModeCommandLong(commandMsg)
+        ArduCopterFlightMode.from(params.customMode)
+            ?.let {
+                logger.d { "FlightMode requested: ${params.customMode}" }
+                if (handler.aircraft.requestMode(it).isOk) {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+                } else {
+                    sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+                }
+            }
+            ?: {
+                logger.d { "FlightMode ${params.customMode} not found" }
+                sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            }
+    }
+
+    fun processArmDisarm(commandMsg: msg_command_long) {
+        val params = ComponentArmDisarmCommandLong(commandMsg)
+
+        if (params.arm == null) {
+            logger.d { "Invalid arm/disarm request" }
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+            return
+        }
+
+        val command = if (params.arm) {
+            logger.d { "Requesting to arm motors" }
+            ArmCommand()
+        } else {
+            logger.d { "Requesting to disarm motors" }
+            DisarmCommand()
+        }
+        handler.dispatchCommand(WenuLinkCommand.Aircraft(command)) { result ->
+            if (result.hasError) logger.e { "Unable to $command: ${result.errorReason}" }
+        }
+
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+    }
+
+    fun processTakeoff(commandMsg: msg_command_long) {
+        logger.d { "processTakeoff: $commandMsg" }
+        val params = NavTakeoffCommandLong(commandMsg)
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(RequestTakeoff(params.altitude))
+        ) { result ->
+            if (result.hasError) logger.e { "Takeoff error: ${result.errorReason}" }
+        }
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+    }
+
+    fun processLanding(commandMsg: msg_command_long) {
+        logger.d { "processLanding: $commandMsg" }
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.LAND).isOk) {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        } else {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        }
+    }
+
+    fun processReturn(commandMsg: msg_command_long) {
+        logger.d { "processReturn: $commandMsg" }
+        if (handler.aircraft.requestMode(ArduCopterFlightMode.RTL).isOk) {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+        } else {
+            sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_DENIED)
+        }
+    }
+
+    fun processDelay(commandMsg: msg_command_long) {
+        logger.d { "processDelay: $commandMsg" }
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestMissionAction(
+                    DelayAction.fromParameters(NavDelayMessage(commandMsg))
+                )
+            )
+        ) { result ->
+            logger.d { "processDelay: $result" }
+        }
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+    }
+
+    fun processYaw(commandMsg: msg_command_long) {
+        logger.d { "processYaw: $commandMsg" }
+        handler.dispatchCommand(
+            WenuLinkCommand.Request(
+                RequestMissionAction(RotateAction.fromParameters(ConditionYawMessage(commandMsg)))
+            )
+        ) { result ->
+            logger.d { "processYaw: $result" }
+        }
+        sendCommandAck(commandMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
+    }
+}

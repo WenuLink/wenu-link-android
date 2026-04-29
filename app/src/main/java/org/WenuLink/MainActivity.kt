@@ -1,261 +1,115 @@
 package org.WenuLink
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-
-import org.WenuLink.adapters.ControlViewModel
-import org.WenuLink.sdk.SDKManager
+import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import org.WenuLink.ui.navigation.AppNavigation
 import org.WenuLink.ui.theme.WenuLinkTheme
-
-
+import org.WenuLink.views.ServicesViewModel
+import org.WenuLink.views.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
     companion object {
-        fun getIntent(context: Context): Intent {
-            return Intent(context, MainActivity::class.java).apply {
-                action = SDKManager.getIntentAction()
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
+        fun getIntent(context: Context): Intent = Intent(context, MainActivity::class.java).apply {
+            action = WenuLinkApp.apiIntentAction
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
     }
 
-    private val TAG: String = MainActivity::class.java.simpleName
+    private lateinit var thisApp: WenuLinkApp
 
-    private val controlViewModel: ControlViewModel by viewModels()
+    private val servicesViewModel: ServicesViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     private fun checkAndRequestPermissions() {
-        controlViewModel.updateWorkflow("Checking permissions")
-        var permissionsList = arrayOf(
-            Manifest.permission.VIBRATE,
-            Manifest.permission.INTERNET,
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.WAKE_LOCK,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_NETWORK_STATE,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.READ_PHONE_STATE,
-        )
+        thisApp.updateWorkflow("Checking permissions")
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            permissionsList += arrayOf(Manifest.permission.FOREGROUND_SERVICE)
+        if (thisApp.missingPermissions.isEmpty()) {
+            thisApp.onPermissionsGranted()
+            return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsList += arrayOf(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
-        val missingPermissions = permissionsList.filter {
-            ContextCompat.checkSelfPermission(applicationContext, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missingPermissions.isNotEmpty()) {
-            controlViewModel.updateWorkflow("Waiting for pending permissions")
-            val requestPermissionLauncher =
-                registerForActivityResult(ActivityResultContracts.
-                RequestMultiplePermissions()) { permissionsMap ->
-                    if (permissionsMap.all { it.value }) {
-                        onPermissionsGranted()
-                    } else {
-                        onPermissionsDenied()
-                    }
-                }
-            requestPermissionLauncher.launch(missingPermissions.toTypedArray())
-        } else {
-            onPermissionsGranted()
-        }
-    }
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        checkAndRequestPermissions()
-
-        enableEdgeToEdge()
-        setContent {
-            WenuLinkTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        TopAppBar(title = { Text("WenuLink status") })
-                    }
-                ) { innerPadding ->
-                    MainScreen(
-                        viewModel = controlViewModel,
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                    )
+        thisApp.updateWorkflow("Waiting for pending permissions")
+        val requestPermissionLauncher =
+            registerForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { permissionsMap ->
+                if (permissionsMap.all { it.value }) {
+                    thisApp.onPermissionsGranted()
+                } else {
+                    thisApp.onPermissionsDenied()
                 }
             }
+        requestPermissionLauncher.launch(thisApp.missingPermissions.toTypedArray())
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        thisApp = (application as WenuLinkApp)
+
+        checkAndRequestPermissions()
+        enableEdgeToEdge()
+
+        setContent {
+            val context = LocalContext.current
+
+            val initialTheme = remember { WenuLinkPreferences.getThemeMode(context) }
+            val themeMode by WenuLinkPreferences.themeFlow.collectAsState(initial = initialTheme)
+
+            val darkTheme = when (themeMode) {
+                1 -> false
+                2 -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            WenuLinkTheme(darkTheme = darkTheme) {
+                var logMessages by remember {
+                    mutableStateOf(listOf("Waiting System Initialization..."))
+                }
+
+                val addLog: (String) -> Unit = { message ->
+                    val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                    val formattedMessage = "[$time] $message"
+
+                    logMessages = buildList {
+                        add(formattedMessage)
+                        addAll(logMessages.take(49))
+                    }
+                }
+
+                AppNavigation(
+                    app = thisApp,
+                    servicesViewModel = servicesViewModel,
+                    settingsViewModel = settingsViewModel,
+                    logMessages = logMessages,
+                    addLog = addLog
+                )
+            }
         }
-    }
-
-    private fun onPermissionsGranted() {
-        Log.i(TAG, "All permissions granted")
-        controlViewModel.updatePermission(true)
-        controlViewModel.updateWorkflow("Waiting for SDK")
-        controlViewModel.startSDK(applicationContext)
-        controlViewModel.initMAVLinkCallbacks()
-    }
-
-    private fun onPermissionsDenied() {
-        Log.e(TAG, "Some permissions denied")
-        controlViewModel.updatePermission(false)
-        controlViewModel.updateWorkflow("Missing permission(s), please restart the app.")
     }
 
     override fun onStop() {
         super.onStop()
         // Deinitialize sdk only when no service is running
-        if(!controlViewModel.isServiceRunning.value!!){
-            controlViewModel.stopSDK(applicationContext)
-        }
-        // TODO: mostrar aviso para forzar salida
-    }
-
-    @Composable
-    fun MainScreen(viewModel: ControlViewModel, modifier: Modifier = Modifier) {
-        // Basic
-        val isPermissionsGranted by viewModel.isPermissionsGranted.observeAsState(false)
-        val workflowStatus by viewModel.workflowStatus.observeAsState("Idle")
-        val isServiceRunning by viewModel.isServiceRunning.observeAsState(false)
-        // DJI
-        val isSDKOk by viewModel.isRegistered.observeAsState(false)
-        val sdkStatus by viewModel.sdkStatus.observeAsState("Idle")
-        val canRunService by viewModel.canRunService.observeAsState(false)
-//        val bindingState by viewModel.bindingState.observeAsState("Waiting Binding")
-//        val activationState by viewModel.activationState.observeAsState("Waiting Activation")
-        // MAVLink
-        val telemetry by viewModel.telemetryData.observeAsState()
-        val isDataFlowing by viewModel.isDataFlowing.collectAsState(false)
-        val isMAVLinkRunning by viewModel.isMAVLinkRunning.collectAsState(false)
-        // WebRTC
-        val isWebRTCRunning by viewModel.isWebRTCRunning.collectAsState(false)
-        // Logs
-        var logMessages by remember { mutableStateOf(listOf<String>()) }
-
-        // UI code here using telemetry and status
-        Column(
-            modifier = modifier.padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("App status:")
-            Text(workflowStatus)
-            if(isPermissionsGranted) {
-                Spacer(Modifier.height(4.dp))
-                Text("SDK is registered?: $isSDKOk")
-                Spacer(Modifier.height(2.dp))
-                Text("DataFlowing is active?: $isDataFlowing")
-                Spacer(Modifier.height(2.dp))
-                Text("MAVLinkService's up?: $isMAVLinkRunning")
-                Spacer(Modifier.height(2.dp))
-                Text("WebRTCService's up?: $isWebRTCRunning")
-                Spacer(Modifier.height(8.dp))
-                Text("SDK status:")
-                Text(sdkStatus)
-            }
-
-            if(isSDKOk && canRunService){
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = {
-                    viewModel.runService(!isServiceRunning, applicationContext)
-                }) {
-                    Text(if (isServiceRunning) {
-                        "Stop Drone Service"
-                    } else {
-                        "Start Drone Service"
-                    })
-                }
-                if (isServiceRunning) {
-                    HorizontalDivider()
-                    Button(onClick = {
-                        viewModel.runMAVLink(!isMAVLinkRunning)
-                    }) {
-                        Text(if (isMAVLinkRunning) {
-                            "Stop MAVLink"
-                        } else {
-                            "Start MAVLink"
-                        })
-                    }
-                    Button(onClick = {
-                        viewModel.runWebRTC(!isWebRTCRunning)
-                    }) {
-                        Text(if (isWebRTCRunning) {
-                            "Stop WebRTC"
-                        } else {
-                            "Start WebRTC"
-                        })
-                    }
-                }
-            }
-            HorizontalDivider()
-            Button(
-                onClick = {
-                    logMessages = logMessages + "Log manual em ${System.currentTimeMillis()}"
-                },
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Text("Adicionar Log (Teste)")
-            }
-            Card(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.padding(8.dp),
-                    reverseLayout = true
-                ) {
-                    items(logMessages) { message ->
-                        Text(text = message, modifier = Modifier.padding(4.dp))
-                        HorizontalDivider()
-                    }
-                }
-            }
-
-            telemetry?.let {
-                Text("Telemetry: R=${it.roll}, P=${it.pitch}, Y=${it.yaw}, Alt=${it.altitude}")
-            }
+        if (!thisApp.isAircraftBoot.value) {
+            thisApp.apiDestroy()
         }
     }
 }

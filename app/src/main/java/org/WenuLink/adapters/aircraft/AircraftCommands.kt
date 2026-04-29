@@ -1,0 +1,134 @@
+package org.WenuLink.adapters.aircraft
+
+import org.WenuLink.adapters.AsyncUtils
+import org.WenuLink.commands.CommandResult
+import org.WenuLink.commands.ICommand
+import org.WenuLink.commands.UnitResult
+
+sealed interface AircraftCommand : ICommand<AircraftHandler> {
+    override fun validate(ctx: AircraftHandler): UnitResult
+    override suspend fun execute(ctx: AircraftHandler): UnitResult
+    override suspend fun onStop(ctx: AircraftHandler)
+}
+
+data class BootCommand(val timeout: Long = 5000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        !ctx.isPowerOff -> CommandResult.error("Already booted")
+        else -> ctx.canDispatchTransition(BootTransition)
+    }
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        // TODO: check if compatible with CancellableCoroutine
+        ctx.dispatchTransition(BootTransition)
+        val bootResult = ctx.boot(timeout)
+        if (bootResult.hasError) return bootResult
+        ctx.dispatchTransition(StandbyTransition)
+        return CommandResult.ok
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchTransition(InitialTransition)
+    }
+}
+
+data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        !ctx.sensorsHealthy -> CommandResult.error("Sensors failing")
+        else -> ctx.canDispatchTransition(ArmTransition)
+    }
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        // TODO: check if compatible with CancellableCoroutine
+        if (!TakeoffTransition.hasDelayedArmMode(ctx.state)) {
+            // Manual takeoff
+            ctx.armMotors()
+            if (!ctx.waitArmTransition(true, timeout)) {
+                return CommandResult.error("Unable to arm motors")
+            }
+        }
+        // Automatic takeoff only. Must wait for state changes
+        ctx.dispatchTransition(ArmTransition)
+
+        return CommandResult.ok
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchCommand(DisarmCommand())
+    }
+}
+
+data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult =
+        ctx.canDispatchTransition(StandbyTransition)
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        ctx.disarmMotors()
+        return if (ctx.waitArmTransition(false, timeout)) {
+            ctx.dispatchTransition(StandbyTransition)
+            CommandResult.ok
+        } else {
+            CommandResult.error("Unable to disarm motors")
+        }
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
+}
+
+data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult =
+        ctx.canDispatchTransition(TakeoffTransition)
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        // TODO: check if compatible with CancellableCoroutine
+        ctx.dispatchTransition(TakeoffTransition)
+        ctx.takeOff()
+        return if (ctx.waitFlightState(true, timeout)) {
+            ctx.dispatchTransition(FlyingTransition)
+            CommandResult.ok
+        } else {
+            ctx.dispatchCommand(DisarmCommand())
+            CommandResult.error("Unable to takeoff")
+        }
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchCommand(DisarmCommand())
+    }
+}
+
+data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = when {
+        ctx.isPowerOff -> CommandResult.error("Already power off")
+        !withTransitionCheck -> CommandResult.ok
+        else -> ctx.canDispatchTransition(PowerOffTransition)
+    }
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        // TODO: check if compatible with CancellableCoroutine
+        if (withTransitionCheck) ctx.dispatchTransition(PowerOffTransition)
+        ctx.shutdown()
+        ctx.dispatchTransition(InitialTransition)
+        return CommandResult.ok
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) {
+        ctx.dispatchTransition(InitialTransition)
+    }
+}
+
+data class SetHomePositionCommand(val timeout: Long = 30_000L) : AircraftCommand {
+    override fun validate(ctx: AircraftHandler): UnitResult = CommandResult.ok
+
+    override suspend fun execute(ctx: AircraftHandler): UnitResult {
+        val isHomeSet = AsyncUtils.waitTimeout(1000L, timeout) {
+            ctx.updateHomeCoordinatesFromAircraft()
+        }
+        if (!isHomeSet) {
+            return CommandResult.error("Home position not acquired after $timeout ms")
+        }
+
+        return CommandResult.ok
+    }
+
+    override suspend fun onStop(ctx: AircraftHandler) { } // silently omit
+}

@@ -1,53 +1,49 @@
 package org.WenuLink.sdk
 
-import android.util.Log
-import org.WenuLink.adapters.BatteryData
 import dji.common.battery.BatteryState
 import dji.common.error.DJIError
 import dji.common.util.CommonCallbacks.CompletionCallbackWith
 import dji.sdk.airlink.AirLink
 import dji.sdk.battery.Battery
 import dji.sdk.products.Aircraft
-
+import io.getstream.log.taggedLogger
+import org.WenuLink.adapters.aircraft.BatteryData
+import org.WenuLink.adapters.aircraft.SignalQuality
 
 object AircraftManager {
-    private val TAG: String = AircraftManager::class.java.simpleName
-    private val lastBatteryData: BatteryData = BatteryData()
-    private val lastAirLinkQuality: IntArray = intArrayOf(-1, -1)
+    private val logger by taggedLogger(AircraftManager::class.java.simpleName)
+    private var lastBatteryData = BatteryData()
+    private var downlinkQuality: Int? = null
+    private var uplinkQuality: Int? = null
     private var aircraftInstance: Aircraft? = null
     private var batteryInstance: Battery? = null
     private var airLinkInstance: AirLink? = null
-    private var useAirLink: Boolean = false
+    private var useAirLink = false
 
     @Synchronized
-    fun init(aircraft: Aircraft)  {
+    fun init(aircraft: Aircraft) {
         aircraftInstance = aircraft
         batteryInstance = aircraft.battery
         CameraManager.updateStreamID(getModel())
-        Log.i(TAG, "Aircraft connected: ${getModelName()}")
+        logger.i { "Aircraft present: ${getModelName()}" }
     }
 
     @Synchronized
-    fun initAirLink(airLink: AirLink)  {
+    fun isConnected(): Boolean = aircraftInstance != null
+
+    @Synchronized
+    fun initAirLink(airLink: AirLink) {
         this.airLinkInstance = airLink
         useAirLink = true
-        Log.i(TAG, "AirLink connected")
+        logger.i { "AirLink present" }
     }
 
     @Synchronized
-    fun isUpdated(): Boolean {
-        var isUpdated = lastBatteryData.percentCharge > -1
-        if (useAirLink) {
-            isUpdated = isUpdated && lastAirLinkQuality[0] > -1 &&
-                    lastAirLinkQuality[1] > -1
-        }
-        return isUpdated
-    }
+    fun isUpdated(): Boolean = lastBatteryData.percentCharge != null &&
+        (!useAirLink || (downlinkQuality != null && uplinkQuality != null))
 
     @Synchronized
-    fun isAircraftConnected(): Boolean {
-        return aircraftInstance != null
-    }
+    fun isAircraftConnected() = aircraftInstance != null
 
     fun startListeners() {
         startBatteryListeners()
@@ -60,53 +56,46 @@ object AircraftManager {
     }
 
     @Synchronized
-    fun getBatteryData(): BatteryData {
-        return lastBatteryData
-    }
+    fun getBatteryData(): BatteryData = lastBatteryData
 
-    fun getModelName(): String {
-        return aircraftInstance?.model?.displayName ?: "No aircraft"
-    }
+    fun getModelName(): String = aircraftInstance?.model?.displayName ?: "No aircraft"
 
-    fun getModel(): String {
-        return aircraftInstance?.model?.toString() ?: "NONE"
+    fun getModel(): String = aircraftInstance?.model?.toString() ?: "NONE"
+
+    @Synchronized
+    private fun updateBattery(state: BatteryState) {
+        lastBatteryData = lastBatteryData.merge(
+            state.chargeRemainingInPercent,
+            state.voltage,
+            state.current,
+            state.fullChargeCapacity,
+            state.chargeRemaining,
+            state.temperature
+        )
     }
 
     @Synchronized
-    private fun updateBattery(battery: BatteryData) {
-        lastBatteryData.updateFrom(battery)
+    private fun updateBatteryCellVoltages(cellVoltage: List<Int>) {
+        lastBatteryData = lastBatteryData.merge(voltageCells = cellVoltage)
     }
 
     @Synchronized
-    private fun updateBatteryCellVoltages(cellVoltage: IntArray) {
-        lastBatteryData.voltageCells = cellVoltage.clone()
-    }
+    fun getAirlinkData(): SignalQuality = SignalQuality(downlinkQuality, uplinkQuality)
 
     @Synchronized
     private fun updateAirlink(downLink: Int?, upLink: Int?) {
-        if (downLink != null) lastAirLinkQuality[0] = downLink
-        if (upLink != null) lastAirLinkQuality[1] = upLink
+        downLink?.let { downlinkQuality = it }
+        upLink?.let { uplinkQuality = it }
     }
 
     private fun startBatteryListeners() {
-        Log.d(TAG, "Starting Battery updates")
-        batteryInstance?.setStateCallback { batteryState: BatteryState ->
-            updateBattery(
-                BatteryData(
-                    batteryState.chargeRemainingInPercent,
-                    batteryState.voltage,
-                    batteryState.current,
-                    batteryState.fullChargeCapacity,
-                    batteryState.chargeRemaining,
-                    batteryState.temperature,
-                )
-            )
-        }
+        logger.d { "Starting Battery updates" }
+        batteryInstance?.setStateCallback { state -> updateBattery(state) }
 
-        batteryInstance?.getCellVoltages(object: CompletionCallbackWith<Array<Int>> {
+        batteryInstance?.getCellVoltages(object : CompletionCallbackWith<Array<Int>> {
             override fun onSuccess(p0: Array<Int>) {
-                updateBatteryCellVoltages(p0.toIntArray())
-                Log.d(TAG, "getCellVoltages $p0")
+                updateBatteryCellVoltages(p0.toList())
+                logger.d { "getCellVoltages $p0" }
             }
 
             override fun onFailure(p0: DJIError?) {
@@ -116,26 +105,26 @@ object AircraftManager {
     }
 
     private fun stopBatteryListeners() {
-        Log.d(TAG, "Stopping Battery updates")
-        batteryInstance?.setStateCallback { null }
-        updateBattery(BatteryData())
+        logger.d { "Stopping Battery updates" }
+        batteryInstance?.setStateCallback { }
+        lastBatteryData = BatteryData()
     }
 
     private fun startAirLinkListeners() {
         if (!useAirLink) {
-            updateAirlink(-1, -1)
-            Log.w(TAG, "Unable to start AirLink updates, no AirLink present")
+            updateAirlink(null, null)
+            logger.w { "Unable to start AirLink updates, no AirLink present" }
             return
         }
-        Log.d(TAG, "Starting AirLink updates")
-        airLinkInstance?.setDownlinkSignalQualityCallback { i: Int -> updateAirlink(i, null) }
-        airLinkInstance?.setUplinkSignalQualityCallback { i: Int -> updateAirlink(null, i) }
+        logger.d { "Starting AirLink updates" }
+        airLinkInstance?.setDownlinkSignalQualityCallback { updateAirlink(it, null) }
+        airLinkInstance?.setUplinkSignalQualityCallback { updateAirlink(null, it) }
     }
 
     private fun stopAirLinkListeners() {
-        Log.d(TAG, "Stopping AirLink updates")
-        airLinkInstance?.setDownlinkSignalQualityCallback{ i -> }
-        airLinkInstance?.setUplinkSignalQualityCallback{ i -> }
-        updateAirlink(-1, -1)
+        logger.d { "Stopping AirLink updates" }
+        airLinkInstance?.setDownlinkSignalQualityCallback { }
+        airLinkInstance?.setUplinkSignalQualityCallback { }
+        updateAirlink(null, null)
     }
 }

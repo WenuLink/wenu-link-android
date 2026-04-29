@@ -1,23 +1,23 @@
 package org.WenuLink.webrtc
 
 import android.content.Context
-import org.WenuLink.adapters.CameraCapturer
-import org.WenuLink.webrtc.peer.StreamPeerConnection
-import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
-import org.WenuLink.webrtc.peer.StreamPeerType
-import org.WenuLink.webrtc.utils.stringify
 import io.getstream.log.taggedLogger
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.WenuLink.adapters.ServiceAddress
+import org.WenuLink.adapters.camera.CameraCapturer
+import org.WenuLink.webrtc.peer.StreamPeerConnection
+import org.WenuLink.webrtc.peer.StreamPeerConnectionFactory
+import org.WenuLink.webrtc.peer.StreamPeerType
+import org.WenuLink.webrtc.utils.stringify
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.SessionDescription
@@ -25,46 +25,41 @@ import org.webrtc.SurfaceTextureHelper
 import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
-import java.util.UUID
 
 class WebRTCService {
     companion object {
         private var mInstance: WebRTCService? = null
-        var isEnabled: Boolean = true
+        var isEnabled = true
             private set
 
         fun getInstance(): WebRTCService {
-            if (mInstance == null)
+            if (mInstance == null) {
                 mInstance = WebRTCService()
+            }
             return mInstance!!
-        }
-
-        private val _isRunning = MutableStateFlow(false)
-        val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
-
-        fun runProcess(isRunning: Boolean) {
-            _isRunning.value = isRunning
         }
     }
 
     // logger an coroutine scope
-    private val logger by taggedLogger("WebRTCService")
-    private lateinit var serviceScope: CoroutineScope  //(SupervisorJob() + Dispatchers.Main)
+    private val logger by taggedLogger(WebRTCService::class.java.simpleName)
+    private var serviceScope: CoroutineScope? = null // (SupervisorJob() + Dispatchers.Main)
     private var runningJob: Job? = null
-    private var listeningJob: Job? = null
 
     // element required for WebRTC logics
-    private lateinit var videoSource: VideoSource
-    private lateinit var localVideoTrack: VideoTrack
-    private lateinit var webRTCClient: WebRTCClient
-    private lateinit var peerConnectionFactory: StreamPeerConnectionFactory
-    private lateinit var surfaceTextureHelper: SurfaceTextureHelper
+    private var videoSource: VideoSource? = null
+    private var localVideoTrack: VideoTrack? = null
+    private var webRTCClient: WebRTCClient? = null
+    private var peerConnection: StreamPeerConnection? = null
+    private var peerConnectionFactory: StreamPeerConnectionFactory? = null
+    private var surfaceTextureHelper: SurfaceTextureHelper? = null
+
     // Signaling configuration
-    private var signalingServer = "ws://192.168.1.220:8090"
-    var isServiceUp: Boolean = false
+    private lateinit var signalingServer: ServiceAddress
+    var isStreaming = false
         private set
-    var isStreaming: Boolean = false
-        private set
+
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
     // used to send local video track to the fragment
     private val _localVideoTrackFlow = MutableSharedFlow<VideoTrack>()
@@ -82,98 +77,104 @@ class WebRTCService {
 
     // getting front camera
     private val videoCapturer: VideoCapturer by lazy { CameraCapturer() }
-    val mediaOptions = CameraCapturer.MediaMetadata()
-    private var offer: String? = null
-
-    fun updateServerAddress(serverAddress: String) {
-        signalingServer = serverAddress
-    }
-
-    private val peerConnection: StreamPeerConnection by lazy {
-        peerConnectionFactory.makePeerConnection(
-            coroutineScope = serviceScope,
-            configuration = peerConnectionFactory.rtcConfig,
-            type = StreamPeerType.PUBLISHER,
-            mediaConstraints = mediaConstraints,
-            onIceCandidateRequest = { iceCandidate, _ ->
-                webRTCClient.sendCandidate(iceCandidate)
-            }
+    private val mediaOptions: CameraCapturer.MediaMetadata by lazy {
+        CameraCapturer.MediaMetadata.fromCameraManager() ?: error(
+            "CameraManager not ready, cannot start WebRTC"
         )
     }
+    private var offer: String? = null
 
-    fun canStartClient(): Boolean = CameraCapturer.hasCameraPresent() && isEnabled
+    private fun makePeerConnection() = peerConnectionFactory!!.makePeerConnection(
+        coroutineScope = serviceScope!!,
+        configuration = peerConnectionFactory!!.rtcConfig,
+        type = StreamPeerType.PUBLISHER,
+        mediaConstraints = mediaConstraints,
+        onIceCandidateRequest = { iceCandidate, _ -> webRTCClient!!.sendCandidate(iceCandidate) }
+    )
+
+    fun updateServerAddress(ip: String, port: Int) {
+        signalingServer = ServiceAddress(ip, port, "WS")
+    }
+
+    fun canStartClient() = CameraCapturer.hasCameraPresent() && isEnabled
 
     fun startClient(serviceScope: CoroutineScope, context: Context) {
         if (!isEnabled) {
             logger.i { "Unable to start client, WebRTC not enabled." }
             return
         }
+
+        if (!::signalingServer.isInitialized) {
+            logger.e { "Signaling address not configured" }
+            return
+        }
+
+        if (webRTCClient != null) return
+
         this.serviceScope = serviceScope
-        webRTCClient = WebRTCClient(signalingServer)
+
+        logger.i { "Connecting WebRTC client to $signalingServer" }
+
+        webRTCClient = WebRTCClient(signalingServer.toString())
         peerConnectionFactory = StreamPeerConnectionFactory(context)
         surfaceTextureHelper = SurfaceTextureHelper.create(
             "SurfaceTextureHelperThread",
-            peerConnectionFactory.eglBaseContext
+            peerConnectionFactory!!.eglBaseContext
         )
+        peerConnection = makePeerConnection()
 
-        isRunning.distinctUntilChangedBy { it }
-            .onEach {
-                if (it) run(context)
-                else disconnect()
-                logger.d { "isRunning: $it" }
-            }
-            .launchIn(this.serviceScope)
+        run(context)
+        _isRunning.value = true
     }
 
-    fun run(context: Context) {
-        if (isServiceUp)
-            return
-        runningJob = serviceScope.launch {
-            webRTCClient.signalingCommandFlow.collect { commandToValue ->
-                logger.d { "signalingCommandFlow ${commandToValue.first}" }
-                when (commandToValue.first) {
-                    WebRTCClient.CommandType.OFFER -> {
-                        createVideoTrack(context)
-                        handleOffer(commandToValue.second)
-                    }
-
-                    WebRTCClient.CommandType.ANSWER -> handleAnswer(commandToValue.second)
-                    WebRTCClient.CommandType.ICE -> handleIce(commandToValue.second)
-                    else -> Unit
-                }
+    private fun run(context: Context) {
+        runningJob = serviceScope!!.launch {
+            webRTCClient!!.signalingCommandFlow.collect { (command, value) ->
+                handleSignalingCommand(command, value, context)
             }
         }
     }
 
+    private suspend fun handleSignalingCommand(
+        command: WebRTCClient.CommandType,
+        value: String,
+        context: Context
+    ) {
+        logger.d { "signalingCommandFlow $command" }
+        when (command) {
+            WebRTCClient.CommandType.OFFER -> handleOffer(value, context)
+            WebRTCClient.CommandType.ANSWER -> handleAnswer(value)
+            WebRTCClient.CommandType.ICE -> handleIce(value)
+            else -> Unit
+        }
+    }
 
     fun createVideoTrack(context: Context) {
         logger.d { "mediaOptions: $mediaOptions" }
-        videoSource =
-            peerConnectionFactory.makeVideoSource(videoCapturer.isScreencast).apply {
-                videoCapturer.initialize(surfaceTextureHelper, context, this.capturerObserver)
+        videoSource = peerConnectionFactory!!.makeVideoSource(videoCapturer.isScreencast)
+            .apply {
+                videoCapturer.initialize(surfaceTextureHelper!!, context, this.capturerObserver)
                 videoCapturer.startCapture(
-                    mediaOptions.VIDEO_RESOLUTION_WIDTH,
-                    mediaOptions.VIDEO_RESOLUTION_HEIGHT,
-                    mediaOptions.FPS
+                    mediaOptions.videoResolutionWidth,
+                    mediaOptions.videoResolutionHeight,
+                    mediaOptions.fps
                 )
                 isStreaming = true
             }
 
-        localVideoTrack =
-            peerConnectionFactory.makeVideoTrack(
-                source = videoSource,
-                trackId = "Video${UUID.randomUUID()}"
-            )
+        localVideoTrack = peerConnectionFactory!!.makeVideoTrack(
+            source = videoSource!!,
+            trackId = "Video${UUID.randomUUID()}"
+        )
     }
 
     fun onAnswerReady() {
-        peerConnection.connection.addTrack(localVideoTrack, listOf(mediaOptions.MEDIA_STREAM_ID))
-        serviceScope.launch {
+        peerConnection!!.connection.addTrack(localVideoTrack, listOf(mediaOptions.mediaStreamId))
+        serviceScope!!.launch {
             // sending local video track to show local video from start
-            _localVideoTrackFlow.emit(localVideoTrack)
+            _localVideoTrackFlow.emit(localVideoTrack!!)
 
-            if (offer != null)
-                sendAnswer()
+            if (offer != null) sendAnswer()
         }
     }
 
@@ -181,9 +182,9 @@ class WebRTCService {
         if (enabled && !isStreaming) {
             isStreaming = true
             videoCapturer.startCapture(
-                mediaOptions.VIDEO_RESOLUTION_WIDTH,
-                mediaOptions.VIDEO_RESOLUTION_HEIGHT,
-                mediaOptions.FPS
+                mediaOptions.videoResolutionWidth,
+                mediaOptions.videoResolutionHeight,
+                mediaOptions.fps
             )
         } else {
             isStreaming = false
@@ -191,21 +192,24 @@ class WebRTCService {
         }
     }
 
+    private suspend fun stopClient() {
+        val job = runningJob
+        val helper = surfaceTextureHelper
+        val track = localVideoTrack
+        val pc = peerConnection
+        val client = webRTCClient
 
-    fun disconnect() {
-        if (!isServiceUp)
-            return
+        runningJob = null
+        surfaceTextureHelper = null
+        localVideoTrack = null
+        peerConnection = null
+        webRTCClient = null
 
         try {
-//            listeningJob?.cancel()
-//            listeningJob = null
-            runningJob?.cancel()
-            runningJob = null
+            job?.cancelAndJoin()
             // dispose video tracks
             localVideoTrackFlow.replayCache.forEach { it.dispose() }
-            if (::localVideoTrack.isInitialized) {
-                localVideoTrack.dispose()
-            }
+            track?.dispose()
 
             // stop capturer
             try {
@@ -216,56 +220,58 @@ class WebRTCService {
             videoCapturer.dispose()
 
             // release surfaceTextureHelper
-            if (::surfaceTextureHelper.isInitialized) {
-                surfaceTextureHelper.dispose()
-            }
-
+            helper?.dispose()
             // close peer connection
-            peerConnection.connection.close()
-
+            pc?.connection?.close()
             // stop signaling client
-            webRTCClient.dispose()
+            client?.dispose()
         } finally {
             isStreaming = false
-            isServiceUp = false
         }
     }
 
+    suspend fun stopService() {
+        logger.d { "Request to stop WebRTXService." }
+        stopClient()
+        _isRunning.value = false
+    }
+
     private suspend fun sendAnswer() {
-        peerConnection.setRemoteDescription(
+        peerConnection!!.setRemoteDescription(
             SessionDescription(SessionDescription.Type.OFFER, offer)
         )
-        val answer = peerConnection.createAnswer().getOrThrow()
-        val result = peerConnection.setLocalDescription(answer)
+        val answer = peerConnection!!.createAnswer().getOrThrow()
+        val result = peerConnection!!.setLocalDescription(answer)
         result.onSuccess {
-            webRTCClient.sendAnswer(answer.description)
+            webRTCClient!!.sendAnswer(answer.description)
         }
         logger.d { "[SDP] send answer: ${answer.stringify()}" }
     }
 
-    private fun handleOffer(sdp: String) {
+    private fun handleOffer(sdp: String, context: Context) {
         logger.d { "[SDP] handle offer: $sdp" }
-        offer = webRTCClient.valueFromKey(sdp, "sdp")!!
+        createVideoTrack(context)
+        offer = webRTCClient!!.valueFromKey(sdp, "sdp")!!
         onAnswerReady()
     }
 
     private suspend fun handleAnswer(sdp: String) {
         logger.d { "[SDP] handle answer: $sdp" }
-        peerConnection.setRemoteDescription(
+        peerConnection!!.setRemoteDescription(
             SessionDescription(
                 SessionDescription.Type.ANSWER,
-                webRTCClient.valueFromKey(sdp, "sdp")!!
+                webRTCClient!!.valueFromKey(sdp, "sdp")!!
             )
         )
     }
 
     private suspend fun handleIce(iceMessage: String) {
         logger.d { "[ICE] handle candidate: $iceMessage" }
-        peerConnection.addIceCandidate(
+        peerConnection!!.addIceCandidate(
             IceCandidate(
-                webRTCClient.valueFromKey(iceMessage, "id")!!,
-                webRTCClient.valueFromKey(iceMessage, "label")!!.toInt(),
-                webRTCClient.valueFromKey(iceMessage, "candidate")!!
+                webRTCClient!!.valueFromKey(iceMessage, "id")!!,
+                webRTCClient!!.valueFromKey(iceMessage, "label")!!.toInt(),
+                webRTCClient!!.valueFromKey(iceMessage, "candidate")!!
             )
         )
     }

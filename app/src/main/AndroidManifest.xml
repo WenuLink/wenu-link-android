@@ -53,7 +53,7 @@
 
         <meta-data
             android:name="com.dji.sdk.API_KEY"
-            android:value="@string/dji_key" />
+            android:value="${djiApiKey}" />
 
         <activity
             android:name="dji.sdk.sdkmanager.DJIAoaControllerActivity"
@@ -82,7 +82,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".adapters.DroneService"
+            android:name=".adapters.WenuLinkService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location|connectedDevice" />

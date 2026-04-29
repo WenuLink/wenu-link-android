@@ -1,152 +1,161 @@
 package org.WenuLink.sdk
 
-import org.WenuLink.adapters.TelemetryData
-import dji.common.error.DJIError
+import dji.common.flightcontroller.CompassCalibrationState
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.imu.IMUState
+import dji.common.flightcontroller.imu.SensorState
 import dji.common.model.LocationCoordinate2D
-import dji.common.util.CommonCallbacks
 import dji.sdk.flightcontroller.FlightController
 import io.getstream.log.taggedLogger
-import kotlin.getValue
+import org.WenuLink.adapters.aircraft.Coordinates3D
+import org.WenuLink.adapters.aircraft.GPSMapper
+import org.WenuLink.adapters.aircraft.SensorState as AppSensorState
+import org.WenuLink.adapters.aircraft.TelemetryData
+
+private fun Double.finiteOrNull(): Double? = takeIf { isFinite() }
+private fun Float.finiteOrNull(): Float? = takeIf { isFinite() }
+private fun Double.finiteOr(default: Double): Double = if (isFinite()) this else default
+private fun Float.finiteOr(default: Float): Float = if (isFinite()) this else default
 
 object FCManager {
-    private val logger by taggedLogger("FlightControllerManager")
+    private val logger by taggedLogger(FCManager::class.java.simpleName)
 
-    var fcInstance: FlightController? = null
+    var mInstance: FlightController? = null
         private set
-    @Volatile private var serialNumber: String? = null
-    @Volatile private var fwVersion: String? = null
-
-    @Synchronized
-    fun updateSerialNumber(sn: String) {
-        serialNumber = sn
-    }
-
-    @Synchronized
-    fun updateFirmwareVersion(firmware: String) {
-        fwVersion = firmware
-    }
+    private var serialNumber: String? = null
+    private var fwVersion: String? = null
 
     @Synchronized
     fun init(flightController: FlightController) {
-        fcInstance = flightController
-
-        flightController.getSerialNumber(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(sn: String) {
-                updateSerialNumber(sn)
-                logger.i { "${this@FCManager}: $sn" }
-            }
-
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Serial Number obtained: $error" }
-            }
-
-        })
-        flightController.getFirmwareVersion(object : CommonCallbacks.CompletionCallbackWith<String> {
-            override fun onSuccess(firmware: String) {
-                updateFirmwareVersion(firmware)
-                logger.i { this@FCManager.toString() }
-            }
-
-            override fun onFailure(error: DJIError) {
-                logger.e { "No Firmware version obtained: $error" }
-            }
-
-        })
-
+        SimManager.init(flightController)
+        mInstance = flightController
         logger.i { "FlightController init" }
     }
 
+    suspend fun retrieveMetadata() = mInstance?.let { fcInstance ->
+        fwVersion = SDKUtils.retrieveFirmwareVersion(fcInstance)
+        serialNumber = SDKUtils.retrieveSerialNumber(fcInstance)
+    }
+
     @Synchronized
-    fun isConnected(): Boolean {
-        return fcInstance != null
-    }
+    fun isConnected() = mInstance != null
 
-    override fun toString(): String {
-        return if (!isConnected()) {
-            val sn = "SN: " + if (serialNumber != null) serialNumber else "N/A"
-            val fw = "FW: " + if (fwVersion != null) fwVersion else "N/A"
-            if (serialNumber != null && fwVersion != null) {
-                "FlightController $sn - $fw"
-            } else
-                "Reading FlightController"
-        } else "No FlightController"
-    }
-
-    fun state2telemetry(state: FlightControllerState): TelemetryData {
-        // TODO: move dji2ArduCopterFlightMode to adapters package to maintain SDK code isolated
-        val (customMode, guidedFlag) = SDKUtils.dji2ArduCopterFlightMode(state.flightMode)
-        return TelemetryData(
-            roll = state.attitude.roll,
-            pitch = state.attitude.pitch,
-            yaw = state.attitude.yaw,
-            latitude = state.aircraftLocation.latitude,
-            longitude = state.aircraftLocation.longitude,
-            altitude = state.aircraftLocation.altitude,
-            velocityX = state.velocityX,
-            velocityY = state.velocityY,
-            velocityZ = state.velocityZ,
-            flightTime = state.flightTimeInSeconds,
-            flightMode = customMode,
-            flightGuided = guidedFlag,
-            takeOffAltitude = state.takeoffLocationAltitude,
-            isFlying = state.isFlying,
-            motorsOn = state.areMotorsOn(),
-            satelliteCount = state.satelliteCount,
-            gpsLevel = SDKUtils.getGPSSignalLevelArray(state.gpsSignalLevel)
-        )
-    }
-
-    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) {
-        fcInstance?.setStateCallback(stateCallback)
-    }
-
-    fun unregisterStateCallback() {
-        fcInstance?.setStateCallback(null)
-    }
-
-    fun getHomePosition(): Triple<Double, Double, Int>? {
-        val flightState = fcInstance!!.state
-        if (!flightState.isHomeLocationSet) {
-            return null
+    override fun toString(): String =
+        if (isConnected() && serialNumber != null && fwVersion != null) {
+            "FlightController SN: $serialNumber - FW: $fwVersion"
+        } else if (isConnected()) {
+            "Reading FlightController"
+        } else {
+            "No FlightController"
         }
 
-        val homeLocation = flightState.homeLocation
-        return Triple(
-            first = homeLocation.latitude,
-            second = homeLocation.longitude,
-            third = flightState.goHomeHeight
-        )
-    }
+    fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
+        roll = state.attitude.roll.finiteOr(0.0),
+        pitch = state.attitude.pitch.finiteOr(0.0),
+        yaw = state.attitude.yaw.finiteOr(0.0),
+        latitude = state.aircraftLocation.latitude.finiteOrNull(),
+        longitude = state.aircraftLocation.longitude.finiteOrNull(),
+        positionX = 0f,
+        positionY = 0f,
+        positionZ = 0f,
+        velocityX = state.velocityX.finiteOr(0f),
+        velocityY = state.velocityY.finiteOr(0f),
+        velocityZ = state.velocityZ.finiteOr(0f),
+        flightTime = state.flightTimeInSeconds,
+        takeOffAltitude = state.takeoffLocationAltitude.finiteOrNull(),
+        relativeAltitude = state.aircraftLocation.altitude.finiteOrNull(),
+        isFlying = state.isFlying,
+        motorsOn = state.areMotorsOn(),
+        satelliteCount = state.satelliteCount,
+        gpsFixType = GPSMapper.toMavlinkFixType(state.gpsSignalLevel)
+    )
 
-    fun getCurrentLocation(): Pair<Double?, Double?> {
-        return Pair(fcInstance?.state?.aircraftLocation?.latitude,
-            fcInstance?.state?.aircraftLocation?.longitude)
+    fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
+        mInstance?.setStateCallback(stateCallback)
+
+    fun unregisterStateCallback() = mInstance?.setStateCallback(null)
+
+    fun getHomePosition(): Coordinates3D? {
+        val flightState = mInstance!!.state
+        if (!flightState.isHomeLocationSet) return null
+
+        val homeLocation = flightState.homeLocation
+        return Coordinates3D(
+            homeLocation.latitude,
+            homeLocation.longitude,
+            flightState.goHomeHeight.toFloat()
+        )
     }
 
     fun setHomePosition(
         latitude: Double? = null,
         longitude: Double? = null,
         onResult: (String?) -> Unit
-    ) {
-        if (latitude != null && longitude != null) {
-            fcInstance?.setHomeLocation(
-                LocationCoordinate2D(latitude, longitude),
-                SDKUtils.createCompletionCallback(onResult)
-            )
-        } else {
-            fcInstance?.setHomeLocationUsingAircraftCurrentLocation(
-                SDKUtils.createCompletionCallback(onResult)
-            )
+    ) = if (latitude != null && longitude != null) {
+        mInstance?.setHomeLocation(
+            LocationCoordinate2D(latitude, longitude),
+            SDKUtils.createCompletionCallback(onResult)
+        )
+    } else {
+        mInstance?.setHomeLocationUsingAircraftCurrentLocation(
+            SDKUtils.createCompletionCallback(onResult)
+        )
+    }
+
+    fun needLandingConfirmation() = mInstance?.state?.isLandingConfirmationNeeded == true
+
+    fun getAltitude(): Float = mInstance?.state?.aircraftLocation?.altitude ?: Float.MAX_VALUE
+
+    fun startTakeoff(onResult: (String?) -> Unit) =
+        mInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+
+    fun confirmLanding(onResult: (String?) -> Unit) =
+        // for some reason these methods are not calling onResult, possibly is a thread issue.
+        mInstance?.confirmLanding { SDKUtils.createCompletionCallback(onResult) }
+
+    fun armMotors(onResult: (String?) -> Unit) =
+        mInstance?.turnOnMotors { SDKUtils.createCompletionCallback(onResult) }
+
+    fun disarmMotors(onResult: (String?) -> Unit) =
+        mInstance?.turnOffMotors { SDKUtils.createCompletionCallback(onResult) }
+
+    fun sensorState(sensorState: SensorState?): AppSensorState = when (sensorState) {
+        SensorState.DISCONNECTED,
+        SensorState.CALIBRATING,
+        SensorState.CALIBRATION_FAILED,
+        SensorState.WARMING_UP
+        -> AppSensorState.BOOT
+
+        SensorState.DATA_EXCEPTION,
+        SensorState.IN_MOTION,
+        SensorState.LARGE_BIAS
+        -> AppSensorState.CALIBRATION_NEEDED
+
+        SensorState.NORMAL_BIAS,
+        SensorState.MEDIUM_BIAS,
+        SensorState.UNKNOWN
+        -> AppSensorState.OK
+
+        null -> AppSensorState.BOOT
+    }
+
+    fun getIMUCount(): Int = mInstance?.imuCount ?: 0
+
+    fun registerIMUStateCallback(stateCallback: (IMUState) -> Unit) =
+        mInstance?.setIMUStateCallback(stateCallback)
+
+    fun unregisterIMUStateCallback() = mInstance?.setIMUStateCallback(null)
+
+    fun getCompassCount(): Int = mInstance?.compassCount ?: 0
+
+    fun compassOk(): Boolean {
+        if (getCompassCount() <= 0) {
+            logger.i { "No Compass sensor found!" }
+            return false
         }
-    }
 
-    fun simpleTakeoff(onResult: (String?) -> Unit) {
-        fcInstance?.startTakeoff { SDKUtils.createCompletionCallback(onResult) }
+        return mInstance?.compass?.let {
+            !it.hasError() && it.calibrationState == CompassCalibrationState.NOT_CALIBRATING
+        } ?: false
     }
-
-    fun simpleLanding(onResult: (String?) -> Unit) {
-        fcInstance?.startLanding { SDKUtils.createCompletionCallback(onResult) }
-    }
-
 }
