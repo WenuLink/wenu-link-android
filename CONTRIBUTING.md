@@ -40,6 +40,10 @@ All types of contributions are encouraged and valued. See the [Table of Contents
     - [Running Gradle commands](#running-gradle-commands)
     - [Recommended: pre-commit hook](#recommended-pre-commit-hook)
   - [Commit Messages](#commit-messages)
+- [Releases](#releases)
+  - [Versioning](#versioning)
+  - [Cutting a Release](#cutting-a-release)
+  - [Release Credentials](#release-credentials)
 - [Join The Project Team](#join-the-project-team)
 - [Attribution](#attribution)
 
@@ -295,6 +299,66 @@ Implemented user registration and login features. This refactor introduces JWT t
 
 Fixes #42
 ```
+
+## Releases
+
+Releases are produced from the `main` branch and published to the [Releases page](https://github.com/WenuLink/wenu-link-android/releases) as signed APKs. Publishing is automated: pushing a `v*` tag to `main` triggers `.github/workflows/release.yml`, which builds, signs, and uploads the release APK.
+
+### Versioning
+
+The project uses [Semantic Versioning](https://semver.org/). Tags are prefixed with `v` (e.g. `v0.1.0-alpha`, `v1.0.0`). Pre-release identifiers (`-alpha`, `-beta`, `-rc.1`) are used for unstable releases; the release workflow automatically flags any tag containing a dash as a GitHub pre-release.
+
+`versionName` in `app/build.gradle.kts` must match the tag without the leading `v`. `versionCode` must increase monotonically across all releases, including pre-releases.
+
+### Cutting a Release
+
+Only project maintainers with access to the release credentials can cut a release. The full procedure:
+
+1. Make sure `develop` contains everything intended for the release and is green.
+2. Branch a release branch off `develop`:
+    ```bash
+       git checkout develop
+       git pull upstream develop
+       git checkout -b release/X.Y.Z
+    ```
+3. On the release branch, bump `versionName` and `versionCode` in `app/build.gradle.kts`, update the changelog if applicable, and commit.
+4. Open a pull request from `release/X.Y.Z` to `main`.
+5. After review and approval, merge the PR into `main`.
+6. Tag the merge commit and push the tag:
+    ```bash
+       git checkout main
+       git pull upstream main
+       git tag -a vX.Y.Z -m "Release vX.Y.Z"
+       git push upstream vX.Y.Z
+    ```
+   
+    Pushing the tag triggers the release workflow, which builds the signed APK and publishes the GitHub Release.
+7. Merge `main` back into `develop` so the version bump is reflected on both branches:
+    ```bash
+       git checkout develop
+       git pull upstream develop
+       git merge --no-ff main
+       git push upstream develop
+    ```
+
+If the workflow fails, delete the tag both locally and on the remote (`git push --delete upstream vX.Y.Z`), fix the cause on the release branch or `main`, and re-tag.
+
+### Release Credentials
+
+The release APK is signed with a project-owned keystore registered to a project-owned DJI developer account. These credentials are stored in:
+
+- The project password vault, which is the canonical copy and the source of truth for handoff between maintainer groups.
+- The GitHub organization's Actions secrets, used by the release workflow.
+
+The required secrets are:
+
+- `RELEASE_KEYSTORE_BASE64`: the keystore file, base64-encoded.
+- `RELEASE_KEYSTORE_PASSWORD`
+- `RELEASE_KEY_ALIAS`
+- `RELEASE_KEY_PASSWORD`
+- `DJI_API_KEY`: the DJI key registered against `org.WenuLink` for the project's DJI developer account.
+
+To rotate any of these, update the value in the password vault and the corresponding GitHub secret in lockstep. The keystore itself must never be rotated once releases have been published with it, since Android refuses to install updates signed with a different key.
 
 ## Join The Project Team
 
