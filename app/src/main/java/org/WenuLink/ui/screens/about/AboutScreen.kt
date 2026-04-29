@@ -67,8 +67,9 @@ fun AboutScreen(navController: NavController) {
     )
 
     val onOpenGithub = {
-        val intent = Intent(Intent.ACTION_VIEW, "https://github.com/WenuLink".toUri())
-        context.startActivity(intent)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, "https://github.com/WenuLink/wenu-link-android".toUri())
+        )
     }
 
     Scaffold(
@@ -90,7 +91,6 @@ fun AboutScreen(navController: NavController) {
         },
         contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
-
         if (isLandscape) {
             LandscapeAboutContent(
                 modifier = Modifier.padding(innerPadding),
