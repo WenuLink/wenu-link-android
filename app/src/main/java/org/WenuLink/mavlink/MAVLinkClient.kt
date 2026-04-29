@@ -31,10 +31,6 @@ class MAVLinkClient(
     val txCount = AtomicLong(0L)
     val parseErrors = AtomicLong(0L)
 
-    @Volatile
-    var lastObservedPeer: String? = null
-        private set
-
     var systemID = 1
         private set
 
