@@ -122,7 +122,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
                         }
 
                         launch {
-                            cameraHooks()
+                            if (camera.hasCameraPresent) cameraHooks()
                         }
 
                         launch {
@@ -330,7 +330,6 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
     }
 
     private fun cameraHooks() {
-        if (!camera.wasInitialized) return
         if (camera.consumeCaptureEvent()) {
             val cameraId = camera.availableCameras.firstOrNull()?.id ?: return
             onImageCaptured?.invoke(cameraId, camera.photoSeqIndex)

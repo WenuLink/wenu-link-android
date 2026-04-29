@@ -25,8 +25,15 @@ data class CameraState(
      * - CaptureType.IMAGE: capture interval in seconds
      * - CaptureType.VIDEO: elapsed recording time in milliseconds
      */
-    val captureTime: Long = 0
-)
+    val captureTimestamp: Long = -1,
+    val totalPhotos: Int = 0
+) {
+    val timeMillis: Long get() = if (captureTimestamp != -1L) {
+        System.currentTimeMillis() - captureTimestamp
+    } else {
+        0
+    }
+}
 
 data class CameraMetadata(
     val id: Int = 1,
