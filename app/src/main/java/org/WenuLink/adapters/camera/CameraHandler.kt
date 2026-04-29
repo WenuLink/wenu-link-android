@@ -28,9 +28,9 @@ class CameraHandler : CommandHandler<CameraHandler>() {
     private val logger by taggedLogger(CameraHandler::class.java.simpleName)
     val availableCameras: MutableList<CameraMetadata> = mutableListOf()
     var photoSeqIndex: Int = 0
-    var captureTimestamp: Long = System.currentTimeMillis()
     var wasInitialized = false
         private set
+    val hasCameraPresent: Boolean get() = availableCameras.isNotEmpty() && wasInitialized
     private val _captureCount = MutableStateFlow(0)
     val captureCount: StateFlow<Int> = _captureCount.asStateFlow()
     private var wasStoringPhoto = false
@@ -59,7 +59,7 @@ class CameraHandler : CommandHandler<CameraHandler>() {
 
     private fun registerCameraState() = CameraManager.registerStateCallback { state ->
         if (state.isStoringPhoto && !wasStoringPhoto) {
-            _captureCount.value += 1
+            increasePhotoCounter(availableCameras.first().id)
         }
         wasStoringPhoto = state.isStoringPhoto
     }
@@ -85,16 +85,25 @@ class CameraHandler : CommandHandler<CameraHandler>() {
                     CAMERA_CAP_FLAGS.CAMERA_CAP_FLAGS_HAS_MODES.toLong()
             )
         )
-        setMode(CAMERA_MODE.CAMERA_MODE_IMAGE, 0)
+        // set mode as a command avoid thread issues
+        dispatchCommand(
+            SetModeCommand(CAMERA_MODE.CAMERA_MODE_IMAGE, availableCameras.first().id)
+        )
 
-        logger.d { "Managing ${availableCameras.size} detected camera(s)" }
+        // TODO: grab current number of photos in storage
+
+        logger.d { "Handling ${availableCameras.size} detected camera(s)" }
         return true
     }
 
     fun getCamera(cameraId: Int): CameraMetadata? =
         availableCameras.firstOrNull { it.id == cameraId }
 
-    fun setMode(newMode: Int, cameraIdx: Int = 0) {
+    private fun getCameraWithIndex(cameraId: Int): Pair<Int, CameraMetadata>? =
+        availableCameras.withIndex().firstOrNull { it.value.id == cameraId }
+            ?.let { it.index to it.value }
+
+    fun setMode(newMode: Int, cameraId: Int) {
         val captureType = when (newMode) {
             CAMERA_MODE.CAMERA_MODE_IMAGE -> CameraCaptureType.IMAGE
             CAMERA_MODE.CAMERA_MODE_VIDEO -> CameraCaptureType.VIDEO
@@ -108,8 +117,8 @@ class CameraHandler : CommandHandler<CameraHandler>() {
             0
         )
 
-        getCamera(cameraIdx)?.let {
-            availableCameras.set(cameraIdx, it.copy(state = newState))
+        getCameraWithIndex(cameraId)?.let { (idx, camera) ->
+            availableCameras[idx] = camera.copy(state = newState)
         }
     }
 
@@ -117,48 +126,59 @@ class CameraHandler : CommandHandler<CameraHandler>() {
         val current = captureCount.value
         if (current <= lastSeenCaptureCount) return false
         lastSeenCaptureCount = current
-        photoSeqIndex += 1
         return true
     }
 
-    fun updateCaptureStatus(newStatus: CameraCaptureStatus, cameraIdx: Int = 0) {
-        getCamera(cameraIdx)?.let {
-            availableCameras.set(
-                cameraIdx,
-                it.copy(
-                    state = it.state.copy(
-                        captureStatus = newStatus
-                    )
-                )
+    fun updateCaptureStatus(newStatus: CameraCaptureStatus, cameraId: Int) =
+        getCameraWithIndex(cameraId)?.let { (idx, camera) ->
+            availableCameras[idx] = camera.copy(
+                state = camera.state.copy(captureStatus = newStatus)
+            )
+        }
+
+    fun checkCaptureStatus(status: CameraCaptureStatus, cameraId: Int) =
+        getCamera(cameraId)?.state?.captureStatus == status
+
+    fun captureInProgress(cameraId: Int): Boolean = checkCaptureStatus(
+        CameraCaptureStatus.IN_PROGRESS,
+        cameraId
+    )
+
+    fun captureIdle(cameraId: Int): Boolean = checkCaptureStatus(
+        CameraCaptureStatus.IDLE,
+        cameraId
+    )
+
+    fun checkCameraMode(mode: Int, cameraId: Int) = getCamera(cameraId)?.state?.mavlinkMode == mode
+
+    fun isPhotoMode(cameraId: Int): Boolean = checkCameraMode(
+        CAMERA_MODE.CAMERA_MODE_IMAGE,
+        cameraId
+    )
+
+    fun isVideoMode(cameraId: Int): Boolean = checkCameraMode(
+        CAMERA_MODE.CAMERA_MODE_VIDEO,
+        cameraId
+    )
+
+    fun canTakePhotoInVideo(cameraId: Int): Boolean = CameraManager.canTakePhotoInVideo()
+
+    fun updateCaptureTimestamp(timestamp: Long?, cameraId: Int) =
+        getCameraWithIndex(cameraId)?.let { (idx, camera) ->
+            logger.d { "updateTimestamp" }
+            availableCameras[idx] = camera.copy(
+                state = camera.state.copy(captureTimestamp = timestamp)
+            )
+        }
+
+    fun increasePhotoCounter(cameraId: Int) {
+        logger.d { "Photo taken, increasing number" }
+        photoSeqIndex += 1 // sequence index
+        _captureCount.value += 1 // session count
+        getCameraWithIndex(cameraId)?.let { (idx, camera) ->
+            availableCameras[idx] = camera.copy(
+                state = camera.state.copy(totalPhotos = camera.state.totalPhotos + 1) // total count
             )
         }
     }
-
-    fun checkCaptureStatus(status: CameraCaptureStatus, cameraIdx: Int = 0) =
-        getCamera(cameraIdx)?.state?.captureStatus == status
-
-    fun captureInProgress(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
-        CameraCaptureStatus.IN_PROGRESS,
-        cameraIdx
-    )
-
-    fun captureIdle(cameraIdx: Int = 0): Boolean = checkCaptureStatus(
-        CameraCaptureStatus.IDLE,
-        cameraIdx
-    )
-
-    fun checkCameraMode(mode: Int, cameraIdx: Int = 0) =
-        getCamera(cameraIdx)?.state?.mavlinkMode == mode
-
-    fun isPhotoMode(cameraIdx: Int = 0): Boolean = checkCameraMode(
-        CAMERA_MODE.CAMERA_MODE_IMAGE,
-        cameraIdx
-    )
-
-    fun isVideoMode(cameraIdx: Int = 0): Boolean = checkCameraMode(
-        CAMERA_MODE.CAMERA_MODE_VIDEO,
-        cameraIdx
-    )
-
-    fun canRecordVideo(cameraIdx: Int = 0): Boolean = CameraManager.canRecordVideo()
 }

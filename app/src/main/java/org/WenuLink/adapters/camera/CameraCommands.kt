@@ -13,14 +13,14 @@ sealed interface CameraCommand : ICommand<CameraHandler> {
     override suspend fun onStop(ctx: CameraHandler) { }
 }
 
-data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand {
+data class SetModeCommand(val newMode: Int, val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when (newMode) {
         CAMERA_MODE.CAMERA_MODE_IMAGE -> CommandResult.ok
         CAMERA_MODE.CAMERA_MODE_VIDEO -> CommandResult.ok
         else -> CommandResult.error("Unrecognized mode: $newMode")
     }
 
-    suspend fun setPhotoMode(cameraIdx: Int = 0): UnitResult {
+    suspend fun setPhotoMode(cameraId: Int): UnitResult {
         if (!CameraManager.isPhotoMode()) {
             CameraManager.setPhotoMode()?.let {
                 return CommandResult.error("setPhotoMode error: $it")
@@ -30,7 +30,7 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
         return CommandResult.ok
     }
 
-    suspend fun setVideoMode(cameraIdx: Int = 0): UnitResult {
+    suspend fun setVideoMode(cameraId: Int): UnitResult {
         if (!CameraManager.isVideoMode()) {
             CameraManager.setVideoMode()?.let {
                 return CommandResult.error("setVideoMode error: $it")
@@ -42,70 +42,69 @@ data class SetModeCommand(val newMode: Int, val cameraIdx: Int) : CameraCommand 
 
     override suspend fun execute(ctx: CameraHandler): UnitResult {
         val setModeResult = when (newMode) {
-            CAMERA_MODE.CAMERA_MODE_IMAGE -> setPhotoMode()
-            CAMERA_MODE.CAMERA_MODE_VIDEO -> setVideoMode()
+            CAMERA_MODE.CAMERA_MODE_IMAGE -> setPhotoMode(cameraId)
+            CAMERA_MODE.CAMERA_MODE_VIDEO -> setVideoMode(cameraId)
             else -> CommandResult.ok
         }
 
         if (setModeResult.isOk) {
-            ctx.setMode(newMode, cameraIdx)
+            ctx.setMode(newMode, cameraId)
         }
         return setModeResult
     }
 }
 
-data class TakePhotoCommand(val cameraIdx: Int) : CameraCommand {
+data class TakePhotoCommand(val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        !ctx.isPhotoMode(cameraIdx) -> CommandResult.error("Not in photo mode!")
-        !ctx.captureIdle(cameraIdx) -> CommandResult.error("Busy")
+        ctx.isVideoMode(cameraId) && ctx.canTakePhotoInVideo(cameraId) -> CommandResult.ok
+        !ctx.isPhotoMode(cameraId) -> CommandResult.error("Not in photo mode!")
+        !ctx.captureIdle(cameraId) -> CommandResult.error("Busy")
         else -> CommandResult.ok
     }
 
     override suspend fun execute(ctx: CameraHandler): UnitResult {
         // mark IN_PROGRESS
-        ctx.updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraIdx)
+        ctx.updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraId)
         // Trigger camera and wait for photo to be taken
         val error = CameraManager.requestPhotoShoot()
         if (error == null) {
-            ctx.captureTimestamp = System.currentTimeMillis()
-            ctx.photoSeqIndex += 1
+            ctx.updateCaptureTimestamp(System.currentTimeMillis(), cameraId)
         }
         // mark IDLE back
-        ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+        ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
         return error
             ?.let { CommandResult.error(it) }
             ?: CommandResult.ok
     }
 }
 
-data class StartRecordCommand(val cameraIdx: Int) : CameraCommand {
+data class StartRecordCommand(val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        !ctx.isVideoMode(cameraIdx) -> CommandResult.error("Not in video mode!")
-        !ctx.canRecordVideo(cameraIdx) -> CommandResult.error("Unable to start recording")
-        !ctx.captureIdle(cameraIdx) -> CommandResult.error("Busy")
+        !ctx.isVideoMode(cameraId) -> CommandResult.error("Not in video mode!")
+        !ctx.captureIdle(cameraId) -> CommandResult.error("Busy")
         else -> CommandResult.ok
     }
 
     override suspend fun execute(ctx: CameraHandler): UnitResult {
         // mark IN_PROGRESS
-        ctx.updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraIdx)
+        ctx.updateCaptureStatus(CameraCaptureStatus.IN_PROGRESS, cameraId)
         // Trigger camera and wait for photo to be taken
         return CameraManager.requestStartVideoRecording()
             ?.let {
-                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
                 CommandResult.error(it)
             }
             ?: let {
-                ctx.captureTimestamp = System.currentTimeMillis()
+                ctx.updateCaptureTimestamp(System.currentTimeMillis(), cameraId)
                 CommandResult.ok
             }
     }
 }
 
-data class StopRecordCommand(val cameraIdx: Int) : CameraCommand {
+data class StopRecordCommand(val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        !ctx.isVideoMode(cameraIdx) -> CommandResult.error("Not in video mode!")
-        !ctx.captureInProgress(cameraIdx) -> CommandResult.error("Record not started")
+        !ctx.isVideoMode(cameraId) -> CommandResult.error("Not in video mode!")
+        !ctx.captureInProgress(cameraId) -> CommandResult.error("Record not started")
         else -> CommandResult.ok
     }
 
@@ -115,16 +114,17 @@ data class StopRecordCommand(val cameraIdx: Int) : CameraCommand {
             ?.let { CommandResult.error(it) }
             ?: let {
                 // mark IDLE back
-                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
+                ctx.updateCaptureTimestamp(null, cameraId)
                 CommandResult.ok
             }
     }
 }
 
-data class StartIntervalShootCommand(val cameraIdx: Int, val intervalSeconds: Int) : CameraCommand {
+data class StartIntervalShootCommand(val cameraId: Int, val intervalSeconds: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        !ctx.isPhotoMode(cameraIdx) -> CommandResult.error("Not in photo mode!")
-        !ctx.captureIdle(cameraIdx) -> CommandResult.error("Busy")
+        !ctx.isPhotoMode(cameraId) -> CommandResult.error("Not in photo mode!")
+        !ctx.captureIdle(cameraId) -> CommandResult.error("Busy")
         else -> CommandResult.ok
     }
 
@@ -135,7 +135,7 @@ data class StartIntervalShootCommand(val cameraIdx: Int, val intervalSeconds: In
         CameraManager.setIntervalSeconds(intervalSeconds)
             ?.let { return CommandResult.error(it) }
 
-        ctx.updateCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraIdx)
+        ctx.updateCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraId)
 
         return CameraManager.requestStartIntervalShoot()
             ?.let { CommandResult.error(it) }
@@ -144,15 +144,15 @@ data class StartIntervalShootCommand(val cameraIdx: Int, val intervalSeconds: In
 
     override suspend fun onStop(ctx: CameraHandler) {
         CameraManager.requestStopIntervalShoot()
-        ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+        ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
     }
 }
 
-data class StopIntervalShootCommand(val cameraIdx: Int) : CameraCommand {
+data class StopIntervalShootCommand(val cameraId: Int) : CameraCommand {
     override fun validate(ctx: CameraHandler): UnitResult = when {
-        !ctx.isPhotoMode(cameraIdx) -> CommandResult.error("Not in photo mode!")
+        !ctx.isPhotoMode(cameraId) -> CommandResult.error("Not in photo mode!")
 
-        !ctx.checkCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraIdx) ->
+        !ctx.checkCaptureStatus(CameraCaptureStatus.INTERVAL_PROGRESS, cameraId) ->
             CommandResult.error("Interval shoot not started")
 
         else -> CommandResult.ok
@@ -162,7 +162,7 @@ data class StopIntervalShootCommand(val cameraIdx: Int) : CameraCommand {
         CameraManager.requestStopIntervalShoot()
             ?.let { CommandResult.error(it) }
             ?: let {
-                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraIdx)
+                ctx.updateCaptureStatus(CameraCaptureStatus.IDLE, cameraId)
                 CommandResult.ok
             }
 }

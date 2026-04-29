@@ -225,7 +225,7 @@ object CameraManager {
 
     fun isSingleShoot() = captureMode == SettingsDefinitions.ShootPhotoMode.SINGLE
 
-    fun canRecordVideo() = mInstance?.isCaptureInVideoSupported == true
+    fun canTakePhotoInVideo() = mInstance?.isCaptureInVideoSupported == true
 
     suspend fun requestPhotoShoot(): String? {
         val camera = mInstance ?: return "Camera instance is null"
