@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.navigation.NavController
+import org.WenuLink.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +67,9 @@ fun AboutScreen(navController: NavController) {
     )
 
     val onOpenGithub = {
-        val intent = Intent(Intent.ACTION_VIEW, "https://github.com/WenuLink".toUri())
-        context.startActivity(intent)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, "https://github.com/WenuLink/wenu-link-android".toUri())
+        )
     }
 
     Scaffold(
@@ -89,7 +91,6 @@ fun AboutScreen(navController: NavController) {
         },
         contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
-
         if (isLandscape) {
             LandscapeAboutContent(
                 modifier = Modifier.padding(innerPadding),
@@ -210,7 +211,7 @@ private fun AppIdentitySection() {
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "v1-beta",
+            text = "v${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary
         )

@@ -9,6 +9,7 @@ data class DashboardUiState(
     val isAircraftPresent: Boolean = false,
     val isSimulationReady: Boolean = false,
     val canRunService: Boolean = false,
+    val isUsingSimulation: Boolean = false,
     val isServiceRunning: Boolean = false,
     val isMAVLinkRunning: Boolean = false,
     val isWebRTCRunning: Boolean = false,

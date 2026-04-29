@@ -35,6 +35,7 @@ fun AppNavigation(
     val isAircraftPresent by app.isAircraftPresent.collectAsState()
     val isSimulationReady by app.isSimulationReady.collectAsState()
     val canRunService by app.isAircraftBoot.collectAsState()
+    val isUsingSimulation by servicesViewModel.isUsingSimulation.collectAsState()
     val isServiceRunning by servicesViewModel.isServiceUp.collectAsState()
     val isMAVLinkRunning by servicesViewModel.isMAVLinkRunning.collectAsState()
     val isWebRTCRunning by servicesViewModel.isWebRTCRunning.collectAsState()
@@ -47,6 +48,7 @@ fun AppNavigation(
         isAircraftPresent = isAircraftPresent,
         isSimulationReady = isSimulationReady,
         canRunService = canRunService,
+        isUsingSimulation = isUsingSimulation,
         isServiceRunning = isServiceRunning,
         isMAVLinkRunning = isMAVLinkRunning,
         isWebRTCRunning = isWebRTCRunning,

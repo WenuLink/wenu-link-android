@@ -26,6 +26,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
     val isAircraftPresent: StateFlow<Boolean> = thisApp.isAircraftPresent.asStateFlow()
     val isSimReady: StateFlow<Boolean> = thisApp.isSimulationReady.asStateFlow()
     val isAircraftBoot: StateFlow<Boolean> = thisApp.isAircraftBoot.asStateFlow()
+    val isUsingSimulation: StateFlow<Boolean> = thisApp.isUsingSimulation.asStateFlow()
     val isServiceUp: StateFlow<Boolean> = thisApp.isServiceUp.asStateFlow()
 
     // To expose the StateFlow for MAVLink
