@@ -16,16 +16,7 @@ class ServicesViewModel(application: Application) : AndroidViewModel(application
 
     private var thisApp = (getApplication() as WenuLinkApp)
 
-    // Basic status reporting
-    val isPermissionsGranted: StateFlow<Boolean> = thisApp.isPermissionsGranted.asStateFlow()
-    val workflowStatus: StateFlow<String> = thisApp.workflowStatus.asStateFlow()
-    val sdkStatus: StateFlow<String> = thisApp.sdkStatus.asStateFlow()
-
     // SDK related reporting
-    val isRegistered: StateFlow<Boolean> = thisApp.isRegistered.asStateFlow()
-    val isAircraftPresent: StateFlow<Boolean> = thisApp.isAircraftPresent.asStateFlow()
-    val isSimReady: StateFlow<Boolean> = thisApp.isSimulationReady.asStateFlow()
-    val isAircraftBoot: StateFlow<Boolean> = thisApp.isAircraftBoot.asStateFlow()
     val isUsingSimulation: StateFlow<Boolean> = thisApp.isUsingSimulation.asStateFlow()
     val isServiceUp: StateFlow<Boolean> = thisApp.isServiceUp.asStateFlow()
 

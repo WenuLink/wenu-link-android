@@ -1,7 +1,6 @@
 package org.WenuLink.adapters
 
 import org.WenuLink.adapters.aircraft.AircraftCommand
-import org.WenuLink.adapters.aircraft.ArduCopterFlightMode
 import org.WenuLink.adapters.aircraft.ArmTransition
 import org.WenuLink.adapters.aircraft.ControlAuthorityType
 import org.WenuLink.adapters.aircraft.DisarmCommand

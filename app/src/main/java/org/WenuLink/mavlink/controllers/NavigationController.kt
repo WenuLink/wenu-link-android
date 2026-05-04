@@ -348,14 +348,11 @@ class NavigationController(
     // TODO: start, pause, and resume procedures
 
     fun msgHomePosition(): MAVLinkMessage? = msg_home_position().apply {
-        val telemetryData = handler.aircraft.currentTelemetry ?: return null
-        val latVal = telemetryData.latitude ?: return null
-        val lonVal = telemetryData.longitude ?: return null
-        val altVal = telemetryData.altitude ?: return null
+        val homeLoc = handler.aircraft.state.homeCoordinates ?: return null
 
-        latitude = MessageUtils.coordinateDJI2MAVLink(latVal)
-        longitude = MessageUtils.coordinateDJI2MAVLink(lonVal)
-        altitude = MessageUtils.altitudeDJI2MAVLink(altVal)
+        latitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.lat)
+        longitude = MessageUtils.coordinateDJI2MAVLink(homeLoc.long)
+        altitude = MessageUtils.altitudeDJI2MAVLink(homeLoc.alt)
     }
 
     fun msgGlobalPositionInt(): MAVLinkMessage? = msg_global_position_int().apply {
