@@ -37,8 +37,8 @@ android {
         applicationId = "org.WenuLink"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0-alpha"
+        versionCode = 2
+        versionName = "0.1.1-alpha"
 
         manifestPlaceholders["djiApiKey"] = localProps.getProperty("dji.api.key", "")
 
