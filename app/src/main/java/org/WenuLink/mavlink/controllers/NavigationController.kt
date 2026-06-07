@@ -274,6 +274,8 @@ class NavigationController(
         client.sendMessage(
             MessageUtils.msgCommandAck(commandLongMsg.command, MAV_RESULT.MAV_RESULT_ACCEPTED)
         )
+        // ensure arm state sync
+        handler.aircraft.syncState()
         handler.dispatchCommand(
             WenuLinkCommand.Request(
                 RequestStartMission(

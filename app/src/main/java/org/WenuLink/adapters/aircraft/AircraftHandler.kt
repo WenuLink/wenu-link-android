@@ -257,6 +257,12 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     }
 
     fun takeOff() {
+        // sync and check for already-airborne cases
+        syncState()
+        if (state.isFlying()) {
+            logger.d { "Aircraft already airborne" }
+            return
+        }
         logger.d { "Aircraft taking off" }
         FCManager.startTakeoff { error ->
             if (error != null) {

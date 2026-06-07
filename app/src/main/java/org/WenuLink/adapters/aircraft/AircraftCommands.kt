@@ -78,6 +78,11 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
     override fun validate(ctx: AircraftHandler): UnitResult =
         ctx.canDispatchTransition(TakeoffTransition)
 
+    private fun disarm(ctx: AircraftHandler) {
+        // only when landed
+        if (ctx.state.isOnTheGround()) ctx.dispatchCommand(DisarmCommand())
+    }
+
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
         ctx.dispatchTransition(TakeoffTransition)
@@ -86,14 +91,12 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
             ctx.dispatchTransition(FlyingTransition)
             CommandResult.ok
         } else {
-            ctx.dispatchCommand(DisarmCommand())
+            disarm(ctx)
             CommandResult.error("Unable to takeoff")
         }
     }
 
-    override suspend fun onStop(ctx: AircraftHandler) {
-        ctx.dispatchCommand(DisarmCommand())
-    }
+    override suspend fun onStop(ctx: AircraftHandler) = disarm(ctx)
 }
 
 data class ShutdownCommand(val withTransitionCheck: Boolean = true) : AircraftCommand {
