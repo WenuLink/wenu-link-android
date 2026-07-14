@@ -44,7 +44,7 @@ class WenuLinkHandler : CommandHandler<WenuLinkHandler>() {
         }
     }
 
-    private val logger by taggedLogger(WenuLinkHandler::class.java.simpleName)
+    val logger by taggedLogger(WenuLinkHandler::class.java.simpleName)
     private var monitorJob: Job? = null
     private var controlAuthority = ControlAuthority(ControlAuthorityType.NONE)
     var startTimestamp: Long = -1
