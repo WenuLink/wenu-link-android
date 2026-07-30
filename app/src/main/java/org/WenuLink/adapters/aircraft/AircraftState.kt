@@ -247,7 +247,8 @@ class AircraftStateMachine {
         val fcState = state.resolveFrom(isArmed, isFlying)
         when {
             // RC trigger arm while on ground: advance to armed
-            fcState.isArmed() && state.isOnTheGround() -> dispatch(ArmTransition)
+            fcState.isArmed() && !state.isArmed() && state.isOnTheGround() ->
+                dispatch(ArmTransition)
 
             // Armed and on ground: advance to takeoff
             fcState.isArmed() && fcState.isFlying() && state.isOnTheGround() ->
@@ -258,12 +259,13 @@ class AircraftStateMachine {
                 dispatch(FlyingTransition)
 
             // Disarmed and grounded: return to standby
-            !fcState.isArmed() && !fcState.isFlying() && !state.armRequested ->
+            fcState.isStandBy() && !state.isStandBy() && !state.armRequested ->
                 dispatch(StandbyTransition)
 
             // Catch unsuccessful arm
             !fcState.isArmed() && state.armRequested -> {
-                if ((state.armTimestamp - System.currentTimeMillis()) > 10_000) {
+                if ((System.currentTimeMillis() - state.armTimestamp) > 10_000) {
+                    logger.w { "Unable to arm! Moving to Standby state" }
                     dispatch(StandbyTransition)
                 }
             }
