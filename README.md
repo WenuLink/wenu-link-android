@@ -27,9 +27,9 @@ WenuLink is developed using **Kotlin** and **Jetpack Compose**, and its architec
 
 | Feature                | Status             |
 |------------------------|--------------------|
-| MAVLink Middleware     | 🟡 In Development |
+| MAVLink Middleware     | 🟢 Fully Developed |
 | WebRTC Video Streaming | 🟢 Fully Developed |
-| Telemetry Monitoring   | 🟡 In Development |
+| Telemetry Monitoring   | 🟢 Fully Developed |
 | Flight Control         | 🟡 In Development  |
 | Mission Control        | 🟡 In Development  |
 | Video/Photo Capture    | 🔴 Not Developed   |
@@ -52,7 +52,7 @@ To see what you can do with WenuLink — from autonomous flight plans and live v
 
 For developers and contributors looking to verify compatibility with specific drone models, see the **Test Procedures**:
 
-📄 [_Click here to view Test Procedures_](https://github.com/WenuLink/wenu-link-android/wiki/Test-Procedures)
+📄 [_Click here to view Test Procedures_](https://github.com/WenuLink/wenu-link-android/wiki/Drone-Compatibility-&-Test-Procedures)
 
 ---
 
@@ -68,9 +68,9 @@ WenuLink is designed for:
 
 ## Team
 
-- **Angel Ayala Maldonado** — PhD in Computational Science at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil; Co-advisor of the [DeltaV Drones](https://deltavquad.github.io/) team.
+- **Angel Ayala Maldonado** — PhD in Computational Science at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil; Co-advisor of the [DeltaV Drones](https://deltavdrones.github.io/) team.
 - **Maximilian Johenneken** — Researcher at the Hochschule Bonn-Rhein-Sieg (H-BRS), Germany; specialization in UAV systems, machine learning and computer vision.
-- **Eliton Sena de Souza** — Operational Leader of the [DeltaV Drones](https://deltavquad.github.io/) team; Computer Engineering student at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil.
+- **Eliton Sena de Souza** — Operational Leader of the [DeltaV Drones](https://deltavdrones.github.io/) team; Computer Engineering student at the Escola Politécnica da Universidade de Pernambuco (POLI-UPE), Brazil.
 - **Timon Schreiber** - Computer Science Student (H-BRS)
 ---
 
