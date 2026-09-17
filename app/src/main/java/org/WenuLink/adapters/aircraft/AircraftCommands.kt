@@ -41,7 +41,7 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
         // Arm is requested and async wait for state transition
         ctx.stateMachine.requestArm()
 
-        if (!TakeoffTransition.hasDelayedArmMode(ctx.state)) {
+        if (!ctx.state.isDelayedArmMode()) {
             // Manual takeoff if in Stabilize or similar modes
             ctx.armMotors()
             if (!ctx.waitArmTransition(true, timeout)) {

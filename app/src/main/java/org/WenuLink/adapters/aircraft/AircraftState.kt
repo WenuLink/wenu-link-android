@@ -70,6 +70,12 @@ data class AircraftState(
             MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
         }
     )
+
+    fun isDelayedArmMode(): Boolean = listOf(
+        // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
+        ArduCopterFlightMode.GUIDED,
+        ArduCopterFlightMode.AUTO
+    ).any { it == this.flightMode }
 }
 
 sealed interface StateTransition {
@@ -127,14 +133,8 @@ object ArmTransition : StateTransition {
 }
 
 object TakeoffTransition : StateTransition {
-    // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
-    fun hasDelayedArmMode(from: AircraftState): Boolean = listOf(
-        ArduCopterFlightMode.GUIDED,
-        ArduCopterFlightMode.AUTO
-    ).any { it == from.flightMode }
-
     override fun canTransition(from: AircraftState): UnitResult = when {
-        !hasDelayedArmMode(from) && !from.isArmed() ->
+        !from.isDelayedArmMode() && !from.isArmed() ->
             CommandResult.error("${from.flightMode} requires to be armed first")
 
         else -> CommandResult.ok
@@ -232,7 +232,7 @@ class AircraftStateMachine {
     }
 
     fun updateArmFlag(): AircraftState {
-        val modeFlag = if (state.isArmed() || state.mustArm) {
+        val modeFlag = if (state.isArmed() || (state.mustArm && state.isDelayedArmMode())) {
             state.flightMode.baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
         } else {
             state.flightMode.baseMode
