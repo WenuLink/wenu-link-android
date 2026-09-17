@@ -207,7 +207,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
     suspend fun waitArmTransition(mustArm: Boolean, timeout: Long): Boolean {
         logger.d { "Waiting for ${if (mustArm) "arming" else "disarming"} motors" }
         val motorsUpdated = AsyncUtils.waitTimeout(timeout = timeout) {
-            mustArm == currentTelemetry?.motorsOn
+            mustArm == state.isArmed()
         }
 
         if (motorsUpdated) {
@@ -215,8 +215,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         } else {
             logger.w { "Timeout: ${if (mustArm) "armed" else "disarmed"} state not reached" }
         }
-
-        syncState()
 
         return motorsUpdated
     }
@@ -237,7 +235,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
 
         val flyingStateUpdated = AsyncUtils.waitTimeout(100L, timeout) {
-            takingOff == currentTelemetry?.isFlying
+            takingOff == state.isFlying()
         }
 
         if (flyingStateUpdated) {
@@ -245,8 +243,6 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         } else {
             logger.w { "Timeout: ${if (takingOff) "takeoff" else "landing"} state not reached" }
         }
-
-        syncState()
 
         return flyingStateUpdated
     }
