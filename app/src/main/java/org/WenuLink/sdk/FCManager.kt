@@ -49,26 +49,30 @@ object FCManager {
             "No FlightController"
         }
 
-    fun state2Telemetry(state: FlightControllerState): TelemetryData = TelemetryData(
-        roll = state.attitude.roll.finiteOr(0.0),
-        pitch = state.attitude.pitch.finiteOr(0.0),
-        yaw = state.attitude.yaw.finiteOr(0.0),
-        latitude = state.aircraftLocation.latitude.finiteOrNull(),
-        longitude = state.aircraftLocation.longitude.finiteOrNull(),
-        positionX = 0f,
-        positionY = 0f,
-        positionZ = 0f,
-        velocityX = state.velocityX.finiteOr(0f),
-        velocityY = state.velocityY.finiteOr(0f),
-        velocityZ = state.velocityZ.finiteOr(0f),
-        flightTime = state.flightTimeInSeconds,
-        takeOffAltitude = state.takeoffLocationAltitude.finiteOrNull(),
-        relativeAltitude = state.aircraftLocation.altitude.finiteOrNull(),
-        isFlying = state.isFlying,
-        motorsOn = state.areMotorsOn(),
-        satelliteCount = state.satelliteCount,
-        gpsFixType = GPSMapper.toMavlinkFixType(state.gpsSignalLevel)
-    )
+    fun state2Telemetry(state: FlightControllerState): TelemetryData {
+        val data = TelemetryData(
+            roll = state.attitude.roll.finiteOr(0.0),
+            pitch = state.attitude.pitch.finiteOr(0.0),
+            yaw = state.attitude.yaw.finiteOr(0.0),
+            latitude = state.aircraftLocation.latitude.finiteOrNull(),
+            longitude = state.aircraftLocation.longitude.finiteOrNull(),
+            positionX = 0f,
+            positionY = 0f,
+            positionZ = 0f,
+            velocityX = state.velocityX.finiteOr(0f),
+            velocityY = state.velocityY.finiteOr(0f),
+            velocityZ = state.velocityZ.finiteOr(0f),
+            flightTime = state.flightTimeInSeconds,
+            takeOffAltitude = state.takeoffLocationAltitude.finiteOrNull(),
+            relativeAltitude = state.aircraftLocation.altitude.finiteOrNull(),
+            isFlying = state.isFlying,
+            motorsOn = state.areMotorsOn(),
+            satelliteCount = state.satelliteCount,
+            gpsFixType = GPSMapper.toMavlinkFixType(state.gpsSignalLevel)
+        )
+        // TODO: update positionX and positionY
+        return data.copy(positionZ = data.relativeAltitude ?: data.positionZ)
+    }
 
     fun registerStateCallback(stateCallback: (FlightControllerState) -> Unit) =
         mInstance?.setStateCallback(stateCallback)

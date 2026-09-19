@@ -91,12 +91,19 @@ data class RequestTakeoff(val altitude: Float = 2f, val timeout: Long = 15_000L)
         val takeoffResult = ctx.dispatchAndAwait(WenuLinkCommand.Aircraft(TakeoffCommand(timeout)))
         if (takeoffResult.hasError) return takeoffResult
 
-        val coordinates = ctx.aircraft.currentCoordinates
+        // Capture current global coordinates
+        val coordinates = ctx.aircraft.globalCoordinates
+            ?: return CommandResult.error("No aircraft coordinates available")
+        val position = ctx.aircraft.localPosition
             ?: return CommandResult.error("No aircraft position available")
+        // update with relative altitude
+        val finalAltitude = altitude - position.alt
+
+        ctx.logger.i { "processTakeoff finalAltitude: $finalAltitude" }
 
         return ctx.dispatchAndAwait(
             WenuLinkCommand.Mission(
-                RepositionAction(coordinates.copy(alt = altitude), ctx.mission.flightSpeed)
+                RepositionAction(coordinates.copy(alt = finalAltitude), ctx.mission.flightSpeed)
             )
         )
     }

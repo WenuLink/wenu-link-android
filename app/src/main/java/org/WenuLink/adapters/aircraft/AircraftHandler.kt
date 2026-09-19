@@ -32,13 +32,23 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         private set
     val telemetry = TelemetryHandler.getInstance()
     val currentTelemetry: TelemetryData? get() = telemetry.getData()
-    val currentCoordinates: Coordinates3D?
+    val globalCoordinates: Coordinates3D?
         get() {
-            val data = telemetry.getData() ?: return null
+            val data = currentTelemetry ?: return null
             val lat = data.latitude ?: return null
             val lon = data.longitude ?: return null
-            val rel = data.relativeAltitude ?: return null
+            val rel = data.altitude ?: return null
+            logger.i { "globalCoordinates($lat, $lon, $rel)" }
             return Coordinates3D(lat, lon, rel)
+        }
+    val localPosition: Coordinates3D?
+        get() {
+            val data = currentTelemetry ?: return null
+            val posX = data.positionX.toDouble()
+            val posY = data.positionY.toDouble()
+            val posZ = data.positionZ
+            logger.i { "localCoordinates($posX, $posY, $posZ)" }
+            return Coordinates3D(posX, posY, posZ)
         }
     var isPowerOff = true
     val parameters by lazy {
