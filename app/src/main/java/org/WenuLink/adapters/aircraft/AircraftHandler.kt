@@ -235,7 +235,7 @@ class AircraftHandler : CommandHandler<AircraftHandler>() {
         logger.d { "Waiting for ${if (takingOff) "taking off" else "touching ground"}" }
 
         val flyingStateUpdated = AsyncUtils.waitTimeout(100L, timeout) {
-            takingOff == state.isFlying()
+            takingOff == (state.isFlying() || state.isLanding())
         }
 
         if (flyingStateUpdated) {

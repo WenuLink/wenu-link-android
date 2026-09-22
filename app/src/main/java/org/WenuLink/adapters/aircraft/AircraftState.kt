@@ -31,10 +31,10 @@ data class AircraftState(
     val modeFlag: Int = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
     val flightMode: ArduCopterFlightMode = ArduCopterFlightMode.STABILIZE,
     val mustArm: Boolean = false,
-    val currentTimeMark: Long = System.currentTimeMillis(),
-    val armTimeMark: Long = 0
+    val currentTimestamp: Long = System.currentTimeMillis(),
+    val armTimestamp: Long = 0
 ) {
-    val armTime = currentTimeMark - armTimeMark
+    val armTime = currentTimestamp - armTimestamp
 
     fun isHomeSet() = homeCoordinates != null
 
@@ -114,7 +114,8 @@ object StandbyTransition : StateTransition {
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_STANDBY,
-        landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
+        landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND,
+        mustArm = false
     )
 }
 
@@ -127,7 +128,7 @@ object ArmTransition : StateTransition {
 
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_ACTIVE,
-        armTimeMark = if (from.armTimeMark == 0L) System.currentTimeMillis() else from.armTimeMark,
+        armTimestamp = System.currentTimeMillis(),
         mustArm = false
     )
 }
@@ -216,14 +217,14 @@ class AircraftStateMachine {
     private val logger by taggedLogger(AircraftStateMachine::class.java.simpleName)
     var state = AircraftState()
         private set
+    val armTimeout = 10_000L
 
     fun canDispatch(event: StateTransition): UnitResult = event.canTransition(state)
 
     fun dispatch(event: StateTransition): AircraftState {
         logger.d { "StateTransition: $event" }
         state = event.reduce(state)
-        tick()
-        return updateArmFlag()
+        return state
     }
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
@@ -247,17 +248,28 @@ class AircraftStateMachine {
     fun isModeAllowed(mode: ArduCopterFlightMode): UnitResult =
         canDispatch(FlightModeTransition(mode))
 
-    fun tick() {
+    fun tick(): AircraftState {
         // Update time mark
-        state = state.copy(currentTimeMark = System.currentTimeMillis())
+        state = state.copy(currentTimestamp = System.currentTimeMillis())
+        return updateArmFlag()
     }
 
-    fun requestArm() {
-        state = state.copy(mustArm = true, armTimeMark = System.currentTimeMillis())
+    fun requestArm(): AircraftState {
+        state = state.copy(mustArm = true, armTimestamp = System.currentTimeMillis())
+        return state
+    }
+
+    fun transitionGuards() {
+        // Catch unsuccessful arm
+        if (state.mustArm && state.armTime > armTimeout) {
+            logger.w { "Arm timeout! Moving to Standby state" }
+            dispatch(StandbyTransition)
+        }
     }
 
     fun sync(isArmed: Boolean, isFlying: Boolean) {
         tick()
+        transitionGuards()
         // Check state and dispatch state transitions accordingly
         val fcState = state.resolveFrom(isArmed, isFlying)
         when {
@@ -276,12 +288,6 @@ class AircraftStateMachine {
             // Disarmed and grounded: return to standby
             fcState.isStandBy() && !state.isStandBy() ->
                 dispatch(StandbyTransition)
-
-            // Catch unsuccessful arm
-            !fcState.isArmed() && state.mustArm && state.armTime > 10_000 -> {
-                logger.w { "Unable to arm! Moving to Standby state" }
-                dispatch(StandbyTransition)
-            }
         }
     }
 }
