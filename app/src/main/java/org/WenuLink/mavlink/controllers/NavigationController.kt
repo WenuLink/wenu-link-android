@@ -237,7 +237,7 @@ class NavigationController(
             ItemAssemblyResult.Accepted -> Unit
 
             ItemAssemblyResult.UnsupportedCommand -> {
-                logger.w { "Unsupported mission command: ${itemMsg.command}" }
+                logger.e { "Unsupported mission command: ${itemMsg.command}" }
                 sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED)
                 return
             }

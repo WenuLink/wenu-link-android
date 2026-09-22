@@ -119,13 +119,17 @@ class MissionAssembler(private val id: Int) {
 
         val params = NavTakeoffMissionItem(itemMsg)
         // If there is no coordinates on takeoff node, replace with the first node
-        // assumed as Home given seq == 0 f
-        val homeCoordinates = nodes.first().coordinates3D
-        val lat = if (params.latitude == 0.0) homeCoordinates.lat else params.latitude
-        val long = if (params.longitude == 0.0) homeCoordinates.long else params.longitude
-        addTakeoff(Coordinates3D(lat, long, params.altitude))
+        // assumed as Home given seq == 0
+        val home = nodes.firstOrNull() as? MissionNode.Home
+            ?: return ItemAssemblyResult.UnsupportedCommand
+        val coordinates = if (params.latitude == 0.0 && params.longitude == 0.0) {
+            Coordinates3D(home.coordinates3D.lat, home.coordinates3D.long, params.altitude)
+        } else {
+            Coordinates3D(params.latitude, params.longitude, params.altitude)
+        }
 
-        logger.d { "Takeoff: ($lat, $long) ALT ${params.altitude}" }
+        addTakeoff(coordinates)
+        logger.d { "Takeoff: (${coordinates.lat}, ${coordinates.long}) ALT ${params.altitude}" }
         return ItemAssemblyResult.Accepted
     }
 
