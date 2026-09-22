@@ -56,8 +56,6 @@ class MissionAssembler(private val id: Int) {
     fun build(): AssembledMission = AssembledMission(nodes.toList(), nWaypoints, rtlWhenFinish)
 
     fun addWaypointNode(itemMsg: msg_mission_item_int): ItemAssemblyResult {
-        logger.d { "Append mission item." }
-
         // ArduPilot mission protocol: seq 0 is always the home location, never a flight item.
         // https://mavlink.io/en/services/mission.html#flight-plan-missions
         if (itemMsg.seq == 0) return assembleHomeNode(itemMsg)
@@ -118,10 +116,16 @@ class MissionAssembler(private val id: Int) {
 
     private fun assembleTakeoffNode(itemMsg: msg_mission_item_int): ItemAssemblyResult {
         if (!hasSupportedFrame(itemMsg)) return ItemAssemblyResult.UnsupportedFrame
+
         val params = NavTakeoffMissionItem(itemMsg)
-        addTakeoff(
-            Coordinates3D(params.latitude, params.longitude, params.altitude)
-        )
+        // If there is no coordinates on takeoff node, replace with the first node
+        // assumed as Home given seq == 0 f
+        val homeCoordinates = nodes.first().coordinates3D
+        val lat = if (params.latitude == 0.0) homeCoordinates.lat else params.latitude
+        val long = if (params.longitude == 0.0) homeCoordinates.long else params.longitude
+        addTakeoff(Coordinates3D(lat, long, params.altitude))
+
+        logger.d { "Takeoff: ($lat, $long) ALT ${params.altitude}" }
         return ItemAssemblyResult.Accepted
     }
 

@@ -216,18 +216,17 @@ class NavigationController(
     )
 
     fun processMissionItem(msg: MAVLinkMessage) {
-        logger.d { "processMissionItem" }
         val itemMsg = msg as msg_mission_item_int
-        logger.d { "\t$itemMsg" }
+        logger.d { "Processing mission item #${itemMsg.seq} command ${itemMsg.command}" }
 
         // Validate sequence
         if (itemMsg.seq != nextExpectedSeq) {
-            logger.e { "Received item #${itemMsg.seq} instead #$nextExpectedSeq, re-requesting..." }
+            logger.w { "Received item #${itemMsg.seq} instead #$nextExpectedSeq, re-requesting..." }
             if (currentRetryTimes < maxRetryTimes) {
                 requestMissionItem(nextExpectedSeq)
                 currentRetryTimes += 1
             } else {
-                logger.w { "Max re-requesting attempts reached" }
+                logger.e { "Max re-requesting attempts reached" }
                 sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_INVALID_SEQUENCE)
             }
             return
@@ -244,7 +243,7 @@ class NavigationController(
             }
 
             ItemAssemblyResult.UnsupportedFrame -> {
-                logger.w { "Unsupported frame ${itemMsg.frame} for command ${itemMsg.command}" }
+                logger.e { "Unsupported frame ${itemMsg.frame} for command ${itemMsg.command}" }
                 sendAckAnswer(MAV_MISSION_RESULT.MAV_MISSION_UNSUPPORTED_FRAME)
                 return
             }
