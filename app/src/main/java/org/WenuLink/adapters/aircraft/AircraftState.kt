@@ -30,15 +30,17 @@ data class AircraftState(
     val homeCoordinates: Coordinates3D? = null,
     val modeFlag: Int = MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
     val flightMode: ArduCopterFlightMode = ArduCopterFlightMode.STABILIZE,
+    val mustArm: Boolean = false,
+    val currentTimestamp: Long = System.currentTimeMillis(),
     val armTimestamp: Long = 0
 ) {
-    val armRequested = armTimestamp > 0
+    val armTime = currentTimestamp - armTimestamp
 
     fun isHomeSet() = homeCoordinates != null
 
     fun isStandBy() = mavlink == MAV_STATE.MAV_STATE_STANDBY
 
-    fun isArmed() = mavlink == MAV_STATE.MAV_STATE_ACTIVE || armRequested
+    fun isArmed() = mavlink == MAV_STATE.MAV_STATE_ACTIVE
 
     fun isFlying() = landed == MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR
 
@@ -68,6 +70,12 @@ data class AircraftState(
             MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND
         }
     )
+
+    fun isDelayedArmMode(): Boolean = listOf(
+        // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
+        ArduCopterFlightMode.GUIDED,
+        ArduCopterFlightMode.AUTO
+    ).any { it == this.flightMode }
 }
 
 sealed interface StateTransition {
@@ -107,7 +115,7 @@ object StandbyTransition : StateTransition {
     override fun reduce(from: AircraftState): AircraftState = from.copy(
         mavlink = MAV_STATE.MAV_STATE_STANDBY,
         landed = MAV_LANDED_STATE.MAV_LANDED_STATE_ON_GROUND,
-        armTimestamp = 0
+        mustArm = false
     )
 }
 
@@ -118,19 +126,16 @@ object ArmTransition : StateTransition {
         else -> CommandResult.ok
     }
 
-    override fun reduce(from: AircraftState): AircraftState =
-        from.copy(mavlink = MAV_STATE.MAV_STATE_ACTIVE, armTimestamp = System.currentTimeMillis())
+    override fun reduce(from: AircraftState): AircraftState = from.copy(
+        mavlink = MAV_STATE.MAV_STATE_ACTIVE,
+        armTimestamp = System.currentTimeMillis(),
+        mustArm = false
+    )
 }
 
 object TakeoffTransition : StateTransition {
-    // This is a list with ArduCopterFlightModes that can bypass state.isArmed() and wait isFlying()
-    fun hasDelayedArmMode(from: AircraftState): Boolean = listOf(
-        ArduCopterFlightMode.GUIDED,
-        ArduCopterFlightMode.AUTO
-    ).any { it == from.flightMode }
-
     override fun canTransition(from: AircraftState): UnitResult = when {
-        !hasDelayedArmMode(from) && !from.isArmed() ->
+        !from.isDelayedArmMode() && !from.isArmed() ->
             CommandResult.error("${from.flightMode} requires to be armed first")
 
         else -> CommandResult.ok
@@ -147,7 +152,7 @@ object FlyingTransition : StateTransition {
     }
 
     override fun reduce(from: AircraftState): AircraftState =
-        from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR, armTimestamp = 0)
+        from.copy(landed = MAV_LANDED_STATE.MAV_LANDED_STATE_IN_AIR)
 }
 
 object LandTransition : StateTransition {
@@ -212,13 +217,14 @@ class AircraftStateMachine {
     private val logger by taggedLogger(AircraftStateMachine::class.java.simpleName)
     var state = AircraftState()
         private set
+    val armTimeout = 10_000L
 
     fun canDispatch(event: StateTransition): UnitResult = event.canTransition(state)
 
     fun dispatch(event: StateTransition): AircraftState {
         logger.d { "StateTransition: $event" }
         state = event.reduce(state)
-        return updateArmFlag()
+        return state
     }
 
     fun updateHomePosition(homeCoordinates: Coordinates3D): AircraftState {
@@ -227,7 +233,7 @@ class AircraftStateMachine {
     }
 
     fun updateArmFlag(): AircraftState {
-        val modeFlag = if (state.isArmed()) {
+        val modeFlag = if (state.isArmed() || (state.mustArm && state.isDelayedArmMode())) {
             state.flightMode.baseMode or MAV_MODE_FLAG.MAV_MODE_FLAG_SAFETY_ARMED
         } else {
             state.flightMode.baseMode
@@ -242,31 +248,46 @@ class AircraftStateMachine {
     fun isModeAllowed(mode: ArduCopterFlightMode): UnitResult =
         canDispatch(FlightModeTransition(mode))
 
+    fun tick(): AircraftState {
+        // Update time mark
+        state = state.copy(currentTimestamp = System.currentTimeMillis())
+        return updateArmFlag()
+    }
+
+    fun requestArm(): AircraftState {
+        state = state.copy(mustArm = true, armTimestamp = System.currentTimeMillis())
+        return state
+    }
+
+    fun transitionGuards() {
+        // Catch unsuccessful arm
+        if (state.mustArm && state.armTime > armTimeout) {
+            logger.w { "Arm timeout! Moving to Standby state" }
+            dispatch(StandbyTransition)
+        }
+    }
+
     fun sync(isArmed: Boolean, isFlying: Boolean) {
+        tick()
+        transitionGuards()
         // Check state and dispatch state transitions accordingly
         val fcState = state.resolveFrom(isArmed, isFlying)
         when {
-            // RC trigger arm while on ground: advance to armed
-            fcState.isArmed() && state.isOnTheGround() -> dispatch(ArmTransition)
+            // when manually trigger arm with RC: advance to armed
+            fcState.isArmed() && !state.isArmed() && state.isOnTheGround() ->
+                dispatch(ArmTransition)
 
-            // Armed and on ground: advance to takeoff
-            fcState.isArmed() && fcState.isFlying() && state.isOnTheGround() ->
+            // Actually armed after arm transition: advance to takeoff
+            fcState.isArmed() && state.isArmed() && state.isOnTheGround() ->
                 dispatch(TakeoffTransition)
 
-            // Taking off and now flying: advance to flying
-            fcState.isArmed() && fcState.isFlying() && state.isTakingOff() ->
+            // Now flying: advance to flying when not landing
+            fcState.isFlying() && !state.isFlying() && !state.isLanding() ->
                 dispatch(FlyingTransition)
 
             // Disarmed and grounded: return to standby
-            !fcState.isArmed() && !fcState.isFlying() && !state.armRequested ->
+            fcState.isStandBy() && !state.isStandBy() ->
                 dispatch(StandbyTransition)
-
-            // Catch unsuccessful arm
-            !fcState.isArmed() && state.armRequested -> {
-                if ((state.armTimestamp - System.currentTimeMillis()) > 10_000) {
-                    dispatch(StandbyTransition)
-                }
-            }
         }
     }
 }

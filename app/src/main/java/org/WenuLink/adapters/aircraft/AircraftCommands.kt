@@ -38,16 +38,16 @@ data class ArmCommand(val timeout: Long = 5000L) : AircraftCommand {
     }
 
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
-        // TODO: check if compatible with CancellableCoroutine
-        if (!TakeoffTransition.hasDelayedArmMode(ctx.state)) {
-            // Manual takeoff
+        // Arm is requested and async wait for state transition
+        ctx.stateMachine.requestArm()
+
+        if (!ctx.state.isDelayedArmMode()) {
+            // Manual takeoff if in Stabilize or similar modes
             ctx.armMotors()
             if (!ctx.waitArmTransition(true, timeout)) {
                 return CommandResult.error("Unable to arm motors")
             }
         }
-        // Automatic takeoff only. Must wait for state changes
-        ctx.stateMachine.dispatch(ArmTransition)
 
         return CommandResult.ok
     }
@@ -64,7 +64,6 @@ data class DisarmCommand(val timeout: Long = 5000L) : AircraftCommand {
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         ctx.disarmMotors()
         return if (ctx.waitArmTransition(false, timeout)) {
-            ctx.stateMachine.dispatch(StandbyTransition)
             CommandResult.ok
         } else {
             CommandResult.error("Unable to disarm motors")
@@ -80,10 +79,8 @@ data class TakeoffCommand(val timeout: Long = 15_000L) : AircraftCommand {
 
     override suspend fun execute(ctx: AircraftHandler): UnitResult {
         // TODO: check if compatible with CancellableCoroutine
-        ctx.stateMachine.dispatch(TakeoffTransition)
         ctx.takeOff()
         return if (ctx.waitFlightState(true, timeout)) {
-            ctx.stateMachine.dispatch(FlyingTransition)
             CommandResult.ok
         } else {
             ctx.dispatchCommand(DisarmCommand())
