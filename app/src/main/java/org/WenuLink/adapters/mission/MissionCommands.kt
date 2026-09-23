@@ -53,6 +53,7 @@ data class UploadWaypointMission(val maxTries: Int = 3) : MissionCommand {
             ctx.setUploadingMission(false)
         }
     }
+
     override suspend fun execute(ctx: MissionHandler): UnitResult {
         val maxAttempts = maxTries.coerceAtLeast(1)
         var attempt = 0
