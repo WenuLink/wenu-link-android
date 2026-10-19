@@ -278,7 +278,7 @@ class AircraftStateMachine {
                 dispatch(ArmTransition)
 
             // Actually armed after arm transition: advance to takeoff
-            fcState.isArmed() && state.isArmed() && state.isOnTheGround() ->
+            fcState.isArmed() && state.isArmed() && !state.isTakingOff() ->
                 dispatch(TakeoffTransition)
 
             // Now flying: advance to flying when not landing
