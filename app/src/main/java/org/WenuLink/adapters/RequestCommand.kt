@@ -39,7 +39,7 @@ sealed interface RequestCommand : ICommand<WenuLinkHandler> {
  * Aircraft related classes
  */
 
-open class RequestTransition(open val transition: StateTransition) : RequestCommand {
+abstract class RequestTransition(open val transition: StateTransition) : RequestCommand {
     override fun validate(ctx: WenuLinkHandler): UnitResult =
         ctx.aircraft.stateMachine.canDispatch(transition)
 
@@ -50,18 +50,14 @@ open class RequestTransition(open val transition: StateTransition) : RequestComm
         )
     }
 
-    override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
-        ctx.aircraft.stateMachine.dispatch(transition)
-        return CommandResult.ok
-    }
-
     override suspend fun onStop(ctx: WenuLinkHandler) = ctx.manualControl()
 }
 
 data class RequestLand(val withLandingConfirmation: Boolean = true, val timeout: Long = 15_000L) :
     RequestTransition(LandTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
-        super.execute(ctx)
+        // Land is the only transition that is manually triggered
+        ctx.aircraft.stateMachine.dispatch(transition)
 
         val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
         if (authorityResult.hasError) return authorityResult
@@ -82,8 +78,6 @@ data class RequestTakeoff(val altitude: Float = 2f, val timeout: Long = 15_000L)
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
         val homeResult = checkHomePosition(ctx)
         if (homeResult.hasError) return homeResult
-
-        super.execute(ctx)
 
         val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
         if (authorityResult.hasError) return authorityResult
@@ -133,9 +127,6 @@ data class RequestStartMission(
         val startResult = ctx.dispatchAndAwait(WenuLinkCommand.Mission(StartWaypointMission))
         if (startResult.hasError) return startResult
 
-        // Handle initial transitions
-        super.execute(ctx)
-
         // Wait arm and takeoff
         val takeoffOk = ctx.aircraft.waitFlightState(true, 15_000L)
         if (!takeoffOk) return CommandResult.error("Vehicle did not takeoff!")
@@ -151,8 +142,6 @@ data class RequestStartMission(
 open class RequestMissionAction(private val action: MissionActionCommand) :
     RequestTransition(FlyingTransition) {
     override suspend fun execute(ctx: WenuLinkHandler): UnitResult {
-        super.execute(ctx)
-
         val authorityResult = ctx.dispatchControlAuthority(ControlAuthorityType.TIMELINE_COMMAND)
         if (authorityResult.hasError) return authorityResult
 
